@@ -20,5 +20,6 @@ config/      配置
 
 ## 文档
 
+- [方法论说明书](docs/methodology.md)
 - [变更日志](CHANGELOG.md)
 - [贡献指南](CONTRIBUTING.md)
