@@ -38,14 +38,20 @@ class ReminderRepository(BaseRepository[Reminder]):
     model = Reminder
 
     def list_upcoming(self, user_id: str, limit: int = 10) -> list[Reminder]:
-        """未来7天内的提醒（左侧面板展示）"""
-        now = datetime.utcnow()
+        """未来7天内的提醒（左侧面板展示）。
+
+        remind_at 为用户输入的本地 naive 时间（schemas 无时区转换），
+        比较基准必须同为本地 naive；且须过滤已过期未 dismiss 的提醒，
+        否则它们永远出现在"即将到来"列表里。
+        """
+        now = datetime.now()
         end = now + timedelta(days=7)
         q = (
             select(Reminder)
             .where(
                 Reminder.user_id == user_id,
                 Reminder.dismissed.is_(False),
+                Reminder.remind_at >= now,
                 Reminder.remind_at <= end,
             )
             .order_by(Reminder.remind_at.asc())

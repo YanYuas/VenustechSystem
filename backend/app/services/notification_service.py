@@ -31,13 +31,16 @@ class NotificationService:
         return [self._out(n) for n in rows]
 
     def stats(self) -> NotificationStats:
-        total = int(
-            self.db.scalar(
-                select(func.count()).select_from(Notification).where(Notification.user_id == self.user_id)
-            )
-            or 0
-        )
-        return NotificationStats(total=total, unread=self.repo.count_unread(self.user_id))
+        # 30s 轮询必达端点：合并为一条聚合 SQL（此前 total/unread 两条 COUNT）
+        from sqlalchemy import case
+
+        total, unread = self.db.execute(
+            select(
+                func.count(),
+                func.coalesce(func.sum(case((Notification.is_read.is_(False), 1), else_=0)), 0),
+            ).where(Notification.user_id == self.user_id)
+        ).one()
+        return NotificationStats(total=int(total), unread=int(unread))
 
     def create(self, data: CreateNotificationRequest) -> NotificationOut:
         n = self.repo.create(

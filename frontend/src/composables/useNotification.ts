@@ -60,7 +60,10 @@ async function markAllRead() {
 
 function startPolling(intervalMs = 30000) {
   if (pollTimer) return
-  pollTimer = setInterval(fetchStats, intervalMs)
+  // 页面不可见时跳过轮询（Electron 最小化/切后台时不再空转打后端）
+  pollTimer = setInterval(() => {
+    if (!document.hidden) fetchStats()
+  }, intervalMs)
 }
 
 function stopPolling() {

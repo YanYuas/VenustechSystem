@@ -2,7 +2,7 @@
 // useConversation —— 第二分身（AI对话）业务逻辑
 // 支持无API Key时的规则式回复降级
 // ============================================================
-import { ref } from 'vue'
+import { ref, onScopeDispose } from 'vue'
 import { conversationApi, aiApi } from '@/api'
 import { useAsync } from './useAsync'
 import { toast } from './useToast'
@@ -101,29 +101,38 @@ export function useConversation() {
   )
 
   let streamAbort: AbortController | null = null
+  /** 规则模式打字机的取消标志（同时用于组件卸载后终止循环） */
+  let ruleCancelled = false
+
+  onScopeDispose(() => {
+    ruleCancelled = true
+  })
 
   async function sendMessage(data: SendMessageRequest) {
     if (!currentId.value || streaming.value) return
     streaming.value = true
     streamContent.value = ''
+    ruleCancelled = false
     const convId = currentId.value
+
+    // 无论哪种模式，先本地插入用户消息：流式期间立即可见，且失败不丢用户输入
+    const userMsg: Message = {
+      id: 'local-user-' + Date.now(),
+      conversation_id: convId,
+      role: 'user',
+      content: data.content,
+      tokens: null,
+      referenced_doc_ids: data.referenced_doc_ids ?? [],
+      created_at: new Date().toISOString(),
+    }
+    messages.value = [...messages.value, userMsg]
 
     // 无API Key时使用规则式回复降级（本地模式，不保存到后端）
     if (!hasApiKey()) {
       const reply = generateRuleReply(data.content)
-      // 先把用户消息加入本地列表
-      const userMsg: Message = {
-        id: 'local-' + Date.now(),
-        conversation_id: convId,
-        role: 'user',
-        content: data.content,
-        tokens: null,
-        referenced_doc_ids: [],
-        created_at: new Date().toISOString(),
-      }
-      messages.value = [...messages.value, userMsg]
-      // 模拟打字机效果
+      // 模拟打字机效果（可被 stopStreaming 或组件卸载中断）
       for (let i = 0; i <= reply.length; i += 3) {
+        if (ruleCancelled) break
         streamContent.value = reply.slice(0, i)
         await new Promise(r => setTimeout(r, 15))
       }
@@ -132,7 +141,7 @@ export function useConversation() {
         id: 'local-' + (Date.now() + 1),
         conversation_id: convId,
         role: 'assistant',
-        content: reply,
+        content: ruleCancelled ? streamContent.value : reply,
         tokens: 0,
         referenced_doc_ids: [],
         created_at: new Date().toISOString(),
@@ -145,19 +154,38 @@ export function useConversation() {
 
     const controller = new AbortController()
     streamAbort = controller
+    /** 后端在流内下发的业务错误（如会话不存在），流正常结束但无内容 */
+    let streamError: string | null = null
     try {
       await conversationApi.sendStream(convId, data, (chunk) => {
         if (chunk.type === 'content' && chunk.content) {
           streamContent.value += chunk.content
-        } else if (chunk.type === 'done') {
-          // 流式结束
+        } else if (chunk.type === 'error') {
+          streamError = (chunk as { error?: string }).error || '生成失败'
         }
       }, controller.signal)
+      if (streamError) {
+        toast.error('分身响应失败', streamError)
+        return
+      }
       await fetchMessages(convId)
     } catch (err) {
       if (!controller.signal.aborted) {
         const msg = err instanceof Error ? err.message : '发送失败'
         toast.error('分身响应失败', msg)
+      }
+      // 刷新失败时保留已流式生成的完整内容，避免回复凭空消失
+      if (streamContent.value) {
+        const fallbackMsg: Message = {
+          id: 'local-fallback-' + Date.now(),
+          conversation_id: convId,
+          role: 'assistant',
+          content: streamContent.value,
+          tokens: null,
+          referenced_doc_ids: [],
+          created_at: new Date().toISOString(),
+        }
+        messages.value = [...messages.value, fallbackMsg]
       }
     } finally {
       streamContent.value = ''
@@ -169,6 +197,7 @@ export function useConversation() {
   /** 中止当前流式生成 */
   function stopStreaming() {
     streamAbort?.abort()
+    ruleCancelled = true
   }
 
   const { execute: summarize } = useAsync(

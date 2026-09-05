@@ -12,7 +12,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
-from app.core.exceptions import AIServiceException
+from app.core.exceptions import AIServiceException, AppException
 from app.core.response import success
 from app.schemas.conversation import (
     CreateConversationRequest,
@@ -72,6 +72,10 @@ async def send_message(
                 yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
         except AIServiceException as exc:
             yield f"data: {json.dumps({'type': 'error', 'error': exc.message}, ensure_ascii=False)}\n\n"
+        except AppException as exc:
+            # 会话不存在等业务异常：响应已 200 开头，无法再回 404，
+            # 以 error 事件下发给前端，避免连接被无声掐断
+            yield f"data: {json.dumps({'type': 'error', 'error': exc.message, 'code': exc.code}, ensure_ascii=False)}\n\n"
 
     return StreamingResponse(
         event_stream(),

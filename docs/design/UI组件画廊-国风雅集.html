@@ -2,9 +2,9 @@
 <html lang="zh-CN" data-theme="light">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="version" content="V3.0"><meta name="alignment" content="47组件标准对齐"><meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="icon" href="data:,">
-<title>启明星 · 国风雅集 v2.0 · 组件画廊</title>
+<title>启明星 · 国风雅集 v3.0 · 组件画廊</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=ZCOOL+XiaoWei&family=Noto+Serif+SC:wght@400;500;600&display=swap" rel="stylesheet">
@@ -461,70 +461,93 @@ section{margin-top:44px;position:relative}
 <!-- ============ A 区 · 应用壳 ============ -->
 <section>
   <div class="sec-head">
-    <h2><svg class="icon sec-icon"><use href="#i-menu"/></svg>甲 · 应用壳</h2><span class="badge">捌</span>
-    <span class="note">自定义窗口 + 沉浸式导航 + 全局搜索，桌面应用外壳</span>
+    <h2><svg class="icon sec-icon"><use href="#i-menu"/></svg>A · 应用壳</h2><span class="badge">4</span>
+    <span class="note">窗口标题栏 + 顶部水平导航 + 左侧信息面板 + 全局搜索</span>
   </div>
   <div class="grid">
 
   <article class="ccard bp">
-    <span class="num">甲〇一</span>
-    <div class="t"><i class="dot"></i>窗口标题栏</div>
-    <div class="titlebar">
-      <div class="traffic"><span></span><span></span><span></span></div>
-      <div class="tb-title">启明星 — 首页</div>
-      <div class="win-ctrl"><button><svg class="icon" style="width:12px"><use href="#i-chevron-left"/></svg></button><button>□</button><button><svg class="icon" style="width:12px"><use href="#i-close"/></svg></button></div>
+    <span class="num">A01</span>
+    <div class="t"><i class="dot"></i>窗口标题栏（Traffic Light）</div>
+    <div style="height:36px;background:var(--bg-panel);border:1px solid var(--line);border-radius:var(--radius-md) var(--radius-md) 0 0;display:flex;align-items:center;padding:0 14px;gap:8px;border-bottom:none">
+      <div style="display:flex;gap:7px"><span style="width:12px;height:12px;border-radius:50%;background:var(--strawberry)"></span><span style="width:12px;height:12px;border-radius:50%;background:var(--butter)"></span><span style="width:12px;height:12px;border-radius:50%;background:var(--mint)"></span></div>
+      <div style="flex:1;text-align:center;font-size:13px;color:var(--text-mid)">Venustech System — 启明星</div>
     </div>
-    <div style="height:80px;background:var(--bg-cream);border:1px solid var(--line);border-top:none;border-radius:0 0 var(--radius-sm) var(--radius-sm);display:grid;place-items:center;color:var(--text-low);font-size:11px;letter-spacing:2px">内容区</div>
-    <div class="land"><span class="pri r">规格</span><b>高36px</b>，Traffic Light朱砂/鎏金/竹青，双击最大化，拖拽移动窗口。</div>
+    <div style="height:50px;background:var(--bg-cream);border:1px solid var(--line);border-top:none;border-radius:0 0 var(--radius-md) var(--radius-md);display:grid;place-items:center;color:var(--text-low);font-size:11px">内容区</div>
+    <div class="land"><b>前端对应</b>：<code>AppTitleBar.vue</code><br><b>规格</b>：高36px，Traffic Light红黄绿。</div>
   </article>
 
-  <article class="ccard bp bp-d1">
-    <span class="num">甲〇二</span>
-    <div class="t"><i class="dot"></i>侧边栏导航</div>
-    <div class="sidebar-demo">
-      <div class="sb">
-        <div class="sb-logo"><div class="lg-icon">星</div><span class="lg-name">启明星</span></div>
-        <div class="sb-item active"><svg class="icon"><use href="#i-home"/></svg>首页</div>
-        <div class="sb-item"><svg class="icon"><use href="#i-check"/></svg>任务</div>
-        <div class="sb-item"><svg class="icon"><use href="#i-doc"/></svg>知识</div>
-        <div class="sb-item"><svg class="icon"><use href="#i-refresh"/></svg>复盘</div>
-        <div class="sb-item"><svg class="icon"><use href="#i-setting"/></svg>设置</div>
+  <article class="ccard bp bp-d1" style="grid-column:1/-1">
+    <span class="num">A02</span>
+    <div class="t"><i class="dot"></i>顶部水平导航栏（TopNav）</div>
+    <div style="background:var(--bg-panel);border:1px solid var(--line);border-radius:var(--radius-md);padding:0 16px;height:56px;display:flex;align-items:center;gap:16px;box-shadow:var(--shadow-card)">
+      <div style="display:flex;align-items:center;gap:10px;flex:none">
+        <div style="width:34px;height:34px;border-radius:var(--radius-sm);background:linear-gradient(135deg,var(--primary),var(--gold));display:grid;place-items:center;box-shadow:var(--glow)"><svg class="icon" style="width:18px;color:var(--on-primary)"><use href="#i-spark"/></svg></div>
+        <div style="line-height:1.2"><div style="font-size:13px;font-weight:700;color:var(--text-hi)">Venustech System</div><div style="font-size:10px;color:var(--text-low)">启明星 · Personal OS</div></div>
       </div>
-      <div class="sb-content">内容区域</div>
+      <nav style="display:flex;gap:4px;flex:1;justify-content:center">
+        <button style="display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:var(--radius-pill);background:var(--primary-soft);color:var(--primary-ink);font-size:13px;font-weight:600;border:none;cursor:pointer"><svg class="icon" style="width:14px"><use href="#i-home"/></svg>首页</button>
+        <button style="display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:var(--radius-pill);color:var(--text-mid);font-size:13px;border:none;background:transparent;cursor:pointer"><svg class="icon" style="width:14px"><use href="#i-calendar"/></svg>今天</button>
+        <button style="display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:var(--radius-pill);color:var(--text-mid);font-size:13px;border:none;background:transparent;cursor:pointer"><svg class="icon" style="width:14px"><use href="#i-folder"/></svg>项目</button>
+        <button style="display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:var(--radius-pill);color:var(--text-mid);font-size:13px;border:none;background:transparent;cursor:pointer"><svg class="icon" style="width:14px"><use href="#i-book"/></svg>学习</button>
+        <button style="display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:var(--radius-pill);color:var(--text-mid);font-size:13px;border:none;background:transparent;cursor:pointer"><svg class="icon" style="width:14px"><use href="#i-send"/></svg>工作台</button>
+        <button style="display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:var(--radius-pill);color:var(--text-mid);font-size:13px;border:none;background:transparent;cursor:pointer"><svg class="icon" style="width:14px"><use href="#i-refresh"/></svg>复盘</button>
+      </nav>
+      <div style="display:flex;align-items:center;gap:10px;flex:none">
+        <button style="display:flex;align-items:center;gap:8px;height:36px;padding:0 14px;border-radius:var(--radius-pill);background:var(--bg-inset);border:1px solid var(--line);color:var(--text-low);font-size:12px;cursor:pointer"><svg class="icon" style="width:14px"><use href="#i-search"/></svg>搜索...<kbd style="font-family:var(--font-mono);font-size:10px;background:var(--bg-panel);padding:2px 6px;border-radius:4px;border:1px solid var(--line)">⌘K</kbd></button>
+        <button style="width:36px;height:36px;border-radius:50%;background:var(--bg-inset);border:1px solid var(--line);display:grid;place-items:center;color:var(--text-mid);cursor:pointer;position:relative"><svg class="icon" style="width:16px"><use href="#i-bell"/></svg><span style="position:absolute;top:6px;right:6px;width:8px;height:8px;border-radius:50%;background:var(--strawberry);border:2px solid var(--bg-panel)"></span></button>
+        <button style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--gold));border:none;display:grid;place-items:center;color:var(--on-primary);cursor:pointer"><svg class="icon" style="width:16px"><use href="#i-user"/></svg></button>
+      </div>
     </div>
-    <div class="land"><span class="pri r">规格</span><b>220px↔64px</b>折叠，激活项朱砂底+3px竖条。宽度切换300ms。</div>
+    <div class="land"><b>前端对应</b>：<code>layout/TopNav.vue</code><br><b>规格</b>：高56px，Logo+6标签水平导航+搜索+通知+头像。<br><b>数据契约</b>：<code>NavItem{id,label,icon,route}</code>，通知<code>{id,type,title,content,created_at,is_read}</code></div>
   </article>
 
   <article class="ccard bp bp-d2">
-    <span class="num">甲〇三</span>
-    <div class="t"><i class="dot"></i>顶栏</div>
-    <div class="topbar">
-      <div class="tb-search"><svg class="icon"><use href="#i-search"/></svg><input placeholder="搜索文档、任务、对话…" readonly><kbd>⌘K</kbd></div>
-      <button class="icon-btn"><svg class="icon" style="width:16px"><use href="#i-bell"/></svg><span class="ping-dot"></span></button>
-      <div class="avatar-sm">旅</div>
+    <span class="num">A03</span>
+    <div class="t"><i class="dot"></i>左侧信息面板（LeftInfoPanel）</div>
+    <div style="background:var(--bg-cream);border:1px solid var(--line);border-radius:var(--radius-md);padding:14px;max-width:260px">
+      <div style="background:linear-gradient(135deg,var(--primary-soft),var(--gold-soft));border-radius:var(--radius-md);padding:14px;margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start"><div><div style="font-size:15px;font-weight:700;color:var(--text-hi)">2026年9月5日</div><div style="font-size:11px;color:var(--text-mid);margin-top:2px">星期六</div></div><svg class="icon" style="width:24px;color:var(--primary)"><use href="#i-spark"/></svg></div>
+        <div style="font-size:12px;color:var(--text-hi);margin-top:8px">早上好，启明星！</div>
+        <div style="font-size:10px;color:var(--text-low);margin-top:2px;font-style:italic">方向启明，人生推演</div>
+      </div>
+      <div style="margin-bottom:12px"><div style="font-size:11px;font-weight:600;color:var(--text-hi);margin-bottom:6px;display:flex;align-items:center;gap:6px"><svg class="icon" style="width:12px"><use href="#i-chart"/></svg>今日状态</div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:var(--bg-panel);border-radius:var(--radius-sm);font-size:11px"><svg class="icon" style="width:12px;color:var(--butter-ink)"><use href="#i-check"/></svg><span style="flex:1;color:var(--text-mid)">待办</span><span style="color:var(--text-hi);font-weight:600">5项</span></div>
+          <div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:var(--bg-panel);border-radius:var(--radius-sm);font-size:11px"><svg class="icon" style="width:12px;color:var(--sky-ink)"><use href="#i-clock"/></svg><span style="flex:1;color:var(--text-mid)">进行中</span><span style="color:var(--text-hi);font-weight:600">3项</span></div>
+          <div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:var(--bg-panel);border-radius:var(--radius-sm);font-size:11px"><svg class="icon" style="width:12px;color:var(--mint-ink)"><use href="#i-check"/></svg><span style="flex:1;color:var(--text-mid)">已完成</span><span style="color:var(--text-hi);font-weight:600">8项</span></div>
+        </div>
+      </div>
+      <div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><span style="font-size:11px;font-weight:600;color:var(--text-hi);display:flex;align-items:center;gap:6px"><svg class="icon" style="width:12px"><use href="#i-check-square"/></svg>待办事项</span><button style="width:20px;height:20px;border-radius:50%;background:var(--primary-soft);border:none;display:grid;place-items:center;color:var(--primary-ink);cursor:pointer;font-size:12px">+</button></div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:var(--bg-panel);border-radius:var(--radius-sm)"><span style="width:14px;height:14px;border-radius:3px;background:var(--mint);display:grid;place-items:center"><svg class="icon" style="width:8px;color:#fff"><use href="#i-check"/></svg></span><span style="flex:1;font-size:11px;color:var(--text-low);text-decoration:line-through">晨间复盘</span></div>
+          <div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:var(--bg-panel);border-radius:var(--radius-sm)"><span style="width:14px;height:14px;border-radius:3px;border:2px solid var(--line)"></span><span style="flex:1;font-size:11px;color:var(--text-hi)">完善架构文档</span></div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding-top:10px;border-top:1px solid var(--line)"><span style="font-size:10px;color:var(--text-low);display:flex;align-items:center;gap:4px"><svg class="icon" style="width:10px"><use href="#i-heart"/></svg>把生活过成作品</span><button style="width:24px;height:24px;border-radius:50%;background:var(--bg-inset);border:none;display:grid;place-items:center;color:var(--text-mid);cursor:pointer"><svg class="icon" style="width:12px"><use href="#i-setting"/></svg></button></div>
     </div>
-    <div class="land"><span class="pri r">规格</span><b>高52px</b>，搜索框focus变朱砂边框，通知铃呼吸扩散。</div>
+    <div class="land"><b>前端对应</b>：<code>layout/LeftInfoPanel.vue</code><br><b>规格</b>：日期卡+今日状态+待办+提醒，固定左侧260px宽。<br><b>数据契约</b>：<code>{date_str,weekday,greeting,stats{},quick_todos[],reminders[]}</code></div>
   </article>
 
   <article class="ccard bp bp-d3">
-    <span class="num">甲〇四</span>
-    <div class="t"><i class="dot"></i>全局搜索面板</div>
-    <div class="search-panel">
-      <div class="sp-input"><svg class="icon"><use href="#i-search"/></svg><input value="复盘" readonly></div>
-      <div class="sp-results">
-        <div class="sp-group-title">任务</div>
-        <div class="sp-item"><span class="kind task">任务</span><span class="hit">完成<mark>复盘</mark>方法论文档</span></div>
-        <div class="sp-group-title">文档</div>
-        <div class="sp-item"><span class="kind doc">文档</span><span class="hit"><mark>复盘</mark>方法论 v2.0</span></div>
-        <div class="sp-item"><span class="kind doc">文档</span><span class="hit">周<mark>复盘</mark>模板</span></div>
+    <span class="num">A04</span>
+    <div class="t"><i class="dot"></i>全局搜索面板（⌘K）</div>
+    <div style="background:var(--bg-panel);border:1px solid var(--line);border-radius:var(--radius-lg);box-shadow:var(--shadow-raise);overflow:hidden;max-width:380px">
+      <div style="display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--line)"><svg class="icon" style="width:18px;color:var(--primary)"><use href="#i-search"/></svg><input value="架构" style="flex:1;border:none;outline:none;font-size:14px;color:var(--text-hi);background:transparent;font-family:var(--font-body)"><kbd style="font-family:var(--font-mono);font-size:10px;color:var(--text-low);background:var(--bg-inset);padding:3px 8px;border-radius:6px;border:1px solid var(--line)">ESC</kbd></div>
+      <div style="padding:8px;max-height:200px;overflow-y:auto">
+        <div style="font-size:10px;color:var(--text-low);padding:6px 10px;letter-spacing:1px">任务</div>
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--primary-soft);border-radius:var(--radius-sm);cursor:pointer"><svg class="icon" style="width:14px;color:var(--butter-ink)"><use href="#i-check"/></svg><span style="font-size:12px;color:var(--text-hi)">完善<span style="background:var(--butter-soft);color:var(--butter-ink);padding:0 2px;border-radius:3px">架构</span>设计文档</span></div>
+        <div style="font-size:10px;color:var(--text-low);padding:6px 10px;letter-spacing:1px;margin-top:4px">文档</div>
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:var(--radius-sm);cursor:pointer"><svg class="icon" style="width:14px;color:var(--sky-ink)"><use href="#i-doc"/></svg><span style="font-size:12px;color:var(--text-hi)">技术<span style="background:var(--butter-soft);color:var(--butter-ink);padding:0 2px;border-radius:3px">架构</span> v2.0</span></div>
+        <div style="font-size:10px;color:var(--text-low);padding:6px 10px;letter-spacing:1px;margin-top:4px">操作</div>
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:var(--radius-sm);cursor:pointer"><svg class="icon" style="width:14px;color:var(--mint-ink)"><use href="#i-plus"/></svg><span style="font-size:12px;color:var(--text-hi)">新建<span style="background:var(--butter-soft);color:var(--butter-ink);padding:0 2px;border-radius:3px">架构</span>相关任务</span></div>
       </div>
     </div>
-    <div class="land"><span class="pri r">规格</span><b>居中模态560px</b>，分区结果，↑↓导航，Enter跳转。墨色晕开入场。</div>
+    <div class="land"><b>前端对应</b>：<code>layout/GlobalSearch.vue</code> + <code>layout/CommandPalette.vue</code><br><b>规格</b>：⌘K唤起，分组结果，关键词高亮，↑↓导航。<br><b>数据契约</b>：<code>{id,type,title}[task|doc|conv|action]</code></div>
   </article>
 
   </div>
 </section>
-
 <!-- ============ B 区 · 首页 ============ -->
 <section>
   <div class="sec-head">
@@ -534,7 +557,7 @@ section{margin-top:44px;position:relative}
   <div class="grid">
 
   <article class="ccard bp">
-    <span class="num">乙〇一</span>
+    <span class="num">B01</span>
     <div class="t"><i class="dot"></i>焦点任务卡</div>
     <div class="focus-card">
       <span class="f-tag"><svg class="icon"><use href="#i-target"/></svg>今日焦点</span>
@@ -543,11 +566,12 @@ section{margin-top:44px;position:relative}
       <div class="f-prog"><span class="bar"><i style="width:67%"></i></span><span class="count">6/9</span></div>
       <div class="f-acts"><button class="btn pri sm">继续工作</button><button class="btn sec sm">提交成果</button></div>
     </div>
-    <div class="land"><span class="pri r">规格</span>朱砂边框+印章角标+进度条。完成时印章盖下动画。</div>
+    <div class="land"><span class="pri r">规格</span>朱砂边框+印章角标+进度条。完成时印章盖下动画。
+<b>前端对应</b>：<code>DashboardView.vue (FocusTaskCard)</code><br><b>数据契约</b>：<code>Task{id,title,excerpt,status,sub_tasks}</code></div>
   </article>
 
   <article class="ccard bp bp-d1">
-    <span class="num">乙〇二</span>
+    <span class="num">B02</span>
     <div class="t"><i class="dot"></i>今日统计卡组</div>
     <div class="stats4">
       <div class="st4 primary"><div class="ic primary"><svg class="icon"><use href="#i-check"/></svg></div><div class="v" data-count="12">0</div><div class="l">今日待办</div><div class="tr up">↑2</div></div>
@@ -555,11 +579,12 @@ section{margin-top:44px;position:relative}
       <div class="st4 lilac"><div class="ic lilac"><svg class="icon"><use href="#i-doc"/></svg></div><div class="v" data-count="3">0</div><div class="l">新增文档</div><div class="tr down">↓1</div></div>
       <div class="st4 butter"><div class="ic butter"><svg class="icon"><use href="#i-refresh"/></svg></div><div class="v" data-count="6">0</div><div class="l">连续复盘</div><div class="tr up">↑1</div></div>
     </div>
-    <div class="land"><span class="pri r">规格</span>4宫格，左竖条语义色，大数字站酷小薇体。数字翻滚动画。</div>
+    <div class="land"><span class="pri r">规格</span>4宫格，左竖条语义色，大数字站酷小薇体。数字翻滚动画。
+<b>前端对应</b>：<code>DashboardView.vue (StatCards)</code></div>
   </article>
 
   <article class="ccard bp bp-d2">
-    <span class="num">乙〇三</span>
+    <span class="num">B03</span>
     <div class="t"><i class="dot"></i>快捷入口宫格</div>
     <div class="qgrid">
       <div class="qitem"><span class="ic primary"><svg class="icon"><use href="#i-plus"/></svg></span><span class="nm">新建任务</span></div>
@@ -571,11 +596,12 @@ section{margin-top:44px;position:relative}
       <div class="qitem"><span class="ic primary"><svg class="icon"><use href="#i-setting"/></svg></span><span class="nm">设置</span></div>
       <div class="qitem"><span class="ic gold"><svg class="icon"><use href="#i-spark"/></svg></span><span class="nm">书童设置</span></div>
     </div>
-    <div class="land"><span class="pri r">规格</span>4×2网格，图标方底语义色。hover上浮+图标放大。</div>
+    <div class="land"><span class="pri r">规格</span>4×2网格，图标方底语义色。hover上浮+图标放大。
+<b>前端对应</b>：<code>DashboardView.vue (QuickActions)</code></div>
   </article>
 
   <article class="ccard bp bp-d3">
-    <span class="num">乙〇四</span>
+    <span class="num">B04</span>
     <div class="t"><i class="dot"></i>最近文档列表</div>
     <div class="recent">
       <div class="rh"><b>最近文档</b><a>查看全部</a></div>
@@ -583,11 +609,12 @@ section{margin-top:44px;position:relative}
       <div class="doc-row"><span class="dic"><svg class="icon"><use href="#i-doc"/></svg></span><div class="dinfo"><b>个人知识库搭建方法论</b><span>知识 · 3.2k字</span></div><time>2小时前</time></div>
       <div class="doc-row"><span class="dic"><svg class="icon"><use href="#i-doc"/></svg></span><div class="dinfo"><b>第二分身 Prompt 合集</b><span>指令 · 1.8k字</span></div><time>昨天</time></div>
     </div>
-    <div class="land"><span class="pri r">规格</span>列表项高48，方图标，标题+摘要+时间。</div>
+    <div class="land"><span class="pri r">规格</span>列表项高48，方图标，标题+摘要+时间。
+<b>前端对应</b>：<code>DashboardView.vue (RecentDocs)</code><br><b>数据契约</b>：<code>Document{id,title,excerpt,updated_at}</code></div>
   </article>
 
   <article class="ccard bp bp-d4">
-    <span class="num">乙〇五</span>
+    <span class="num">B05</span>
     <div class="t"><i class="dot"></i>灵感气泡卡</div>
     <div class="inspire">
       <span class="bulb"><svg class="icon"><use href="#i-spark"/></svg></span>
@@ -596,22 +623,24 @@ section{margin-top:44px;position:relative}
         <div class="acts"><button class="btn gold sm">采纳</button><button class="btn pill sm">忽略</button></div>
       </div>
     </div>
-    <div class="land"><span class="pri r">规格</span>鎏金底+灵感图标，采纳→创建任务。入场墨色晕开。</div>
+    <div class="land"><span class="pri r">规格</span>鎏金底+灵感图标，采纳→创建任务。入场墨色晕开。
+<b>前端对应</b>：<code>DashboardView.vue (InspirationCard)</code></div>
   </article>
 
   <article class="ccard bp bp-d5">
-    <span class="num">乙〇六</span>
+    <span class="num">B06</span>
     <div class="t"><i class="dot"></i>本周进度环</div>
     <div class="ring-wrap" id="ringDemo">
       <svg viewBox="0 0 100 100"><circle class="rb" cx="50" cy="50" r="42"/><circle class="rf" cx="50" cy="50" r="42"/></svg>
       <div class="rv">64%</div>
       <div class="rl">本周完成率</div>
     </div>
-    <div class="land"><span class="pri y">规格</span>SVG环朱砂色，中心百分比。飞白笔画绘制动画。</div>
+    <div class="land"><span class="pri y">规格</span>SVG环朱砂色，中心百分比。飞白笔画绘制动画。
+<b>前端对应</b>：<code>DashboardView.vue (WeekProgress)</code></div>
   </article>
 
   <article class="ccard bp bp-d6">
-    <span class="num">乙〇七</span>
+    <span class="num">B07</span>
     <div class="t"><i class="dot"></i>首页英雄区</div>
     <div class="hero-row">
       <div><h2>早上好，旅人</h2><p>今天是 8月28日，星期五，适合专注一件大事。</p></div>
@@ -619,11 +648,12 @@ section{margin-top:44px;position:relative}
         <svg style="width:50px;height:30px;position:absolute;top:5px;right:0;animation:cloud-drift 8s ease-in-out infinite" viewBox="0 0 80 40"><path d="M10 28 Q4 28 6 22 Q4 16 12 16 Q14 10 22 12 Q26 6 34 10 Q42 6 46 14 Q56 12 58 20 Q68 20 66 28 Q60 32 50 30 Q40 34 30 30 Q20 34 10 28 Z" fill="none" stroke="var(--sky)" stroke-width="1" opacity=".4"/></svg>
       </div>
     </div>
-    <div class="land"><span class="pri r">规格</span>站酷小薇体问候+日期，右侧祥云装饰。祥云缓慢漂移。</div>
+    <div class="land"><span class="pri r">规格</span>站酷小薇体问候+日期，右侧祥云装饰。祥云缓慢漂移。
+<b>前端对应</b>：<code>DashboardView.vue (HeroSection)</code></div>
   </article>
 
   <article class="ccard bp bp-d7">
-    <span class="num">乙〇八</span>
+    <span class="num">B08</span>
     <div class="t"><i class="dot"></i>今日待办速览</div>
     <div class="todos">
       <div class="th"><b>今日待办</b><span class="cnt">5</span></div>
@@ -642,17 +672,19 @@ section{margin-top:44px;position:relative}
         <span class="ck"></span><span class="tt">网站报价确认</span><span class="st straw">逾期</span>
       </div>
     </div>
-    <div class="land"><span class="pri r">规格</span>最多5条，方勾选框，逾期朱砂色。点击勾选可交互。</div>
+    <div class="land"><span class="pri r">规格</span>最多5条，方勾选框，逾期朱砂色。点击勾选可交互。
+<b>前端对应</b>：<code>DashboardView.vue (TodayTodos)</code><br><b>数据契约</b>：<code>QuickTodo{id,title,completed}</code></div>
   </article>
 
   <article class="ccard bp bp-d8">
-    <span class="num">乙〇九</span>
+    <span class="num">B09</span>
     <div class="t"><i class="dot"></i>连续打卡徽章</div>
     <div class="streak">
       <div class="badge"><svg class="icon"><use href="#i-flame"/></svg><span class="n">12</span></div>
       <p>已连续复盘 <b>12</b> 天<br><span style="font-size:11px;color:var(--text-low)">再坚持3天达成"半月之星"</span></p>
     </div>
-    <div class="land"><span class="pri y">规格</span>鎏金方徽章+火焰+天数角标。达成时印章盖下。</div>
+    <div class="land"><span class="pri y">规格</span>鎏金方徽章+火焰+天数角标。达成时印章盖下。
+<b>前端对应</b>：<code>DashboardView.vue (StreakBadge)</code></div>
   </article>
 
   </div>
@@ -666,7 +698,7 @@ section{margin-top:44px;position:relative}
   </div>
   <div class="grid">
   <article class="ccard bp">
-    <span class="num">丙〇一</span>
+    <span class="num">C01</span>
     <div class="t"><i class="dot"></i>任务卡</div>
     <div style="border-left:3px solid var(--primary);border-radius:0 var(--radius-sm) var(--radius-sm) 0;padding:14px 16px;background:var(--bg-panel);box-shadow:var(--glow);margin-left:-3px">
       <div style="display:flex;align-items:center;gap:10px">
@@ -682,10 +714,11 @@ section{margin-top:44px;position:relative}
         <time style="font-size:11px;color:var(--straw-ink);margin-left:auto">8/30 截止</time>
       </div>
     </div>
-    <div class="land"><span class="pri r">规格</span>焦点任务=左3px朱砂条+印章角标+金星。摘要2行截断。</div>
+    <div class="land"><span class="pri r">规格</span>焦点任务=左3px朱砂条+印章角标+金星。摘要2行截断。
+<b>前端对应</b>：<code>TaskListView.vue (TaskCard)</code><br><b>数据契约</b>：<code>Task{id,title,excerpt,status,priority,due_date,tags,sub_tasks,project_id}</code></div>
   </article>
   <article class="ccard bp bp-d1">
-    <span class="num">丙〇二</span>
+    <span class="num">C02</span>
     <div class="t"><i class="dot"></i>任务列表行</div>
     <div style="border:1px solid var(--line);border-radius:var(--radius-sm);overflow:hidden">
       <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer" onclick="this.querySelector('.ck').classList.toggle('on');this.querySelector('.tt').classList.toggle('done')">
@@ -704,10 +737,11 @@ section{margin-top:44px;position:relative}
         <time style="font-size:10px;color:var(--straw-ink)">逾期</time>
       </div>
     </div>
-    <div class="land"><span class="pri r">规格</span>高44，交替行inset底。方勾选框，点击可交互。</div>
+    <div class="land"><span class="pri r">规格</span>高44，交替行inset底。方勾选框，点击可交互。
+<b>前端对应</b>：<code>TaskListView.vue (TaskRow)</code><br><b>数据契约</b>：<code>Task{id,title,status,due_date}</code></div>
   </article>
   <article class="ccard bp bp-d2">
-    <span class="num">丙〇三</span>
+    <span class="num">C03</span>
     <div class="t"><i class="dot"></i>看板列</div>
     <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:4px">
       <div style="min-width:130px;flex:1;background:var(--bg-inset);border-radius:var(--radius-sm);padding:8px">
@@ -723,10 +757,11 @@ section{margin-top:44px;position:relative}
         <div style="background:var(--bg-panel);border-radius:2px;padding:8px;margin-bottom:6px;opacity:.6"><div style="font-size:11px;font-weight:500;text-decoration:line-through">晨间复盘</div></div>
       </div>
     </div>
-    <div class="land"><span class="pri r">规格</span>3列，拖拽目标列朱砂虚线高亮。放置印章盖下动画。</div>
+    <div class="land"><span class="pri r">规格</span>3列，拖拽目标列朱砂虚线高亮。放置印章盖下动画。
+<b>前端对应</b>：<code>TaskListView.vue (KanbanColumn)</code></div>
   </article>
   <article class="ccard bp bp-d3">
-    <span class="num">丙〇四</span>
+    <span class="num">C05</span>
     <div class="t"><i class="dot"></i>子任务列表</div>
     <div style="display:flex;flex-direction:column;gap:2px">
       <div style="display:flex;align-items:center;gap:10px;padding:7px 6px;border-radius:2px">
@@ -745,10 +780,11 @@ section{margin-top:44px;position:relative}
         <svg class="icon" style="width:12px;height:12px"><use href="#i-plus"/></svg>添加子任务
       </div>
     </div>
-    <div class="land"><span class="pri r">规格</span>嵌套任务，Enter添加，Backspace空行删除。</div>
+    <div class="land"><span class="pri r">规格</span>嵌套任务，Enter添加，Backspace空行删除。
+<b>前端对应</b>：<code>TaskDetailDrawer (SubTaskList)</code><br><b>数据契约</b>：<code>SubTask{id,title,completed,task_id}</code></div>
   </article>
   <article class="ccard bp bp-d4">
-    <span class="num">丙〇五</span>
+    <span class="num">C07</span>
     <div class="t"><i class="dot"></i>任务筛选器栏</div>
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
       <div style="display:flex;background:var(--bg-inset);border-radius:2px;padding:3px">
@@ -764,7 +800,8 @@ section{margin-top:44px;position:relative}
         <span style="font-size:11px;color:var(--text-low)">筛选任务…</span>
       </div>
     </div>
-    <div class="land"><span class="pri r">规格</span>高44，分段控件+筛选chips+搜索。</div>
+    <div class="land"><span class="pri r">规格</span>高44，分段控件+筛选chips+搜索。
+<b>前端对应</b>：<code>TaskListView.vue (TaskFilter)</code></div>
   </article>
   </div>
 </section>
@@ -777,7 +814,7 @@ section{margin-top:44px;position:relative}
   </div>
   <div class="grid">
   <article class="ccard bp">
-    <span class="num">丁〇一</span>
+    <span class="num">D01</span>
     <div class="t"><i class="dot"></i>文档卡</div>
     <div style="background:var(--bg-panel);border:1px solid var(--line);border-radius:var(--radius-sm);padding:14px;transition:transform .3s,box-shadow .3s;cursor:pointer" onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='var(--shadow-raise)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
@@ -791,10 +828,11 @@ section{margin-top:44px;position:relative}
         <span style="margin-left:auto;font-size:10px;color:var(--text-low)">12.4k字 · 10分钟前</span>
       </div>
     </div>
-    <div class="land"><span class="pri r">规格</span>方角卡片+描金内线，hover上浮。标题2行+摘要3行。</div>
+    <div class="land"><span class="pri r">规格</span>方角卡片+描金内线，hover上浮。标题2行+摘要3行。
+<b>前端对应</b>：<code>DocumentExplorerView.vue (DocumentCard)</code><br><b>数据契约</b>：<code>Document{id,title,excerpt,tags,word_count,updated_at}</code></div>
   </article>
   <article class="ccard bp bp-d1">
-    <span class="num">丁〇二</span>
+    <span class="num">D05</span>
     <div class="t"><i class="dot"></i>文件夹树</div>
     <div style="font-size:13px">
       <div style="display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:2px;cursor:pointer;background:var(--primary-soft)">
@@ -814,10 +852,11 @@ section{margin-top:44px;position:relative}
         </div>
       </div>
     </div>
-    <div class="land"><span class="pri r">规格</span>缩进16px层级，激活项朱砂底。展开箭头旋转90°。</div>
+    <div class="land"><span class="pri r">规格</span>缩进16px层级，激活项朱砂底。展开箭头旋转90°。
+<b>前端对应</b>：<code>BaseTag.vue / DocumentEditor</code></div>
   </article>
   <article class="ccard bp bp-d2">
-    <span class="num">丁〇三</span>
+    <span class="num">D03</span>
     <div class="t"><i class="dot"></i>文档编辑器</div>
     <div style="border:1px solid var(--line);border-radius:var(--radius-sm);overflow:hidden">
       <div style="display:flex;align-items:center;gap:4px;padding:8px 12px;border-bottom:1px solid var(--line);background:var(--bg-inset)">
@@ -834,10 +873,11 @@ section{margin-top:44px;position:relative}
         <blockquote style="border-left:3px solid var(--primary);background:var(--bg-inset);padding:8px 12px;border-radius:0 2px 2px 0;font-size:12px;color:var(--text-mid);margin:8px 0">长任务拆分：任何同步代码超过50ms必须拆分。</blockquote>
       </div>
     </div>
-    <div class="land"><span class="pri r">规格</span>居中最大宽760，站酷小薇标题，引用块朱砂竖条。</div>
+    <div class="land"><span class="pri r">规格</span>居中最大宽760，站酷小薇标题，引用块朱砂竖条。
+<b>前端对应</b>：<code>DocumentExplorerView.vue (FolderTree)</code><br><b>数据契约</b>：<code>Folder{id,name,parent_id,children[]}</code></div>
   </article>
   <article class="ccard bp bp-d3">
-    <span class="num">丁〇四</span>
+    <span class="num">D04</span>
     <div class="t"><i class="dot"></i>标签输入器</div>
     <div style="background:var(--bg-inset);border-radius:var(--radius-sm);padding:8px 10px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;border:1px solid transparent;transition:border .3s" onfocusin="this.style.borderColor='var(--primary)'" onfocusout="this.style.borderColor='transparent'">
       <span class="chip primary" style="font-size:11px">架构 <span class="x" style="cursor:pointer">×</span></span>
@@ -845,7 +885,8 @@ section{margin-top:44px;position:relative}
       <span class="chip sky" style="font-size:11px">Electron <span class="x" style="cursor:pointer">×</span></span>
       <input placeholder="输入标签…" style="border:none;outline:none;background:transparent;font-size:12px;color:var(--text-hi);flex:1;min-width:80px;font-family:var(--font-body)">
     </div>
-    <div class="land"><span class="pri r">规格</span>inset底+已选chip可删+输入。Enter确认，Backspace删最后。</div>
+    <div class="land"><span class="pri r">规格</span>inset底+已选chip可删+输入。Enter确认，Backspace删最后。
+<b>前端对应</b>：<code>DocumentEditor.vue</code><br><b>数据契约</b>：<code>Document{id,title,content,updated_at}</code></div>
   </article>
   </div>
 </section>
@@ -858,7 +899,7 @@ section{margin-top:44px;position:relative}
   </div>
   <div class="grid">
   <article class="ccard bp">
-    <span class="num">戊〇一</span>
+    <span class="num">E01</span>
     <div class="t"><i class="dot"></i>对话消息流</div>
     <div style="display:flex;flex-direction:column;gap:12px;max-height:220px;overflow-y:auto;padding:4px">
       <div style="display:flex;gap:10px;align-items:flex-end">
@@ -882,10 +923,11 @@ section{margin-top:44px;position:relative}
         </div>
       </div>
     </div>
-    <div class="land"><span class="pri r">规格</span>用户消息朱砂右对齐，书童消息绢白左对齐。流式打字机输出。</div>
+    <div class="land"><span class="pri r">规格</span>用户消息朱砂右对齐，书童消息绢白左对齐。流式打字机输出。
+<b>前端对应</b>：<code>ConversationView.vue (MessageList)</code><br><b>数据契约</b>：<code>Message{role,content,refs[],timestamp}</code></div>
   </article>
   <article class="ccard bp bp-d1">
-    <span class="num">戊〇二</span>
+    <span class="num">E02</span>
     <div class="t"><i class="dot"></i>消息输入框</div>
     <div style="background:var(--bg-panel);border:1px solid var(--line);border-radius:var(--radius-sm);padding:10px;box-shadow:var(--shadow-card)">
       <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">
@@ -898,10 +940,11 @@ section{margin-top:44px;position:relative}
         <button class="btn pri" style="height:36px;width:36px;padding:0;border-radius:2px;flex:none"><svg class="icon" style="width:16px"><use href="#i-send"/></svg></button>
       </div>
     </div>
-    <div class="land"><span class="pri r">规格</span>附件/引用/工具chips+自适应textarea+方发送按钮。</div>
+    <div class="land"><span class="pri r">规格</span>附件/引用/工具chips+自适应textarea+方发送按钮。
+<b>前端对应</b>：<code>ConversationView.vue (MessageInput)</code><br><b>数据契约</b>：<code>Message{content,refs[]}</code></div>
   </article>
   <article class="ccard bp bp-d2">
-    <span class="num">戊〇三</span>
+    <span class="num">E03</span>
     <div class="t"><i class="dot"></i>引用文档卡片</div>
     <div style="background:var(--lilac-soft);border-radius:var(--radius-sm);padding:12px;display:flex;gap:10px;align-items:center;border:1px solid rgba(184,155,168,.3)">
       <div style="width:36px;height:36px;border-radius:2px;background:var(--lilac);display:grid;place-items:center;color:var(--on-primary);flex:none"><svg class="icon" style="width:18px"><use href="#i-doc"/></svg></div>
@@ -911,10 +954,11 @@ section{margin-top:44px;position:relative}
       </div>
       <button style="width:24px;height:24px;border-radius:2px;display:grid;place-items:center;color:var(--text-low);flex:none"><svg class="icon" style="width:12px"><use href="#i-close"/></svg></button>
     </div>
-    <div class="land"><span class="pri r">规格</span>藕荷底+文档图标+标题+引用位置+移除。</div>
+    <div class="land"><span class="pri r">规格</span>藕荷底+文档图标+标题+引用位置+移除。
+<b>前端对应</b>：<code>ConversationView.vue (RefDocCard)</code><br><b>数据契约</b>：<code>Document{id,title,excerpt}</code></div>
   </article>
   <article class="ccard bp bp-d3">
-    <span class="num">戊〇四</span>
+    <span class="num">E05</span>
     <div class="t"><i class="dot"></i>分身状态指示</div>
     <div style="display:flex;flex-direction:column;gap:10px">
       <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--mint-soft);border-radius:var(--radius-sm)">
@@ -929,7 +973,8 @@ section{margin-top:44px;position:relative}
         <button class="btn sm pri" style="margin-left:auto;height:28px;padding:0 12px;font-size:11px">配置</button>
       </div>
     </div>
-    <div class="land"><span class="pri r">规格</span>在线竹青/研墨鎏金/离线灰，状态点印章呼吸。</div>
+    <div class="land"><span class="pri r">规格</span>在线竹青/研墨鎏金/离线灰，状态点印章呼吸。
+<b>前端对应</b>：<code>ConversationView.vue (AvatarStatus)</code></div>
   </article>
   </div>
 </section>
@@ -942,7 +987,7 @@ section{margin-top:44px;position:relative}
   </div>
   <div class="grid">
   <article class="ccard bp">
-    <span class="num">己〇一</span>
+    <span class="num">F01</span>
     <div class="t"><i class="dot"></i>复盘编辑器</div>
     <div style="border:1px solid var(--line);border-radius:var(--radius-sm);overflow:hidden">
       <div style="display:flex;gap:0;border-bottom:1px solid var(--line);background:var(--bg-inset)">
@@ -965,10 +1010,11 @@ section{margin-top:44px;position:relative}
         </div>
       </div>
     </div>
-    <div class="land"><span class="pri r">规格</span>Tab切换日/周/月，编号问题卡（壹贰叁）。墨色晕开入场。</div>
+    <div class="land"><span class="pri r">规格</span>Tab切换日/周/月，编号问题卡（壹贰叁）。墨色晕开入场。
+<b>前端对应</b>：<code>ReviewView.vue (ReviewEditor)</code><br><b>数据契约</b>：<code>Review{id,date,achievements,shortcomings,plans,mood,energy}</code></div>
   </article>
   <article class="ccard bp bp-d1">
-    <span class="num">己〇二</span>
+    <span class="num">F02</span>
     <div class="t"><i class="dot"></i>反思问题卡</div>
     <div style="background:linear-gradient(135deg,var(--lilac-soft),var(--primary-soft));border-radius:var(--radius-md);padding:20px;position:relative;overflow:hidden;border:1px solid rgba(196,68,42,.15)">
       <div style="font-family:var(--font-cute);font-size:11px;color:var(--lilac-ink);letter-spacing:3px;margin-bottom:8px">今日三省</div>
@@ -978,10 +1024,11 @@ section{margin-top:44px;position:relative}
         <button class="btn sm pill" style="height:30px;padding:0 12px;font-size:11px;color:var(--text-mid)">换一题</button>
       </div>
     </div>
-    <div class="land"><span class="pri y">规格</span>渐变背景+朱砂/藕荷，问题站酷小薇体18px。换一题随机。</div>
+    <div class="land"><span class="pri y">规格</span>渐变背景+朱砂/藕荷，问题站酷小薇体18px。换一题随机。
+<b>前端对应</b>：<code>ReviewView.vue (ReflectionCard)</code></div>
   </article>
   <article class="ccard bp bp-d2">
-    <span class="num">己〇三</span>
+    <span class="num">F03</span>
     <div class="t"><i class="dot"></i>情绪记录</div>
     <div style="text-align:center;padding:8px">
       <div style="font-family:var(--font-cute);font-size:13px;color:var(--text-mid);margin-bottom:12px;letter-spacing:2px">今日心境</div>
@@ -996,7 +1043,8 @@ section{margin-top:44px;position:relative}
         <b style="color:var(--primary)">书童察言：</b>你最近3天都是"平常"，或许需要安排一次放松？
       </div>
     </div>
-    <div class="land"><span class="pri r">规格</span>5档emoji，选中scale+朱砂文字。连续情绪触发书童洞察。</div>
+    <div class="land"><span class="pri r">规格</span>5档emoji，选中scale+朱砂文字。连续情绪触发书童洞察。
+<b>前端对应</b>：<code>ReviewView.vue (MoodRecorder)</code><br><b>数据契约</b>：<code>Review{id,date,mood,energy}</code></div>
   </article>
   </div>
 </section>
@@ -1010,7 +1058,7 @@ section{margin-top:44px;position:relative}
   <div class="grid">
 
   <article class="ccard bp" style="grid-column:span 2">
-    <span class="num">庚〇一</span>
+    <span class="num">G01</span>
     <div class="t"><i class="dot"></i>书童角色（多动作）</div>
     <div style="display:flex;gap:24px;align-items:center;flex-wrap:wrap">
       <div style="position:relative;width:160px;height:180px;flex:none">
@@ -1090,11 +1138,12 @@ section{margin-top:44px;position:relative}
         </div>
       </div>
     </div>
-    <div class="land"><span class="pri r">规格</span>SVG书童160×180，5动作（静立/研墨/展卷/蹙眉/指引）。青衫黛青+朱砂发带+凤眼。桌宠模式64px悬浮。</div>
+    <div class="land"><span class="pri r">规格</span>SVG书童160×180，5动作（静立/研墨/展卷/蹙眉/指引）。青衫黛青+朱砂发带+凤眼。桌宠模式64px悬浮。
+<b>前端对应</b>：<code>DesktopPet.vue</code></div>
   </article>
 
   <article class="ccard bp">
-    <span class="num">庚〇二</span>
+    <span class="num">G02</span>
     <div class="t"><i class="dot"></i>书童对话气泡</div>
     <div style="position:relative;padding:10px 0 10px 50px;min-height:60px">
       <div style="position:absolute;left:0;top:50%;transform:translateY(-50%);width:40px;height:40px;border-radius:2px;background:var(--primary);display:grid;place-items:center;color:var(--on-primary);font-family:var(--font-cute);font-size:14px">童</div>
@@ -1106,11 +1155,12 @@ section{margin-top:44px;position:relative}
         </div>
       </div>
     </div>
-    <div class="land"><span class="pri r">规格</span>书童头像+气泡+快捷回复。5秒无操作自动收起。</div>
+    <div class="land"><span class="pri r">规格</span>书童头像+气泡+快捷回复。5秒无操作自动收起。
+<b>前端对应</b>：<code>DesktopPet.vue (PetBubble)</code></div>
   </article>
 
   <article class="ccard bp bp-d1">
-    <span class="num">庚〇三</span>
+    <span class="num">G03</span>
     <div class="t"><i class="dot"></i>桌宠悬浮模式</div>
     <div style="position:relative;height:100px;background:var(--bg-inset);border-radius:var(--radius-sm);overflow:hidden">
       <div style="position:absolute;bottom:8px;right:12px;width:56px;height:64px;cursor:pointer;animation:floaty 5s ease-in-out infinite">
@@ -1129,7 +1179,8 @@ section{margin-top:44px;position:relative}
       </div>
       <div style="position:absolute;bottom:12px;left:12px;font-size:10px;color:var(--text-low);letter-spacing:1px">桌宠悬浮 · 56px · 桌面右下角</div>
     </div>
-    <div class="land"><span class="pri r">规格</span>56px缩小版，悬浮桌面角落，always-on-top，双击展开对话。</div>
+    <div class="land"><span class="pri r">规格</span>56px缩小版，悬浮桌面角落，always-on-top，双击展开对话。
+<b>前端对应</b>：<code>DesktopPet.vue (PetFloating)</code></div>
   </article>
 
   </div>
@@ -1143,7 +1194,7 @@ section{margin-top:44px;position:relative}
   </div>
   <div class="grid">
   <article class="ccard bp">
-    <span class="num">辛〇一</span>
+    <span class="num">H01</span>
     <div class="t"><i class="dot"></i>设置导航分组</div>
     <div style="display:flex;flex-direction:column;gap:2px">
       <div style="font-family:var(--font-cute);font-size:11px;color:var(--text-low);padding:6px 10px;letter-spacing:2px">通用</div>
@@ -1154,10 +1205,11 @@ section{margin-top:44px;position:relative}
       <div style="font-family:var(--font-cute);font-size:11px;color:var(--text-low);padding:10px 10px 4px;letter-spacing:2px">数据与安全</div>
       <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:2px;color:var(--text-mid);cursor:pointer" onmouseover="this.style.background='var(--bg-inset)'" onmouseout="this.style.background=''"><svg class="icon" style="width:16px"><use href="#i-cloud"/></svg>数据管理</div>
     </div>
-    <div class="land"><span class="pri r">规格</span>分组标题+激活项朱砂底。右侧当前值摘要。</div>
+    <div class="land"><span class="pri r">规格</span>分组标题+激活项朱砂底。右侧当前值摘要。
+<b>前端对应</b>：<code>SettingsView.vue (SettingsNav)</code></div>
   </article>
   <article class="ccard bp bp-d1">
-    <span class="num">辛〇二</span>
+    <span class="num">H02</span>
     <div class="t"><i class="dot"></i>AI 模型配置</div>
     <div style="display:flex;flex-direction:column;gap:12px">
       <div>
@@ -1180,10 +1232,11 @@ section{margin-top:44px;position:relative}
         <button class="btn sm" style="margin-left:auto;height:26px;padding:0 10px;font-size:10px;background:var(--bg-panel);color:var(--mint-ink)">测试</button>
       </div>
     </div>
-    <div class="land"><span class="pri r">规格</span>提供商chips+Key密码框(DPAPI加密)+连接状态。Key本地加密。</div>
+    <div class="land"><span class="pri r">规格</span>提供商chips+Key密码框(DPAPI加密)+连接状态。Key本地加密。
+<b>前端对应</b>：<code>SettingsView.vue (AIConfig)</code><br><b>数据契约</b>：<code>AIConfig{provider,model,api_key,base_url}</code></div>
   </article>
   <article class="ccard bp bp-d2">
-    <span class="num">辛〇三</span>
+    <span class="num">H03</span>
     <div class="t"><i class="dot"></i>开关设置项</div>
     <div style="display:flex;flex-direction:column;gap:2px">
       <div style="display:flex;align-items:center;gap:12px;padding:10px 4px;border-bottom:1px solid var(--line)">
@@ -1203,10 +1256,11 @@ section{margin-top:44px;position:relative}
         <div class="toggle on" onclick="this.classList.toggle('on')"></div>
       </div>
     </div>
-    <div class="land"><span class="pri r">规格</span>标题+副标题+方toggle，开启朱砂色。点击可交互。</div>
+    <div class="land"><span class="pri r">规格</span>标题+副标题+方toggle，开启朱砂色。点击可交互。
+<b>前端对应</b>：<code>BaseSwitch.vue</code></div>
   </article>
   <article class="ccard bp bp-d3">
-    <span class="num">辛〇四</span>
+    <span class="num">H04</span>
     <div class="t"><i class="dot"></i>数据导出/导入</div>
     <div style="display:flex;flex-direction:column;gap:10px">
       <div style="display:flex;align-items:center;gap:12px;padding:14px;background:var(--bg-inset);border-radius:var(--radius-sm)">
@@ -1223,10 +1277,11 @@ section{margin-top:44px;position:relative}
         <svg class="icon" style="width:14px"><use href="#i-info"/></svg>数据完全本地，无云端同步，导出文件自行保管。
       </div>
     </div>
-    <div class="land"><span class="pri r">规格</span>导出/导入卡片+隐私提示。导出为加密.venus包。</div>
+    <div class="land"><span class="pri r">规格</span>导出/导入卡片+隐私提示。导出为加密.venus包。
+<b>前端对应</b>：<code>SettingsView.vue (DataManagement)</code><br><b>数据契约</b>：<code>Backup{file_name,size,created_at}</code></div>
   </article>
   <article class="ccard bp bp-d4" style="grid-column:span 2">
-    <span class="num">辛〇五</span>
+    <span class="num">H05</span>
     <div class="t"><i class="dot"></i>内置主题切换器</div>
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
       <a href="UI组件画廊-v2.html" style="text-decoration:none;display:block;border:1px solid var(--line);border-radius:2px;overflow:hidden;cursor:pointer;transition:transform .25s,border-color .3s" onmouseover="this.style.transform='translateY(-3px)';this.style.borderColor='var(--primary)'" onmouseout="this.style.transform='';this.style.borderColor='var(--line)'">
@@ -1255,7 +1310,8 @@ section{margin-top:44px;position:relative}
         <div style="padding:10px 12px;background:var(--bg-panel)"><div style="font-family:var(--font-cute);font-size:13px;color:var(--text-hi);letter-spacing:1px">深渊档案</div><div style="font-size:10px;color:var(--text-low);margin-top:2px">海洋神秘 · 磷火青</div></div>
       </a>
     </div>
-    <div class="land"><span class="pri r">规格</span>三栏主题预览卡，配色缩略图+名称+风格标签。当前主题朱砂边框+「使用中」角标。点击跳转切换，配置写入本地localStorage。</div>
+    <div class="land"><span class="pri r">规格</span>三栏主题预览卡，配色缩略图+名称+风格标签。当前主题朱砂边框+「使用中」角标。点击跳转切换，配置写入本地localStorage。
+<b>前端对应</b>：<code>SettingsView.vue (ThemeSwitcher) / useTheme.ts</code></div>
   </article>
   </div>
 </section>
@@ -1268,27 +1324,29 @@ section{margin-top:44px;position:relative}
   </div>
   <div class="grid">
   <article class="ccard bp">
-    <span class="num">壬〇一</span>
+    <span class="num">I01</span>
     <div class="t"><i class="dot"></i>按钮体系</div>
     <div style="display:flex;flex-direction:column;gap:10px">
       <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn pri">主要</button><button class="btn sec">次要</button><button class="btn txt">文字</button><button class="btn danger">危险</button><button class="btn gold">鎏金</button></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn pri sm">小</button><button class="btn pri">默认</button><button class="btn pri lg">大</button><button class="btn pri disabled">禁用</button></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn pri"><svg class="icon spin" style="width:14px"><use href="#i-refresh"/></svg>加载中</button><button class="icon-btn" style="width:38px;height:38px"><svg class="icon" style="width:16px"><use href="#i-plus"/></svg></button></div>
     </div>
-    <div class="land"><span class="pri r">规格</span>5类型+3尺寸+方角。hover朱砂边框，active scale(.97)。</div>
+    <div class="land"><span class="pri r">规格</span>5类型+3尺寸+方角。hover朱砂边框，active scale(.97)。
+<b>前端对应</b>：<code>BaseButton.vue</code></div>
   </article>
   <article class="ccard bp bp-d1">
-    <span class="num">壬〇二</span>
+    <span class="num">I02</span>
     <div class="t"><i class="dot"></i>输入框体系</div>
     <div style="display:flex;flex-direction:column;gap:10px">
       <div class="input-wrap"><input placeholder="默认输入框"></div>
       <div class="input-wrap has-icon"><svg class="icon input-icon"><use href="#i-search"/></svg><input placeholder="带图标搜索"></div>
       <div class="input-wrap"><input value="有错误的输入" style="border-color:var(--strawberry);box-shadow:0 0 0 2px var(--straw-soft)"><div style="font-size:10px;color:var(--straw-ink);margin-top:4px">此字段不能为空</div></div>
     </div>
-    <div class="land"><span class="pri r">规格</span>默认/带图标/错误。focus朱砂边框+2px光晕。</div>
+    <div class="land"><span class="pri r">规格</span>默认/带图标/错误。focus朱砂边框+2px光晕。
+<b>前端对应</b>：<code>BaseInput.vue</code></div>
   </article>
   <article class="ccard bp bp-d2">
-    <span class="num">壬〇三</span>
+    <span class="num">I03</span>
     <div class="t"><i class="dot"></i>模态弹窗</div>
     <div style="background:var(--overlay);border-radius:var(--radius-sm);padding:20px;display:grid;place-items:center;min-height:140px">
       <div style="background:var(--bg-panel);border-radius:var(--radius-md);padding:20px;max-width:320px;width:100%;box-shadow:var(--shadow-raise);animation:ink-spread .4s var(--ease-ink)">
@@ -1300,20 +1358,22 @@ section{margin-top:44px;position:relative}
         <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn sec sm">取消</button><button class="btn danger sm">确认删除</button></div>
       </div>
     </div>
-    <div class="land"><span class="pri r">规格</span>遮罩+居中卡片。墨色晕开入场。</div>
+    <div class="land"><span class="pri r">规格</span>遮罩+居中卡片。墨色晕开入场。
+<b>前端对应</b>：<code>BaseModal.vue / BaseConfirm.vue</code></div>
   </article>
   <article class="ccard bp bp-d3">
-    <span class="num">壬〇四</span>
+    <span class="num">I04</span>
     <div class="t"><i class="dot"></i>Toast 通知</div>
     <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-start">
       <div class="toast success"><span class="ticon"><svg class="icon" style="width:12px"><use href="#i-check"/></svg></span>保存成功</div>
       <div class="toast error"><span class="ticon"><svg class="icon" style="width:12px"><use href="#i-close"/></svg></span>网络连接失败</div>
       <div class="toast info"><span class="ticon"><svg class="icon" style="width:12px"><use href="#i-info"/></svg></span>书童已生成灵感</div>
     </div>
-    <div class="land"><span class="pri r">规格</span>3状态，右上角滑入，3秒自动消失。</div>
+    <div class="land"><span class="pri r">规格</span>3状态，右上角滑入，3秒自动消失。
+<b>前端对应</b>：<code>BaseToast.vue / ToastItem.vue</code></div>
   </article>
   <article class="ccard bp bp-d4">
-    <span class="num">壬〇五</span>
+    <span class="num">I05</span>
     <div class="t"><i class="dot"></i>空状态</div>
     <div class="empty-state">
       <svg class="eicon" viewBox="0 0 64 64"><g fill="none" stroke="var(--text-low)" stroke-width="1.5"><path d="M16 48 L16 20 Q16 12 24 12 L40 12 Q48 12 48 20 L48 48"/><line x1="24" y1="24" x2="40" y2="24"/><line x1="24" y1="32" x2="40" y2="32"/><line x1="24" y1="40" x2="34" y2="40"/><circle cx="32" cy="52" r="3"/></g></svg>
@@ -1321,10 +1381,11 @@ section{margin-top:44px;position:relative}
       <div style="font-size:11px;color:var(--text-low);margin-bottom:12px">录入第一篇文档，开笔启程</div>
       <button class="btn pri sm"><svg class="icon" style="width:12px"><use href="#i-plus"/></svg>新建文档</button>
     </div>
-    <div class="land"><span class="pri y">规格</span>悬笔砚台SVG+雅句+CTA。每模块专属空状态。</div>
+    <div class="land"><span class="pri y">规格</span>悬笔砚台SVG+雅句+CTA。每模块专属空状态。
+<b>前端对应</b>：<code>BaseEmpty.vue</code></div>
   </article>
   <article class="ccard bp bp-d5">
-    <span class="num">壬〇六</span>
+    <span class="num">I06</span>
     <div class="t"><i class="dot"></i>骨架屏加载</div>
     <div style="display:flex;flex-direction:column;gap:10px">
       <div class="skeleton" style="height:16px;width:60%"></div>
@@ -1332,7 +1393,8 @@ section{margin-top:44px;position:relative}
       <div class="skeleton" style="height:12px;width:75%"></div>
       <div style="display:flex;gap:8px;margin-top:4px"><div class="skeleton" style="height:32px;width:80px;border-radius:2px"></div><div class="skeleton" style="height:32px;width:60px;border-radius:2px"></div></div>
     </div>
-    <div class="land"><span class="pri r">规格</span>shimmer动画1.5s循环。匹配真实布局。</div>
+    <div class="land"><span class="pri r">规格</span>shimmer动画1.5s循环。匹配真实布局。
+<b>前端对应</b>：<code>BaseSkeleton.vue</code></div>
   </article>
   </div>
 </section>
@@ -1345,7 +1407,7 @@ section{margin-top:44px;position:relative}
   </div>
   <div class="grid">
   <article class="ccard bp">
-    <span class="num">癸〇一</span>
+    <span class="num">J01</span>
     <div class="t"><i class="dot"></i>统计卡</div>
     <div style="background:linear-gradient(135deg,var(--primary-soft),var(--lilac-soft));border-radius:var(--radius-md);padding:18px;position:relative;overflow:hidden;border:1px solid rgba(196,68,42,.15)">
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
@@ -1363,10 +1425,11 @@ section{margin-top:44px;position:relative}
         </div>
       </div>
     </div>
-    <div class="land"><span class="pri r">规格</span>渐变背景+大数字+趋势+迷你柱。数字翻滚。</div>
+    <div class="land"><span class="pri r">规格</span>渐变背景+大数字+趋势+迷你柱。数字翻滚。
+<b>前端对应</b>：<code>DashboardView.vue (StatCard)</code><br><b>数据契约</b>：<code>Stat{label,value,trend}</code></div>
   </article>
   <article class="ccard bp bp-d1">
-    <span class="num">癸〇二</span>
+    <span class="num">J02</span>
     <div class="t"><i class="dot"></i>趋势折线图</div>
     <div style="padding:10px 0">
       <svg viewBox="0 0 280 100" width="100%" height="100" style="overflow:visible">
@@ -1377,10 +1440,11 @@ section{margin-top:44px;position:relative}
         <g fill="var(--primary)"><circle cx="120" cy="40" r="3.5"/><circle cx="200" cy="25" r="3.5"/><circle cx="280" cy="15" r="4.5" stroke="var(--bg-panel)" stroke-width="2"/></g>
       </svg>
     </div>
-    <div class="land"><span class="pri r">规格</span>SVG折线+渐变面积+数据点。飞白笔画绘制动画。</div>
+    <div class="land"><span class="pri r">规格</span>SVG折线+渐变面积+数据点。飞白笔画绘制动画。
+<b>前端对应</b>：<code>DashboardView.vue (TrendChart)</code><br><b>数据契约</b>：<code>TimeSeries{date,value}[]</code></div>
   </article>
   <article class="ccard bp bp-d2">
-    <span class="num">癸〇三</span>
+    <span class="num">J03</span>
     <div class="t"><i class="dot"></i>任务分布柱状图</div>
     <div style="display:flex;align-items:flex-end;gap:10px;height:120px;padding:10px 4px 0">
       <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px"><div style="width:100%;background:linear-gradient(180deg,var(--primary),#9E3520);border-radius:2px 2px 0 0;height:70%"></div><span style="font-size:10px;color:var(--text-low)">学习</span></div>
@@ -1389,10 +1453,11 @@ section{margin-top:44px;position:relative}
       <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px"><div style="width:100%;background:linear-gradient(180deg,var(--sky),#364554);border-radius:2px 2px 0 0;height:60%"></div><span style="font-size:10px;color:var(--text-low)">复盘</span></div>
       <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px"><div style="width:100%;background:linear-gradient(180deg,var(--lilac),#947885);border-radius:2px 2px 0 0;height:35%"></div><span style="font-size:10px;color:var(--text-low)">其他</span></div>
     </div>
-    <div class="land"><span class="pri r">规格</span>5分类柱，渐变填充，方角顶部。入场高度从0增长。</div>
+    <div class="land"><span class="pri r">规格</span>5分类柱，渐变填充，方角顶部。入场高度从0增长。
+<b>前端对应</b>：<code>DashboardView.vue (TaskDistribution)</code><br><b>数据契约</b>：<code>Distribution{status,count}[]</code></div>
   </article>
   <article class="ccard bp bp-d3">
-    <span class="num">癸〇四</span>
+    <span class="num">J04</span>
     <div class="t"><i class="dot"></i>复盘热力日历</div>
     <div>
       <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-low);margin-bottom:6px;padding:0 2px"><span>八月</span><span>连续12天</span></div>
@@ -1416,10 +1481,68 @@ section{margin-top:44px;position:relative}
         <span>少</span><div style="width:10px;height:10px;border-radius:2px;background:var(--bg-inset)"></div><div style="width:10px;height:10px;border-radius:2px;background:var(--mint);opacity:.4"></div><div style="width:10px;height:10px;border-radius:2px;background:var(--mint);opacity:.7"></div><div style="width:10px;height:10px;border-radius:2px;background:var(--mint);opacity:1"></div><span>多</span>
       </div>
     </div>
-    <div class="land"><span class="pri y">规格</span>7列网格，竹青4级透明度，今日朱砂高亮。</div>
+    <div class="land"><span class="pri y">规格</span>7列网格，竹青4级透明度，今日朱砂高亮。
+<b>前端对应</b>：<code>ReviewView.vue (HeatmapCalendar)</code><br><b>数据契约</b>：<code>Heatmap{date,count}[]</code></div>
   </article>
   </div>
 </section>
+
+<!-- ============ K 区 · 项目管理 ============ -->
+<section>
+<div class="sec-head"><h2><svg class="icon sec-icon"><use href="#i-folder"/></svg>K · 项目管理</h2><span class="badge">5</span><span class="note">项目卡片 + 列表视图 + 详情面板 + 创建表单 + 进度统计</span></div>
+<div class="grid">
+
+<div class="ccard bp"><span class="num">K01</span><div class="t"><span class="dot"></span>项目卡片（ProjectCard）</div>
+<div style="background:var(--bg-panel);border:1px solid var(--line);border-radius:var(--radius-lg);padding:16px;max-width:280px;position:relative;overflow:hidden">
+<div style="position:absolute;top:0;left:0;width:4px;height:100%;background:var(--primary)"></div>
+<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;padding-left:8px">
+<div style="font-size:14px;font-weight:700;color:var(--text-hi)">启明星系统</div>
+<span style="font-size:10px;padding:3px 8px;border-radius:var(--radius-pill);background:var(--mint-soft);color:var(--mint-ink);font-weight:600">进行中</span></div>
+<div style="font-size:11px;color:var(--text-mid);margin-bottom:12px;padding-left:8px">个人知识管理与人生推演系统</div>
+<div style="margin-bottom:10px;padding-left:8px"><div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-low);margin-bottom:4px"><span>整体进度</span><span style="font-weight:600;color:var(--text-hi)">67%</span></div><div style="height:6px;background:var(--bg-inset);border-radius:3px;overflow:hidden"><div style="width:67%;height:100%;background:linear-gradient(90deg,var(--primary),var(--gold));border-radius:3px"></div></div></div>
+<div style="display:flex;gap:12px;padding-left:8px"><span style="font-size:10px;color:var(--text-low);display:flex;align-items:center;gap:3px"><svg class="icon" style="width:10px"><use href="#i-check"/></svg>12任务</span><span style="font-size:10px;color:var(--text-low);display:flex;align-items:center;gap:3px"><svg class="icon" style="width:10px"><use href="#i-doc"/></svg>8文档</span><span style="font-size:10px;color:var(--text-low);display:flex;align-items:center;gap:3px"><svg class="icon" style="width:10px"><use href="#i-calendar"/></svg>9/30</span></div></div>
+<div class="land"><b>前端对应</b>：<code>ProjectListView.vue (ProjectCard)</code><br><b>数据契约</b>：<code>Project{id,name,description,color,status,progress,task_count,doc_count,due_date}</code></div></div>
+
+<div class="ccard bp bp-d1" style="grid-column:1/-1"><span class="num">K02</span><div class="t"><span class="dot"></span>项目列表视图（ProjectList）</div>
+<div style="background:var(--bg-cream);border:1px solid var(--line);border-radius:var(--radius-lg);padding:16px">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><div style="font-size:14px;font-weight:700;color:var(--text-hi)">我的项目</div><div style="display:flex;gap:8px"><button style="padding:5px 12px;border-radius:var(--radius-pill);background:var(--primary-soft);color:var(--primary-ink);font-size:11px;font-weight:600;border:none;cursor:pointer">全部</button><button style="padding:5px 12px;border-radius:var(--radius-pill);background:var(--bg-panel);color:var(--text-mid);font-size:11px;border:1px solid var(--line);cursor:pointer">进行中</button><button style="padding:5px 12px;border-radius:var(--radius-pill);background:var(--bg-panel);color:var(--text-mid);font-size:11px;border:1px solid var(--line);cursor:pointer">已归档</button><button style="padding:5px 12px;border-radius:var(--radius-pill);background:var(--primary);color:#fff;font-size:11px;font-weight:600;border:none;cursor:pointer">+ 新建</button></div></div>
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+<div style="background:var(--bg-panel);border:1px solid var(--line);border-radius:var(--radius-md);padding:14px;border-left:3px solid var(--primary)"><div style="font-size:13px;font-weight:600;color:var(--text-hi);margin-bottom:4px">启明星系统</div><div style="font-size:10px;color:var(--text-low);margin-bottom:8px">67% · 12任务</div><div style="height:4px;background:var(--bg-inset);border-radius:2px"><div style="width:67%;height:100%;background:var(--primary);border-radius:2px"></div></div></div>
+<div style="background:var(--bg-panel);border:1px solid var(--line);border-radius:var(--radius-md);padding:14px;border-left:3px solid var(--mint)"><div style="font-size:13px;font-weight:600;color:var(--text-hi);margin-bottom:4px">海灵传说</div><div style="font-size:10px;color:var(--text-low);margin-bottom:8px">45% · 8任务</div><div style="height:4px;background:var(--bg-inset);border-radius:2px"><div style="width:45%;height:100%;background:var(--mint);border-radius:2px"></div></div></div>
+<div style="background:var(--bg-panel);border:1px solid var(--line);border-radius:var(--radius-md);padding:14px;border-left:3px solid var(--butter)"><div style="font-size:13px;font-weight:600;color:var(--text-hi);margin-bottom:4px">数学竞赛</div><div style="font-size:10px;color:var(--text-low);margin-bottom:8px">80% · 5任务</div><div style="height:4px;background:var(--bg-inset);border-radius:2px"><div style="width:80%;height:100%;background:var(--butter);border-radius:2px"></div></div></div></div></div>
+<div class="land"><b>前端对应</b>：<code>ProjectListView.vue</code><br><b>数据契约</b>：<code>Project[] + Filter{status}</code></div></div>
+
+<div class="ccard bp bp-d2"><span class="num">K03</span><div class="t"><span class="dot"></span>项目详情面板（ProjectDetail）</div>
+<div style="background:var(--bg-panel);border:1px solid var(--line);border-radius:var(--radius-lg);padding:18px;max-width:320px">
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px"><div style="width:40px;height:40px;border-radius:var(--radius-md);background:linear-gradient(135deg,var(--primary),var(--gold));display:grid;place-items:center"><svg class="icon" style="width:20px;color:#fff"><use href="#i-folder"/></svg></div><div><div style="font-size:15px;font-weight:700;color:var(--text-hi)">启明星系统</div><div style="font-size:10px;color:var(--text-low)">创建于 2026-06-15</div></div></div>
+<div style="font-size:12px;color:var(--text-mid);margin-bottom:14px;line-height:1.6">个人知识管理与人生推演系统，整合任务、文档、对话、复盘四大模块。</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px"><div style="background:var(--bg-inset);border-radius:var(--radius-sm);padding:8px;text-align:center"><div style="font-size:16px;font-weight:700;color:var(--primary)">12</div><div style="font-size:9px;color:var(--text-low)">关联任务</div></div><div style="background:var(--bg-inset);border-radius:var(--radius-sm);padding:8px;text-align:center"><div style="font-size:16px;font-weight:700;color:var(--mint)">8</div><div style="font-size:9px;color:var(--text-low)">关联文档</div></div></div>
+<div style="margin-bottom:14px"><div style="font-size:11px;font-weight:600;color:var(--text-hi);margin-bottom:6px">最近任务</div><div style="display:flex;flex-direction:column;gap:4px"><div style="display:flex;align-items:center;gap:6px;font-size:11px"><span style="width:12px;height:12px;border-radius:3px;background:var(--mint);display:grid;place-items:center"><svg class="icon" style="width:7px;color:#fff"><use href="#i-check"/></svg></span><span style="color:var(--text-low);text-decoration:line-through">需求文档</span></div><div style="display:flex;align-items:center;gap:6px;font-size:11px"><span style="width:12px;height:12px;border-radius:3px;border:2px solid var(--line)"></span><span style="color:var(--text-hi)">UI组件V3.0</span></div></div></div>
+<div style="display:flex;gap:8px"><button style="flex:1;padding:8px;border-radius:var(--radius-sm);background:var(--primary);color:#fff;font-size:11px;font-weight:600;border:none;cursor:pointer">进入项目</button><button style="padding:8px 12px;border-radius:var(--radius-sm);background:var(--bg-inset);color:var(--text-mid);font-size:11px;border:1px solid var(--line);cursor:pointer"><svg class="icon" style="width:12px"><use href="#i-setting"/></svg></button></div></div>
+<div class="land"><b>前端对应</b>：<code>ProjectDetailDrawer.vue</code><br><b>数据契约</b>：<code>Project + tasks[] + docs[]</code></div></div>
+
+<div class="ccard bp bp-d3"><span class="num">K04</span><div class="t"><span class="dot"></span>项目创建表单（ProjectForm）</div>
+<div style="background:var(--bg-panel);border:1px solid var(--line);border-radius:var(--radius-lg);padding:18px;max-width:320px">
+<div style="font-size:14px;font-weight:700;color:var(--text-hi);margin-bottom:14px">新建项目</div>
+<div style="margin-bottom:12px"><label style="font-size:11px;color:var(--text-mid);display:block;margin-bottom:4px">项目名称</label><input value="启明星系统" style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:var(--radius-sm);font-size:12px;color:var(--text-hi);background:var(--bg-cream);box-sizing:border-box"></div>
+<div style="margin-bottom:12px"><label style="font-size:11px;color:var(--text-mid);display:block;margin-bottom:4px">项目描述</label><textarea style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:var(--radius-sm);font-size:12px;color:var(--text-hi);background:var(--bg-cream);height:60px;resize:none;box-sizing:border-box">个人知识管理系统</textarea></div>
+<div style="margin-bottom:12px"><label style="font-size:11px;color:var(--text-mid);display:block;margin-bottom:6px">主题颜色</label><div style="display:flex;gap:8px"><span style="width:24px;height:24px;border-radius:50%;background:var(--primary);border:2px solid var(--text-hi);cursor:pointer"></span><span style="width:24px;height:24px;border-radius:50%;background:var(--mint);border:2px solid transparent;cursor:pointer"></span><span style="width:24px;height:24px;border-radius:50%;background:var(--butter);border:2px solid transparent;cursor:pointer"></span><span style="width:24px;height:24px;border-radius:50%;background:var(--sky);border:2px solid transparent;cursor:pointer"></span><span style="width:24px;height:24px;border-radius:50%;background:var(--lilac);border:2px solid transparent;cursor:pointer"></span></div></div>
+<div style="margin-bottom:14px"><label style="font-size:11px;color:var(--text-mid);display:block;margin-bottom:4px">截止日期</label><input type="date" value="2026-09-30" style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:var(--radius-sm);font-size:12px;color:var(--text-hi);background:var(--bg-cream);box-sizing:border-box"></div>
+<div style="display:flex;gap:8px"><button style="flex:1;padding:10px;border-radius:var(--radius-sm);background:var(--bg-inset);color:var(--text-mid);font-size:12px;border:1px solid var(--line);cursor:pointer">取消</button><button style="flex:1;padding:10px;border-radius:var(--radius-sm);background:var(--primary);color:#fff;font-size:12px;font-weight:600;border:none;cursor:pointer">创建</button></div></div>
+<div class="land"><b>前端对应</b>：<code>ProjectCreateModal.vue</code><br><b>数据契约</b>：<code>{name,description,color,status,due_date}</code></div></div>
+
+<div class="ccard bp bp-d4" style="grid-column:1/-1"><span class="num">K05</span><div class="t"><span class="dot"></span>项目进度统计（ProjectStats）</div>
+<div style="background:var(--bg-panel);border:1px solid var(--line);border-radius:var(--radius-lg);padding:18px;display:flex;gap:24px;align-items:center">
+<div style="position:relative;width:100px;height:100px;flex:none"><svg viewBox="0 0 100 100" style="width:100%;height:100%;transform:rotate(-90deg)"><circle cx="50" cy="50" r="42" fill="none" stroke="var(--bg-inset)" stroke-width="8"/><circle cx="50" cy="50" r="42" fill="none" stroke="url(#grad1)" stroke-width="8" stroke-linecap="round" stroke-dasharray="264" stroke-dashoffset="87"/></svg><defs><linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="var(--primary)"/><stop offset="100%" stop-color="var(--gold)"/></linearGradient></defs><div style="position:absolute;inset:0;display:grid;place-items:center"><div style="text-align:center"><div style="font-size:22px;font-weight:700;color:var(--text-hi)">67%</div><div style="font-size:9px;color:var(--text-low)">完成度</div></div></div></div>
+<div style="flex:1;display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+<div style="text-align:center"><div style="font-size:20px;font-weight:700;color:var(--primary)">12</div><div style="font-size:10px;color:var(--text-low)">总任务</div></div>
+<div style="text-align:center"><div style="font-size:20px;font-weight:700;color:var(--mint)">8</div><div style="font-size:10px;color:var(--text-low)">已完成</div></div>
+<div style="text-align:center"><div style="font-size:20px;font-weight:700;color:var(--butter)">3</div><div style="font-size:10px;color:var(--text-low)">进行中</div></div>
+<div style="text-align:center"><div style="font-size:20px;font-weight:700;color:var(--strawberry)">1</div><div style="font-size:10px;color:var(--text-low)">已逾期</div></div></div>
+<div style="flex:1"><div style="font-size:11px;font-weight:600;color:var(--text-hi);margin-bottom:8px">本周趋势</div><div style="display:flex;align-items:flex-end;gap:4px;height:50px"><div style="flex:1;background:var(--primary-soft);border-radius:3px 3px 0 0;height:40%"></div><div style="flex:1;background:var(--primary-soft);border-radius:3px 3px 0 0;height:60%"></div><div style="flex:1;background:var(--primary);border-radius:3px 3px 0 0;height:80%"></div><div style="flex:1;background:var(--primary-soft);border-radius:3px 3px 0 0;height:50%"></div><div style="flex:1;background:var(--primary-soft);border-radius:3px 3px 0 0;height:70%"></div><div style="flex:1;background:var(--gold);border-radius:3px 3px 0 0;height:90%"></div><div style="flex:1;background:var(--primary-soft);border-radius:3px 3px 0 0;height:55%"></div></div></div></div>
+<div class="land"><b>前端对应</b>：<code>ProjectStats.vue</code><br><b>数据契约</b>：<code>{total,completed,in_progress,overdue,weekly_trend[]}</code></div></div>
+
+</div></section>
 
 </main>
 

@@ -1,10 +1,22 @@
 <!DOCTYPE html>
-<html lang="zh-CN" data-theme="light">
+<html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✨</text></svg>" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>启明星</title>
+    <script>
+      // 在 CSS 加载前恢复用户主题，消除非默认主题启动时的闪烁（FOUC）
+      // 映射逻辑须与 src/composables/useTheme.ts 的 resolveDataTheme 保持一致
+      try {
+        var t = JSON.parse(localStorage.getItem('qm-star-theme') || '{}')
+        var dark = t.mode === 'dark' || (t.mode === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+        var attr = t.pack === 'guofeng' ? (dark ? 'guofeng-dark' : 'guofeng')
+          : t.pack === 'abyss' ? (dark ? 'abyss' : 'abyss-light')
+          : (dark ? 'dark' : null)
+        if (attr) document.documentElement.dataset.theme = attr
+      } catch (e) { /* ignore */ }
+    </script>
     <style>
       /* 首屏底色，避免白闪 —— 仅此处使用一次 token 外色值，工程内 grep 白名单 */
       html { background: #FFFBF5; }

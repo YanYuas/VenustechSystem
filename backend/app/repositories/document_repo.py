@@ -69,10 +69,12 @@ class DocumentRepository(BaseRepository[Document]):
         return list(self.db.scalars(q))
 
     def all_tags(self, user_id: str) -> list[str]:
-        docs = self.list_documents(user_id)
+        # 只取 tags 列且不分页：之前复用 list_documents（默认 limit=100 + 加载全部列），
+        # 文档超过 100 篇后旧文档的标签会从标签栏"消失"
+        rows = self.db.scalars(select(Document.tags).where(Document.user_id == user_id))
         seen: dict[str, None] = {}
-        for d in docs:
-            for t in (d.tags or []):
+        for tags in rows:
+            for t in (tags or []):
                 seen[t] = None
         return list(seen.keys())
 

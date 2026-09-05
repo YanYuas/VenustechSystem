@@ -10,9 +10,13 @@ import { toast } from '@/composables/useToast'
 
 const BASE_URL = import.meta.env.VITE_API_BASE ?? 'http://127.0.0.1:8765/api/v1'
 const TIMEOUT = 15000
+/** SSE 首包超时：LLM 冷启动/长 prompt 时首包可能远超 15s */
+const SSE_TIMEOUT = 60000
 /** 网络错误自动重试次数（PRD §21：重试1次，间隔2秒） */
 const RETRY_COUNT = 1
 const RETRY_DELAY = 2000
+/** 仅幂等方法允许自动重试：POST 重试可能造成重复创建 */
+const IDEMPOTENT_METHODS = new Set(['GET', 'HEAD', 'PUT', 'DELETE'])
 
 class ApiError extends Error {
   code: number
@@ -25,15 +29,18 @@ class ApiError extends Error {
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   let lastError: unknown
-  for (let attempt = 0; attempt <= RETRY_COUNT; attempt++) {
+  const method = (options.method ?? 'GET').toUpperCase()
+  const retryable = IDEMPOTENT_METHODS.has(method)
+  const maxAttempts = retryable ? RETRY_COUNT : 0
+  for (let attempt = 0; attempt <= maxAttempts; attempt++) {
     try {
       return await doRequest<T>(path, options)
     } catch (err) {
       lastError = err
-      // 只对网络错误重试，业务错误（ApiError）不重试
+      // 只对幂等方法的网络错误重试，业务错误（ApiError）不重试
       if (err instanceof ApiError) throw err
       // 最后一次重试失败，抛出错误
-      if (attempt === RETRY_COUNT) break
+      if (attempt === maxAttempts) break
       // 重试间隔
       await new Promise((r) => setTimeout(r, RETRY_DELAY))
     }
@@ -137,7 +144,7 @@ export async function sseRequest(
 ): Promise<void> {
   // 合并外部 signal 与内部超时 signal
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), TIMEOUT)
+  const timer = setTimeout(() => controller.abort(), SSE_TIMEOUT)
   if (signal) {
     if (signal.aborted) controller.abort()
     else signal.addEventListener('abort', () => controller.abort(), { once: true })

@@ -331,18 +331,34 @@ class DocumentService:
         return prefix + content[start:end] + suffix
 
     def _sync_backlinks(self, user_id: str, doc: Document) -> None:
-        """扫描文档内容中的 [[标题]] 链接，重建该文档的出链记录。"""
-        self.link_repo.delete_by_source(doc.id)
-        if not doc.content:
-            return
-        titles = {m.group(1).strip() for m in LINK_PATTERN.finditer(doc.content)}
-        for title in titles:
-            target = self.doc_repo.find_by_title(user_id, title)
-            self.link_repo.create(
-                source_doc_id=doc.id,
-                target_doc_id=target.id if target else None,
-                target_title=title,
-            )
+        """扫描文档内容中的 [[标题]] 链接，重建该文档的出链记录。
+
+        单事务批量重建：此前每个链接一次 SELECT + 一次 INSERT（各自独立 commit），
+        保存含 5 个链接的文档约产生 7 个独立事务（自动保存场景下放大明显）。
+        """
+        from sqlalchemy import delete, select as sa_select
+
+        self.db.execute(delete(Backlink).where(Backlink.source_doc_id == doc.id))
+        if doc.content:
+            titles = list({m.group(1).strip() for m in LINK_PATTERN.finditer(doc.content)})
+            if titles:
+                # 一次 IN 查询解析所有目标文档
+                targets = {
+                    t.title: t.id
+                    for t in self.db.scalars(
+                        sa_select(Document).where(
+                            Document.user_id == user_id,
+                            Document.title.in_(titles),
+                        )
+                    )
+                }
+                for title in titles:
+                    self.db.add(Backlink(
+                        source_doc_id=doc.id,
+                        target_doc_id=targets.get(title),
+                        target_title=title,
+                    ))
+        self.db.commit()
 
     def _owned_doc(self, doc_id: str, user_id: str) -> Document:
         doc = self.doc_repo.get(doc_id)

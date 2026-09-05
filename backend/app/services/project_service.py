@@ -17,11 +17,12 @@ class ProjectService:
 
     def list(self, user_id: str, include_archived: bool = False) -> list[dict]:
         projects = self.repo.list_by_user(user_id, include_archived)
-        result = []
-        for p in projects:
-            stats = self.repo.get_task_stats(p.id)
-            result.append(self._to_dict(p, stats))
-        return result
+        # 一次 GROUP BY 批量取统计（此前每个项目 2 条 COUNT，首页/dashboard 每次加载 N+1）
+        stats_map = self.repo.stats_by_project(user_id, [p.id for p in projects])
+        return [
+            self._to_dict(p, stats_map.get(p.id, {"task_count": 0, "completed_count": 0, "progress": 0}))
+            for p in projects
+        ]
 
     def get(self, user_id: str, project_id: str) -> dict | None:
         p = self.repo.get_by_id(user_id, project_id)

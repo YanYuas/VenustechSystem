@@ -17,31 +17,35 @@ const ICON: Record<string, string> = {
 }
 
 let timer: number | null = null
+/** 到期时间戳方案：单定时器直达，hover 只记录剩余毫秒（替代 100ms 定时器链） */
+let deadline = 0
 let remaining = 0
 const paused = ref(false)
 
-function start() {
-  remaining = props.item.duration
-  tick()
-}
-function tick() {
+function arm() {
   if (timer) window.clearTimeout(timer)
-  if (remaining <= 0) {
+  const ms = deadline - Date.now()
+  if (ms <= 0) {
     toast.remove(props.item.id)
     return
   }
-  timer = window.setTimeout(() => {
-    remaining -= 100
-    tick()
-  }, 100)
+  timer = window.setTimeout(() => toast.remove(props.item.id), ms)
+}
+function start() {
+  deadline = Date.now() + props.item.duration
+  arm()
 }
 function pause() {
   paused.value = true
+  remaining = Math.max(0, deadline - Date.now())
   if (timer) window.clearTimeout(timer)
 }
 function resume() {
   paused.value = false
-  if (remaining > 0) tick()
+  if (remaining > 0) {
+    deadline = Date.now() + remaining
+    arm()
+  }
 }
 
 onMounted(start)

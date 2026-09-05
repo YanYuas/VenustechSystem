@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date
 
 from sqlalchemy import func, select
+from sqlalchemy.orm import joinedload, selectinload
 
+from app.core.utils import local_day_bounds_utc
 from app.models.task import Subtask, Task
 from app.repositories.base import BaseRepository
 
@@ -56,7 +58,12 @@ class TaskRepository(BaseRepository[Task]):
         limit: int = 20,
     ) -> list[Task]:
         """SQL 层排序+分页（列表页专用，性能优先）。"""
-        q = select(Task).where(Task.user_id == user_id)
+        # 预加载 subtasks/project：序列化要访问这两个关系，懒加载会造成每行 2 条 SQL 的 N+1
+        q = (
+            select(Task)
+            .options(selectinload(Task.subtasks), joinedload(Task.project))
+            .where(Task.user_id == user_id)
+        )
         if status:
             q = q.where(Task.status == status)
         if priority:
@@ -88,9 +95,8 @@ class TaskRepository(BaseRepository[Task]):
         return int(self.db.scalar(q))
 
     def count_completed_on(self, user_id: str, day: date) -> int:
-        # SQLite 存 naive UTC，边界用 naive 对齐
-        start = datetime(day.year, day.month, day.day)
-        end = datetime(day.year, day.month, day.day, 23, 59, 59, 999999)
+        # completed_at 存 naive UTC，本地日期边界须换算成 UTC 再比较（否则错位一个时区）
+        start, end = local_day_bounds_utc(day)
         q = (
             select(func.count())
             .select_from(Task)
@@ -98,7 +104,7 @@ class TaskRepository(BaseRepository[Task]):
                 Task.user_id == user_id,
                 Task.status == "completed",
                 Task.completed_at >= start,
-                Task.completed_at <= end,
+                Task.completed_at < end,
             )
         )
         return int(self.db.scalar(q))

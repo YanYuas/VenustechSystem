@@ -38,28 +38,29 @@ def set_event_loop(loop: asyncio.AbstractEventLoop) -> None:
 
 
 def _run_async(coro) -> None:
-    """在后台事件循环中执行协程（fire-and-forget，异常自动记录）。"""
+    """在后台事件循环中执行协程（fire-and-forget，异常自动记录）。
+
+    事件可能从 FastAPI 线程池线程发布（同步路由内），loop.create_task
+    非线程安全，必须用 run_coroutine_threadsafe 提交。
+    """
     if _loop is None:
         logger.warning("事件循环未初始化，跳过异步事件处理")
         return
     try:
-        task = _loop.create_task(coro)
-        task.add_done_callback(_on_task_done)
+        future = asyncio.run_coroutine_threadsafe(coro, _loop)
+        future.add_done_callback(_on_future_done)
     except RuntimeError:
-        # 事件循环已关闭，退化为同步运行
-        try:
-            asyncio.run(coro)
-        except Exception:
-            logger.exception("异步事件处理失败")
+        # 事件循环已关闭，丢弃事件（不再 asyncio.run 阻塞线程池线程）
+        logger.warning("事件循环已关闭，丢弃事件")
 
 
-def _on_task_done(task: asyncio.Task) -> None:
+def _on_future_done(future: "concurrent.futures.Future") -> None:
     """后台任务完成回调：记录未捕获的异常。"""
     try:
-        exc = task.exception()
+        exc = future.exception()
         if exc:
             logger.error("后台事件任务异常: %s", exc, exc_info=exc)
-    except asyncio.CancelledError:
+    except Exception:
         pass
 
 

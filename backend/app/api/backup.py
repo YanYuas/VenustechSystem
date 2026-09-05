@@ -30,12 +30,14 @@ def export(db: Session = Depends(get_db), user: User = Depends(get_current_user)
 
 
 @router.post("/import")
-async def import_backup(
+def import_backup(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    content = await file.read()
+    # 同步路由（线程池执行）：zip 校验/解压/写盘最多 100MB，
+    # 若为 async def 会全程阻塞事件循环，卡死所有并发请求（含 30s 轮询）
+    content = file.file.read()
     return success(_svc(db, user).import_(content, file.filename or "backup.zip"))
 
 

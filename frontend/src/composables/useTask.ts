@@ -18,7 +18,8 @@ export function useTask() {
       total.value = res.total
       return res
     },
-    { immediate: true },
+    // 不再 immediate：视图 onMounted 会按 URL 参数（project_id）组装 query 后统一发起唯一一次请求，
+    // 避免首屏无过滤请求与带过滤请求竞态导致列表被旧数据覆盖
   )
 
   const { execute: createTask } = useAsync(

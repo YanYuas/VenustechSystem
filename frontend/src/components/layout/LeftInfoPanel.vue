@@ -51,10 +51,13 @@ async function addTodo() {
 }
 
 async function toggleTodo(todo: QuickTodo) {
+  // 乐观更新：先改本地状态，失败再回滚（勾选不再等待整个面板聚合接口重载）
+  const prev = todo.completed
+  todo.completed = !prev
   try {
-    await panelApi.updateTodo(todo.id, { completed: !todo.completed })
-    await load()
+    await panelApi.updateTodo(todo.id, { completed: todo.completed })
   } catch {
+    todo.completed = prev
     toast.error('操作失败', '待办状态更新失败')
   }
 }

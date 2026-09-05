@@ -35,7 +35,11 @@ function onKey(e: KeyboardEvent) {
 }
 
 onMounted(() => window.addEventListener('keydown', onKey))
-onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onKey)
+  // 组件带 open 状态被直接卸载（如路由跳转）时，watch(false) 不会触发，需兜底恢复滚动
+  if (props.modelValue) document.body.style.overflow = ''
+})
 
 watch(
   () => props.modelValue,

@@ -37,7 +37,9 @@ export function useAsync<T, Args extends unknown[] = []>(
       const e = err instanceof Error ? err : new Error(String(err))
       error.value = e
       onError?.(e)
-      return undefined
+      // 向调用方抛出：防止「失败仍提示成功」的假成功（如创建任务失败仍弹已创建）
+      // http 层已对 ApiError 统一 toast；未捕获的 rejection 由全局 errorHandler 兜底
+      throw e
     } finally {
       loading.value = false
     }
@@ -51,7 +53,8 @@ export function useAsync<T, Args extends unknown[] = []>(
 
   if (immediate) {
     // unknown[] 元组 → 具体 Args：需双断言（运行时仅透传，安全）
-    void execute(...(immediateArgs as unknown as Args))
+    // 错误已写入 error 状态，此处吞掉避免 unhandled rejection
+    execute(...(immediateArgs as unknown as Args)).catch(() => { /* error 状态已记录 */ })
   }
 
   return { data, loading, error, execute, reset }

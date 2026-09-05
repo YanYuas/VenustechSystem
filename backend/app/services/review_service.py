@@ -4,12 +4,13 @@
 # ============================================================
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date
 
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import NotFoundException
+from app.core.utils import local_day_bounds_utc
 from app.models.document import Document
 from app.models.review import Review
 from app.models.task import Task
@@ -73,9 +74,8 @@ class ReviewService:
     # ---------- 自动数据填充（PRD F5.2） ----------
     def auto_fill(self, review_date: date, type_: str = "daily") -> AutoFillData:
         today = review_date
-        # SQLite 读回的 completed_at 为 naive UTC，边界用 naive 对齐
-        day_start = datetime(today.year, today.month, today.day)
-        day_end = datetime(today.year, today.month, today.day, 23, 59, 59, 999999)
+        # completed_at/created_at 为 naive UTC，本地日边界须换算成 UTC 再比较（否则错位一个时区）
+        day_start, day_end = local_day_bounds_utc(today)
 
         # SQL 层按日期过滤，避免全量查询
         # 今天完成的任务 + 今天到期的未完成任务
@@ -83,7 +83,7 @@ class ReviewService:
             select(Task).where(
                 Task.user_id == self.user_id,
                 or_(
-                    and_(Task.status == "completed", Task.completed_at >= day_start, Task.completed_at <= day_end),
+                    and_(Task.status == "completed", Task.completed_at >= day_start, Task.completed_at < day_end),
                     and_(Task.status != "completed", Task.due_date == today),
                 ),
             )
@@ -105,7 +105,7 @@ class ReviewService:
             select(Document).where(
                 Document.user_id == self.user_id,
                 Document.created_at >= day_start,
-                Document.created_at <= day_end,
+                Document.created_at < day_end,
             )
         )
         docs_created = [

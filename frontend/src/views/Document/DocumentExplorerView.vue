@@ -21,7 +21,7 @@ import DocumentEditor from './DocumentEditor.vue'
 import type { Document, Folder } from '@/types'
 
 const {
-  documents, folders, loading, query,
+  documents, total, folders, loading, query,
   fetchDocuments, fetchFolders, createDocument, deleteDocument,
   createFolder, renameFolder, deleteFolder,
 } = useDocument()
@@ -29,8 +29,8 @@ const toast = useToast()
 const modal = useModal()
 
 onMounted(() => {
-  fetchFolders()
-  fetchDocuments()
+  fetchFolders().catch(() => { /* http 层已提示 */ })
+  fetchDocuments().catch(() => { /* http 层已提示 */ })
 })
 
 const folderOptions = computed(() => [
@@ -44,7 +44,13 @@ const searchText = ref('')
 function onFolderChange(v: string) {
   currentFolderId.value = v
   query.value.folder_id = v || undefined
-  fetchDocuments()
+  query.value.page = 1
+  fetchDocuments().catch(() => { /* http 层已提示 */ })
+}
+
+function onPageChange(p: number) {
+  query.value.page = p
+  fetchDocuments().catch(() => { /* http 层已提示 */ })
 }
 
 let searchTimer: ReturnType<typeof setTimeout> | undefined
@@ -52,7 +58,8 @@ function onSearch() {
   clearTimeout(searchTimer)
   searchTimer = setTimeout(() => {
     query.value.search = searchText.value.trim() || undefined
-    fetchDocuments()
+    query.value.page = 1
+    fetchDocuments().catch(() => { /* http 层已提示 */ })
   }, 300)
 }
 
@@ -112,14 +119,16 @@ function openRenameFolder(f: Folder) {
 async function onFolderSubmit() {
   const name = folderForm.value.name.trim()
   if (!name) return toast.warning('请输入文件夹名称')
-  if (folderModalMode.value === 'create') {
-    await createFolder(name, folderForm.value.parent_id || undefined)
-    toast.success('文件夹已创建')
-  } else if (editingFolder.value) {
-    await renameFolder(editingFolder.value.id, name)
-    toast.success('文件夹已重命名')
-  }
-  folderModalOpen.value = false
+  try {
+    if (folderModalMode.value === 'create') {
+      await createFolder(name, folderForm.value.parent_id || undefined)
+      toast.success('文件夹已创建')
+    } else if (editingFolder.value) {
+      await renameFolder(editingFolder.value.id, name)
+      toast.success('文件夹已重命名')
+    }
+    folderModalOpen.value = false
+  } catch { /* http 层已提示 */ }
 }
 
 async function onDeleteFolder(f: Folder) {
@@ -129,13 +138,15 @@ async function onDeleteFolder(f: Folder) {
     confirmText: '删除',
   })
   if (!ok) return
-  await deleteFolder(f.id)
-  if (currentFolderId.value === f.id) {
-    currentFolderId.value = ''
-    query.value.folder_id = undefined
-    fetchDocuments()
-  }
-  toast.success('文件夹已删除')
+  try {
+    await deleteFolder(f.id)
+    if (currentFolderId.value === f.id) {
+      currentFolderId.value = ''
+      query.value.folder_id = undefined
+      fetchDocuments().catch(() => { /* http 层已提示 */ })
+    }
+    toast.success('文件夹已删除')
+  } catch { /* http 层已提示 */ }
 }
 
 function fmtTime(v: string) {
@@ -220,6 +231,15 @@ function fmtTime(v: string) {
         </BaseEmpty>
       </template>
     </BaseCard>
+
+    <!-- 分页 -->
+    <BasePagination
+      v-if="!loading"
+      :total="total"
+      :page="query.page ?? 1"
+      :page-size="query.page_size ?? 20"
+      @change="onPageChange"
+    />
 
     <!-- 新建文档弹窗 -->
     <BaseModal v-model="createOpen" title="新建文档" @confirm="onCreate">

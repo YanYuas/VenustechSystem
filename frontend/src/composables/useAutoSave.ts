@@ -25,34 +25,52 @@ export function useAutoSave<T>(data: () => T, options: UseAutoSaveOptions<T>) {
 
   let debounceTimer: number | null = null
   let intervalTimer: number | null = null
+  /** 保存期间又有新编辑，需要在途保存完成后补存 */
+  let pendingSave = false
+  /** 保存完成后是否仍有未落盘数据（防止 in-flight 期间 dirty 被误清） */
+  let hasPendingData = false
+  /** 保存链：卸载时的兜底提交挂到链尾，避免并发 PATCH 相互覆盖 */
+  let saveChain: Promise<void> = Promise.resolve()
 
   async function save() {
-    if (saving.value) return
+    if (saving.value) {
+      pendingSave = true
+      return
+    }
     saving.value = true
+    hasPendingData = false
     error.value = null
+    const snapshot = data()
     try {
-      await onSave(data())
-      dirty.value = false
+      await onSave(snapshot)
       lastSaved.value = new Date()
     } catch (err) {
       error.value = err instanceof Error ? err : new Error(String(err))
     } finally {
       saving.value = false
+      // 快照对比：保存期间用户继续输入 → 补存，杜绝并发 PATCH
+      if (pendingSave || hasPendingData || JSON.stringify(data()) !== JSON.stringify(snapshot)) {
+        pendingSave = false
+        void save()
+      } else {
+        dirty.value = false
+      }
     }
   }
 
   function scheduleSave() {
     if (!enabled) return
     dirty.value = true
+    hasPendingData = true
     if (debounceTimer) clearTimeout(debounceTimer)
     debounceTimer = window.setTimeout(() => save(), debounce)
   }
 
   function onVisibilityChange() {
     if (document.hidden && dirty.value) {
-      // 失焦/切后台时立即保存
+      // 失焦/切后台时立即保存（在途保存由 save() 内部串行补存，不会丢）
       if (debounceTimer) clearTimeout(debounceTimer)
-      save()
+      void save()
     }
   }
 
@@ -78,9 +96,12 @@ export function useAutoSave<T>(data: () => T, options: UseAutoSaveOptions<T>) {
     if (intervalTimer) clearInterval(intervalTimer)
     document.removeEventListener('visibilitychange', onVisibilityChange)
     window.removeEventListener('beforeunload', onBeforeUnload)
-    // 卸载时如有未保存数据，静默提交（绕过 save() 状态更新，避免写入已卸载组件）
+    // 卸载时如有未保存数据，挂到保存链尾串行提交（避免与在途保存并发 PATCH 相互覆盖）
     if (dirty.value) {
-      onSave(data()).catch(() => { /* 卸载后忽略错误 */ })
+      const snapshot = data()
+      saveChain = saveChain
+        .then(() => (saving.value ? saveChain : onSave(snapshot)))
+        .catch(() => { /* 卸载后忽略错误 */ })
     }
   })
 

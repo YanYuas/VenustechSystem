@@ -1,12 +1,12 @@
 # ============================================================
-# 数据库连接（SQLite WAL + StaticPool 单连接 + PRAGMA 调优）
+# 数据库连接（SQLite WAL + NullPool + PRAGMA 调优）
 # 对齐技术架构 v2.0 §5.1-5.2
 # ============================================================
 from __future__ import annotations
 
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
+from sqlalchemy.pool import NullPool
 
 from app.config import get_settings
 
@@ -15,10 +15,14 @@ from app.models.base import Base  # noqa: F401
 
 settings = get_settings()
 
+# NullPool：每次 checkout 新建连接、用完即关。
+# 之前用 StaticPool 单连接被 FastAPI 线程池多线程共享，两个请求的事务
+# 在同一条连接上交错，未提交的写入会被别的请求 commit/rollback 波及。
+# WAL 支持多连接并发读 + 单写排队，busy_timeout=5000 兜底写锁竞争。
 engine = create_engine(
     settings.db_url,
     connect_args={"check_same_thread": False},
-    poolclass=StaticPool,  # SQLite 单连接（FastAPI 多线程下避免连接串扰）
+    poolclass=NullPool,
     echo=False,
 )
 

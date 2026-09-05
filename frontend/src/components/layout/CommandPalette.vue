@@ -46,6 +46,9 @@ const filtered = computed(() => {
   return COMMANDS.filter((c) => c.name.toLowerCase().includes(q))
 })
 
+// 输入过滤后高亮行可能越界，Enter 会选中 undefined
+watch(query, () => { highlight.value = 0 })
+
 function close() {
   emit('update:modelValue', false)
 }

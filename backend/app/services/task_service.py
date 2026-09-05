@@ -104,18 +104,23 @@ class TaskService:
         return task
 
     @staticmethod
-    def _apply_status(task: Task, new_status: str) -> None:
+    def _apply_status(task: Task, new_status: str) -> bool:
+        """应用状态流转。返回是否刚变为 completed（供提交后发布事件）。"""
         if new_status not in STATUS_TRANSITIONS.get(task.status, set()):
             raise TaskStateException(f"不能从 {task.status} 流转到 {new_status}")
+        became_completed = False
         if new_status == "completed":
             task.status = "completed"
             task.completed_at = utcnow()
-            event_bus.publish(EVENT_TASK_COMPLETED, task_id=task.id)
+            became_completed = True
         elif task.status == "completed" and new_status != "completed":
             task.status = new_status
             task.completed_at = None
         else:
             task.status = new_status
+        return became_completed
+        # 注意：EVENT_TASK_COMPLETED 不在此发布——数据尚未 commit，
+        # 事件处理器用独立 Session 会读不到；改由 update() 在 commit 后发布
 
     # ---------- 任务 CRUD ----------
     def list(
@@ -175,13 +180,17 @@ class TaskService:
     def update(self, user_id: str, task_id: str, data: UpdateTaskRequest) -> TaskOut:
         task = self._owned(task_id, user_id)
         payload = data.model_dump(exclude_unset=True)
+        became_completed = False
         if "status" in payload:
-            self._apply_status(task, payload.pop("status"))
+            became_completed = self._apply_status(task, payload.pop("status"))
         for key, value in payload.items():
             if key in self._UPDATABLE_FIELDS:
                 setattr(task, key, value)
         self.db.commit()
         self.db.refresh(task)
+        # 事件在 commit 后发布：处理器用独立 Session，未提交数据读不到
+        if became_completed:
+            event_bus.publish(EVENT_TASK_COMPLETED, task_id=task.id)
         return self._to_out(task)
 
     def delete(self, user_id: str, task_id: str) -> None:

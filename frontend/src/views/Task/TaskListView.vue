@@ -18,11 +18,12 @@ import BaseModal from '@/components/common/BaseModal.vue'
 import BaseDrawer from '@/components/common/BaseDrawer.vue'
 import BaseEmpty from '@/components/common/BaseEmpty.vue'
 import BaseSkeleton from '@/components/common/BaseSkeleton.vue'
+import BasePagination from '@/components/common/BasePagination.vue'
 import AppIcon from '@/components/common/AppIcon.vue'
 import type { Task, TaskStatus, TaskPriority, Subtask } from '@/types'
 import type { TagSemantic } from '@/types/common'
 
-const { tasks, loading, query, fetchTasks, createTask, updateTask, deleteTask, setFocus } = useTask()
+const { tasks, total, loading, query, fetchTasks, createTask, updateTask, deleteTask, setFocus } = useTask()
 const toast = useToast()
 const modal = useModal()
 const route = useRoute()
@@ -41,11 +42,10 @@ async function loadProjects() {
 
 onMounted(() => {
   loadProjects()
+  // 按 URL 参数组装 query 后统一发起唯一一次请求（避免双请求竞态）
   const urlProject = route.query.project_id as string
-  if (urlProject) {
-    query.value.project_id = urlProject
-    fetchTasks()
-  }
+  if (urlProject) query.value.project_id = urlProject
+  fetchTasks().catch(() => { /* http 层已提示 */ })
 })
 
 const STATUS_TABS: Array<{ value: TaskStatus | ''; label: string }> = [
@@ -77,7 +77,8 @@ const priorityOptions = [
 
 function switchTab(v: TaskStatus | '') {
   query.value.status = v || undefined
-  fetchTasks()
+  query.value.page = 1
+  fetchTasks().catch(() => { /* http 层已提示 */ })
 }
 
 // 视图切换：列表 / 看板
@@ -96,8 +97,14 @@ function switchView(mode: 'list' | 'kanban') {
   viewMode.value = mode
   if (mode === 'kanban') {
     query.value.status = undefined
-    fetchTasks()
+    query.value.page = 1
+    fetchTasks().catch(() => { /* http 层已提示 */ })
   }
+}
+
+function onPageChange(p: number) {
+  query.value.page = p
+  fetchTasks().catch(() => { /* http 层已提示 */ })
 }
 
 const kanbanGroups = computed(() => {
@@ -134,27 +141,36 @@ const newDueDate = ref('')
 async function onCreate() {
   const title = newTitle.value.trim()
   if (!title) return toast.warning('请输入任务标题')
-  await createTask({
-    title,
-    priority: newPriority.value,
-    due_date: newDueDate.value || undefined,
-  })
-  toast.success('任务已创建')
-  createOpen.value = false
-  newTitle.value = ''
-  newDueDate.value = ''
+  try {
+    await createTask({
+      title,
+      priority: newPriority.value,
+      due_date: newDueDate.value || undefined,
+    })
+    toast.success('任务已创建')
+    createOpen.value = false
+    newTitle.value = ''
+    newDueDate.value = ''
+  } catch {
+    // 创建失败：保留弹窗与用户输入，错误提示由 http 层统一处理
+  }
 }
 
 async function onToggleStatus(t: Task) {
   const next = t.status === 'completed' ? 'pending' : 'completed'
-  await updateTask(t.id, { status: next })
-  emitPetAction(next === 'completed' ? 'celebrate' : 'thinking', 2500)
+  try {
+    await updateTask(t.id, { status: next })
+    emitPetAction(next === 'completed' ? 'celebrate' : 'thinking', 2500)
+  } catch { /* http 层已提示 */ }
 }
 
 async function onSetFocus(t: Task) {
-  await setFocus(t)
-  emitPetAction(t.is_focus ? 'happy' : 'sleep', 2000)
-  toast.success(t.is_focus ? '已取消今日最重要' : '已设为今日最重要')
+  try {
+    await setFocus(t)
+    // t.is_focus 为切换前的旧值：旧值为焦点→现在取消（sleep）；旧值非焦点→现在设为焦点（happy）
+    emitPetAction(t.is_focus ? 'sleep' : 'happy', 2000)
+    toast.success(t.is_focus ? '已取消今日最重要' : '已设为今日最重要')
+  } catch { /* http 层已提示 */ }
 }
 
 async function onDelete(t: Task) {
@@ -162,9 +178,11 @@ async function onDelete(t: Task) {
     title: '删除任务', message: `确定删除「${t.title}」吗？删除后无法恢复。`, confirmText: '删除',
   })
   if (!ok) return
-  await deleteTask(t.id)
-  toast.success('任务已删除')
-  if (detailTask.value?.id === t.id) detailOpen.value = false
+  try {
+    await deleteTask(t.id)
+    toast.success('任务已删除')
+    if (detailTask.value?.id === t.id) detailOpen.value = false
+  } catch { /* http 层已提示 */ }
 }
 
 // ========== 任务详情抽屉 ==========
@@ -178,10 +196,12 @@ const editForm = ref({
   priority: 'medium' as TaskPriority, project_tag: '', project_id: '', due_date: '',
 })
 
+let detailSeq = 0
 async function openDetail(t: Task) {
   detailTask.value = t
   detailOpen.value = true
   detailLoading.value = true
+  const mySeq = ++detailSeq
   editForm.value = {
     title: t.title, description: t.description ?? '',
     status: t.status, priority: t.priority,
@@ -189,43 +209,53 @@ async function openDetail(t: Task) {
   }
   try {
     const detail = await taskApi.detail(t.id)
+    // 过期响应守卫：快速连点两个任务时，丢弃后到的旧详情
+    if (mySeq !== detailSeq || detailTask.value?.id !== t.id) return
     subtasks.value = detail.subtasks ?? []
   } catch { /* ignore */ } finally {
-    detailLoading.value = false
+    if (mySeq === detailSeq) detailLoading.value = false
   }
 }
 
 async function saveDetail() {
   if (!detailTask.value) return
   const t = detailTask.value
-  await updateTask(t.id, {
-    title: editForm.value.title,
-    description: editForm.value.description,
-    status: editForm.value.status,
-    priority: editForm.value.priority,
-    project_tag: editForm.value.project_tag || undefined,
-    project_id: editForm.value.project_id || undefined,
-    due_date: editForm.value.due_date || undefined,
-  })
-  detailTask.value = { ...t, ...editForm.value, description: editForm.value.description || null, project_tag: editForm.value.project_tag || null, due_date: editForm.value.due_date || null }
-  toast.success('已保存')
+  try {
+    await updateTask(t.id, {
+      title: editForm.value.title,
+      description: editForm.value.description,
+      status: editForm.value.status,
+      priority: editForm.value.priority,
+      project_tag: editForm.value.project_tag || undefined,
+      project_id: editForm.value.project_id || undefined,
+      due_date: editForm.value.due_date || undefined,
+    })
+    detailTask.value = { ...t, ...editForm.value, description: editForm.value.description || null, project_tag: editForm.value.project_tag || null, due_date: editForm.value.due_date || null }
+    toast.success('已保存')
+  } catch { /* http 层已提示 */ }
 }
 
 async function addSubtask() {
   if (!detailTask.value || !newSubtask.value.trim()) return
-  const sub = await taskApi.addSubtask(detailTask.value.id, newSubtask.value.trim())
-  subtasks.value.push(sub)
-  newSubtask.value = ''
+  try {
+    const sub = await taskApi.addSubtask(detailTask.value.id, newSubtask.value.trim())
+    subtasks.value.push(sub)
+    newSubtask.value = ''
+  } catch { /* http 层已提示 */ }
 }
 
 async function toggleSubtask(sub: Subtask) {
-  await taskApi.updateSubtask(detailTask.value!.id, sub.id, { completed: !sub.completed })
-  sub.completed = !sub.completed
+  try {
+    await taskApi.updateSubtask(detailTask.value!.id, sub.id, { completed: !sub.completed })
+    sub.completed = !sub.completed
+  } catch { /* http 层已提示 */ }
 }
 
 async function deleteSubtask(sub: Subtask) {
-  await taskApi.removeSubtask(detailTask.value!.id, sub.id)
-  subtasks.value = subtasks.value.filter(s => s.id !== sub.id)
+  try {
+    await taskApi.removeSubtask(detailTask.value!.id, sub.id)
+    subtasks.value = subtasks.value.filter(s => s.id !== sub.id)
+  } catch { /* http 层已提示 */ }
 }
 
 const subtaskProgress = computed(() => {
@@ -337,6 +367,15 @@ function formatDate(iso: string | null): string {
         </BaseEmpty>
       </template>
     </BaseCard>
+
+    <!-- 分页（仅列表视图；看板展示当前页分组） -->
+    <BasePagination
+      v-if="viewMode === 'list' && !loading"
+      :total="total"
+      :page="query.page ?? 1"
+      :page-size="query.page_size ?? 20"
+      @change="onPageChange"
+    />
 
     <!-- 新建任务弹窗 -->
     <BaseModal v-model="createOpen" title="新建任务" @confirm="onCreate">

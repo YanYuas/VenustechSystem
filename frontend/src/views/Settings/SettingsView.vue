@@ -2,7 +2,7 @@
 // ============================================================
 // 设置页 —— 外观 / AI / 第二分身 / 数据管理 / 关于
 // ============================================================
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { authApi, backupApi } from '@/api'
 import { useTheme } from '@/composables/useTheme'
 import { useToast } from '@/composables/useToast'
@@ -60,12 +60,25 @@ async function loadConfig() {
   loading.value = true
   try {
     userConfig.value = await authApi.me()
+    nicknameDraft.value = userConfig.value?.nickname ?? ''
   } catch (err) {
     console.error('[Settings] load config failed', err)
   } finally {
     loading.value = false
   }
 }
+
+// 昵称：本地草稿 + 防抖提交（避免每个击键发一次 PATCH）
+const nicknameDraft = ref('')
+let nicknameTimer: ReturnType<typeof setTimeout> | undefined
+watch(nicknameDraft, (v) => {
+  clearTimeout(nicknameTimer)
+  nicknameTimer = setTimeout(() => {
+    const name = v.trim()
+    if (name && name !== userConfig.value?.nickname) saveConfig({ nickname: name })
+  }, 800)
+})
+onBeforeUnmount(() => clearTimeout(nicknameTimer))
 
 async function loadStats() {
   try {

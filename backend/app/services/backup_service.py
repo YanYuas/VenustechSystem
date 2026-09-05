@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.core.exceptions import ValidationException
 from app.core.logger import get_logger
+from app.database import engine
 from app.models.conversation import Conversation
 from app.models.document import Document
 from app.models.task import Task
@@ -63,8 +64,8 @@ class BackupService:
     def import_(self, file_bytes: bytes, filename: str) -> dict:
         """从备份包恢复数据库：校验 → 备份当前库 → 替换 → 标记需重启。
 
-        由于 SQLite 单连接（StaticPool），替换文件后需重启应用生效。
         当前数据库会被重命名为 app.db.bak.{timestamp}，可回滚。
+        替换前 dispose 引擎连接，避免旧连接句柄继续指向被改名的文件。
         """
         # 1. 文件大小校验
         if len(file_bytes) > MAX_BACKUP_SIZE:
@@ -81,7 +82,11 @@ class BackupService:
         except (zipfile.BadZipFile, ValueError, json.JSONDecodeError) as exc:
             raise ValidationException(f"备份包无效: {exc}") from exc
 
-        # 3. 版本兼容性校验（主版本号不同则警告但不阻止）
+        # 3. 校验 app.db 是合法 SQLite 文件（防止损坏/恶意包直接覆盖用户库）
+        if not db_bytes.startswith(b"SQLite format 3\x00"):
+            raise ValidationException("备份包中的 app.db 不是有效的 SQLite 数据库文件")
+
+        # 4. 版本兼容性校验（主版本号不同则警告但不阻止）
         backup_version = manifest.get("app_version", "0.0.0")
         current_version = self.settings.version
         if backup_version.split(".")[0] != current_version.split(".")[0]:
@@ -94,17 +99,21 @@ class BackupService:
         self.db.execute(text("PRAGMA wal_checkpoint(TRUNCATE)"))
         self.db.commit()
 
-        # 2. 备份当前数据库
+        # 2. 释放引擎持有的连接句柄：否则旧连接仍指向改名后的旧文件，
+        #    「需重启」窗口期内的读写会落到备份文件且破坏 WAL 状态
+        engine.dispose()
+
+        # 3. 备份当前数据库
         current_db = self.settings.db_path
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         backup_path = current_db.with_suffix(f".db.bak.{timestamp}")
         if current_db.exists():
             current_db.rename(backup_path)
 
-        # 3. 写入备份数据库
+        # 4. 写入备份数据库
         current_db.write_bytes(db_bytes)
 
-        # 4. 清理 WAL/SHM 文件（旧连接的残留）
+        # 5. 清理 WAL/SHM 文件（旧连接的残留）
         for suffix in (".db-wal", ".db-shm"):
             wal_file = current_db.with_suffix(suffix)
             if wal_file.exists():

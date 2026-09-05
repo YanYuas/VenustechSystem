@@ -56,19 +56,25 @@ function mapResult(data: SearchResult): SearchResultItem[] {
   return items
 }
 
+/** 请求序号守卫：连续搜索时丢弃后到的过期响应，防止旧结果覆盖新结果 */
+let searchSeq = 0
 async function doSearch(q: string) {
   if (!q.trim()) {
+    searchSeq++
     results.value = []
     return
   }
+  const mySeq = ++searchSeq
   loading.value = true
   try {
     const data = await documentApi.search(q)
+    if (mySeq !== searchSeq) return
     results.value = mapResult(data)
   } catch {
+    if (mySeq !== searchSeq) return
     results.value = []
   } finally {
-    loading.value = false
+    if (mySeq === searchSeq) loading.value = false
   }
 }
 

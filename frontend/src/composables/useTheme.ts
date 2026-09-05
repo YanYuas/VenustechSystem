@@ -10,7 +10,7 @@
 //   abyss+light   → data-theme="abyss-light"
 //   abyss+dark    → data-theme="abyss"
 // ============================================================
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, ref } from 'vue'
 import type { ThemeConfig, ThemeMode, ThemePack } from '@/types/common'
 
 const STORAGE_KEY = 'qm-star-theme'
@@ -83,20 +83,16 @@ function cyclePack() {
   setPack(order[(idx + 1) % order.length])
 }
 
-let mediaHandler: ((e: MediaQueryListEvent) => void) | null = null
+// 模块级立即应用（不等组件 mounted）：配合 index.html 内联脚本消除主题闪烁
+apply(config.value)
+
+// 系统明暗变化监听：模块级只注册一次，避免多组件挂载/卸载互相覆盖导致泄漏
+const onMediaChange = () => {
+  if (config.value.mode === 'system') apply(config.value)
+}
+media.addEventListener('change', onMediaChange)
 
 export function useTheme() {
-  onMounted(() => {
-    apply(config.value)
-    mediaHandler = () => {
-      if (config.value.mode === 'system') apply(config.value)
-    }
-    media.addEventListener('change', mediaHandler)
-  })
-  onUnmounted(() => {
-    if (mediaHandler) media.removeEventListener('change', mediaHandler)
-  })
-
   const isDark = computed(() => resolveMode(config.value.mode) === 'dark')
   const pack = computed(() => config.value.pack)
   const mode = computed(() => config.value.mode)

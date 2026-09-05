@@ -92,24 +92,30 @@ export function useReminderWatcher() {
     }
   }
 
+  // 自调度循环：等上一次检查完成后再等 30s，避免慢网络下请求堆叠
+  async function loop() {
+    if (!running) return
+    if (!document.hidden) await checkReminders()
+    if (!running) return
+    timer = setTimeout(loop, CHECK_INTERVAL)
+  }
+
   // 启动监控
   function start() {
     if (running) return
     running = true
     requestPermission()
-    // 启动后先检查一次
-    checkReminders()
-    // 定期检查
-    timer = setInterval(checkReminders, CHECK_INTERVAL)
+    // 启动后先检查一次，随后进入自调度循环
+    loop()
   }
 
   // 停止监控
   function stop() {
+    running = false
     if (timer) {
-      clearInterval(timer)
+      clearTimeout(timer)
       timer = null
     }
-    running = false
   }
 
   onMounted(() => {

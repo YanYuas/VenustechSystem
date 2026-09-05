@@ -57,7 +57,13 @@ function setAction(a: PetAction, duration = 0) {
   }
 }
 
+/** 拖拽发生过位移后吞掉紧跟的 click，避免拖完随机播放动作 */
+let dragMoved = false
 function onClick() {
+  if (dragMoved) {
+    dragMoved = false
+    return
+  }
   const actions: PetAction[] = ['happy', 'thinking', 'celebrate']
   setAction(actions[Math.floor(Math.random() * actions.length)], 2000)
   emit('click')
@@ -65,19 +71,34 @@ function onClick() {
 
 function onDragStart(e: MouseEvent) {
   dragging.value = true
+  dragMoved = false
   dragOffset.x = e.clientX - pos.value.x
   dragOffset.y = e.clientY - pos.value.y
   document.addEventListener('mousemove', onDragMove)
   document.addEventListener('mouseup', onDragEnd)
 }
 
+// rAF 合帧：mousemove 事件频率（可达 125Hz+）远高于渲染帧率，逐事件写 ref 会造成多余重渲染
+let rafId = 0
+let pendingPos = { x: 0, y: 0 }
 function onDragMove(e: MouseEvent) {
   if (!dragging.value) return
-  pos.value = { x: e.clientX - dragOffset.x, y: e.clientY - dragOffset.y }
+  dragMoved = true
+  pendingPos = { x: e.clientX - dragOffset.x, y: e.clientY - dragOffset.y }
+  if (!rafId) {
+    rafId = requestAnimationFrame(() => {
+      rafId = 0
+      pos.value = { ...pendingPos }
+    })
+  }
 }
 
 function onDragEnd() {
   dragging.value = false
+  if (rafId) {
+    cancelAnimationFrame(rafId)
+    rafId = 0
+  }
   document.removeEventListener('mousemove', onDragMove)
   document.removeEventListener('mouseup', onDragEnd)
   emit('move', pos.value)
@@ -123,7 +144,7 @@ const petClass = computed(() => ({
   <div
     class="pet"
     :class="petClass"
-    :style="{ left: pos.x + 'px', top: pos.y + 'px', zIndex: topmost ? 9999 : 100 }"
+    :style="{ transform: `translate3d(${pos.x}px, ${pos.y}px, 0)`, zIndex: topmost ? 9999 : 100 }"
     @mousedown="onDragStart"
     @click.stop="onClick"
   >
@@ -174,12 +195,15 @@ const petClass = computed(() => ({
 <style scoped lang="scss">
 .pet {
   position: fixed;
+  left: 0;
+  top: 0;
   width: 100px;
   cursor: grab;
   user-select: none;
-  transition: transform 0.3s var(--ease-spring);
+  /* 定位走 transform（合成层，不触发重排）；hover 缩放在 __body 上，避免与定位 transform 冲突 */
+  will-change: transform;
   &:active { cursor: grabbing; }
-  &:hover { transform: scale(1.05); }
+  &:hover .pet__body { transform: scale(1.05); }
 
   &__bubble {
     position: absolute;
@@ -204,13 +228,19 @@ const petClass = computed(() => ({
       border-top-color: var(--bg-raised);
     }
   }
-  &__body { position: relative; width: 100px; height: 120px; }
+  &__body {
+    position: relative;
+    width: 100px;
+    height: 120px;
+    transition: transform 0.3s var(--ease-spring);
+  }
   &__svg { width: 100%; height: 100%; filter: drop-shadow(0 4px 12px rgba(0,0,0,0.15)); }
 
   &--idle .pet__svg { animation: idle-bounce 2s ease-in-out infinite; }
   &--happy .pet__svg { animation: happy-jump 0.5s ease-in-out infinite; }
   &--thinking .pet__eyes { animation: blink 3s ease-in-out infinite; }
-  &--working { animation: working-shake 0.3s ease-in-out infinite; }
+  /* 抖动放 __body：根元素 transform 用于定位，CSS 动画会覆盖内联样式导致跳位 */
+  &--working .pet__body { animation: working-shake 0.3s ease-in-out infinite; }
   &--celebrate .pet__svg { animation: celebrate-spin 0.6s ease-in-out; }
   &--sleep .pet__eyes { opacity: 0.3; }
 

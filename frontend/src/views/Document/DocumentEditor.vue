@@ -53,7 +53,15 @@ const { dirty, lastSaved, save, scheduleSave } = useAutoSave(
   { onSave: doSave, debounce: 1000, interval: 30000 },
 )
 
-watch([title, content], () => scheduleSave())
+/** 恢复历史版本时跳过自动保存触发，避免刚恢复的内容立即生成新版本 */
+let suppressAutoSave = 0
+watch([title, content], () => {
+  if (suppressAutoSave > 0) {
+    suppressAutoSave--
+    return
+  }
+  scheduleSave()
+})
 
 function addTag() {
   const t = tagInput.value.trim()
@@ -105,6 +113,7 @@ function openHistory() {
 async function restoreVersion(v: DocumentVersion) {
   try {
     const doc = await documentApi.restoreVersion(props.document.id, v.version)
+    suppressAutoSave = 2 // 赋值 title + content 各触发一次 watch
     content.value = doc.content ?? ''
     title.value = doc.title
     emit('saved', doc)
@@ -175,12 +184,11 @@ async function restoreVersion(v: DocumentVersion) {
       >+ {{ t }}</button>
     </div>
 
-    <!-- 正文编辑区 -->
+    <!-- 正文编辑区（watch 已触发自动保存，无需 @input） -->
     <textarea
       v-model="content"
       class="editor__content"
       placeholder="开始写作..."
-      @input="scheduleSave"
     />
 
     <!-- 版本历史抽屉 -->

@@ -8,6 +8,7 @@ import type { Document, Folder, DocumentListQuery, CreateDocumentRequest, Update
 
 export function useDocument() {
   const documents = ref<Document[]>([])
+  const total = ref(0)
   const folders = ref<Folder[]>([])
   const tags = ref<string[]>([])
   const query = ref<DocumentListQuery>({ page: 1, page_size: 20 })
@@ -16,6 +17,7 @@ export function useDocument() {
     async () => {
       const res = await documentApi.list(query.value)
       documents.value = res.list
+      total.value = res.total
       return res
     },
   )
@@ -70,6 +72,7 @@ export function useDocument() {
 
   return {
     documents,
+    total,
     folders,
     tags,
     query,

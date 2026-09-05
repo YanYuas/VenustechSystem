@@ -13,13 +13,14 @@ from app.models.types import StringListType
 class Document(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
     __tablename__ = "documents"
 
+    # user_id/folder_id 加索引：列表页按两者过滤是最高频查询路径
     user_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
     title: Mapped[str] = mapped_column(String(500), nullable=False)
     content: Mapped[str | None] = mapped_column(Text, nullable=True)
     folder_id: Mapped[str | None] = mapped_column(
-        String(36), ForeignKey("folders.id", ondelete="SET NULL"), nullable=True
+        String(36), ForeignKey("folders.id", ondelete="SET NULL"), nullable=True, index=True
     )
     tags: Mapped[list] = mapped_column(StringListType, default=list)
     summary: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -48,6 +49,6 @@ class Backlink(UUIDMixin, TimestampMixin, Base):
         String(36), ForeignKey("documents.id", ondelete="CASCADE"), nullable=False, index=True
     )
     target_doc_id: Mapped[str | None] = mapped_column(
-        String(36), ForeignKey("documents.id", ondelete="CASCADE"), nullable=True
+        String(36), ForeignKey("documents.id", ondelete="CASCADE"), nullable=True, index=True
     )
     target_title: Mapped[str | None] = mapped_column(String(500), nullable=True)

@@ -22,11 +22,12 @@ import type { ReviewType } from '@/types'
 const { reviews, autoFillData, loading, fetchReviews, fetchAutoFill, saveReview, convertToTask } = useReview()
 const toast = useToast()
 
-const today = dayjs().format('YYYY-MM-DD')
+/** 动态取「今天」：应用跨午夜挂机后仍写入正确日期 */
+const today = () => dayjs().format('YYYY-MM-DD')
 
 onMounted(() => {
-  fetchReviews('daily' as ReviewType)
-  fetchAutoFill(today, 'daily' as ReviewType)
+  fetchReviews('daily' as ReviewType).catch(() => { /* http 层已提示 */ })
+  fetchAutoFill(today(), 'daily' as ReviewType).catch(() => { /* http 层已提示 */ })
 })
 
 const starOptions = [1, 2, 3, 4, 5].map((n) => ({ label: '★'.repeat(n), value: String(n) }))
@@ -60,7 +61,7 @@ async function genReflections() {
   if (aiLoading.value) return
   aiLoading.value = true
   try {
-    const res = await aiApi.reflectionQuestions('daily', today, {
+    const res = await aiApi.reflectionQuestions('daily', today(), {
       gains: form.value.gains,
       mood: Number(form.value.mood),
       energy: Number(form.value.energy),
@@ -87,22 +88,26 @@ function openWrite() {
 
 async function onSave() {
   if (!form.value.gains.trim()) return toast.warning('写一点今日收获吧')
-  await saveReview({
-    type: 'daily',
-    date: today,
-    data: {
-      completed_tasks: form.value.completed_tasks,
-      unfinished_tasks: '',
-      gains: form.value.gains,
-      reflections: reflections.value,
-      tomorrow_plan: form.value.tomorrow_plan,
-      mood: Number(form.value.mood),
-      energy: Number(form.value.energy),
-    },
-  })
-  toast.success('复盘已保存')
-  writeOpen.value = false
-  await fetchReviews('daily' as ReviewType)
+  try {
+    await saveReview({
+      type: 'daily',
+      date: today(),
+      data: {
+        completed_tasks: form.value.completed_tasks,
+        unfinished_tasks: '',
+        gains: form.value.gains,
+        reflections: reflections.value,
+        tomorrow_plan: form.value.tomorrow_plan,
+        mood: Number(form.value.mood),
+        energy: Number(form.value.energy),
+      },
+    })
+    toast.success('复盘已保存')
+    writeOpen.value = false
+    await fetchReviews('daily' as ReviewType)
+  } catch {
+    // 保存失败：保持弹窗打开，错误提示由 http 层统一处理
+  }
 }
 
 /** 明日计划某行 → 转任务 */
@@ -197,7 +202,9 @@ function toggleDetail(id: string) {
               <div class="review__detail-section" v-if="r.data.reflections?.length">
                 <h4>反思</h4>
                 <ul>
-                  <li v-for="(ref, i) in r.data.reflections" :key="i">{{ ref }}</li>
+                  <li v-for="(ref, i) in r.data.reflections" :key="i">
+                    {{ typeof ref === 'string' ? ref : `${ref.question}${ref.answer ? '：' + ref.answer : ''}` }}
+                  </li>
                 </ul>
               </div>
               <div class="review__detail-meta">

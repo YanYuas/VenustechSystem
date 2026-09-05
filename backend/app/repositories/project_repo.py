@@ -37,3 +37,26 @@ class ProjectRepository(BaseRepository[Project]):
         ).scalar() or 0
         progress = round((completed / total) * 100) if total > 0 else 0
         return {"task_count": total, "completed_count": completed, "progress": progress}
+
+    def stats_by_project(self, user_id: str, project_ids: list[str]) -> dict[str, dict]:
+        """一次 GROUP BY 拿到所有项目的任务统计（列表页避免 N+2 条 COUNT）"""
+        result = {
+            pid: {"task_count": 0, "completed_count": 0, "progress": 0}
+            for pid in project_ids
+        }
+        if not project_ids:
+            return result
+        rows = self.db.execute(
+            select(Task.project_id, Task.status).where(Task.project_id.in_(project_ids))
+        ).all()
+        for pid, status in rows:
+            stats = result[pid]
+            stats["task_count"] += 1
+            if status == "completed":
+                stats["completed_count"] += 1
+        for stats in result.values():
+            if stats["task_count"] > 0:
+                stats["progress"] = round(
+                    stats["completed_count"] / stats["task_count"] * 100
+                )
+        return result

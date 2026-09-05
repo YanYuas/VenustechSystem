@@ -56,15 +56,21 @@ function removeRefDoc(id: string) {
 }
 
 onMounted(() => {
-  fetchConversations()
+  fetchConversations().catch(() => { /* http 层已提示 */ })
 })
 
 async function handleSend() {
   if (!input.value.trim() || streaming.value) return
   const content = input.value
   input.value = ''
+  // 无当前会话时先创建：失败则回填输入框，避免用户消息凭空丢失
   if (!currentId.value) {
-    await createConversation('新对话')
+    try {
+      await createConversation('新对话')
+    } catch {
+      input.value = content
+      return
+    }
   }
   await sendMessage({
     content,
@@ -76,7 +82,7 @@ async function handleSend() {
 
 async function selectConversation(id: string) {
   currentId.value = id
-  await fetchMessages(id)
+  fetchMessages(id).catch(() => { /* http 层已提示 */ })
 }
 
 /** ISO 时间 → 紧凑显示（MM-DD HH:mm） */
@@ -89,7 +95,9 @@ async function onDeleteConversation(id: string, title: string | null) {
     confirmText: '删除',
   })
   if (!ok) return
-  await deleteConversation(id)
+  try {
+    await deleteConversation(id)
+  } catch { /* http 层已提示 */ }
 }
 
 function fmtTime(iso: string) {
@@ -105,7 +113,7 @@ function fmtTime(iso: string) {
     <aside class="conv-view__sidebar">
       <div class="conv-view__sidebar-head">
         <h3 class="conv-view__title">对话</h3>
-        <BaseButton variant="primary" size="sm" @click="createConversation('新对话')">
+        <BaseButton variant="primary" size="sm" @click="createConversation('新对话').catch(() => {})">
           新建
         </BaseButton>
       </div>

@@ -1,4 +1,4 @@
-﻿# ============================================================
+# ============================================================
 # 仪表盘聚合服务（PRD §13.7 / M1 首页 + 参考UI模块丰富度）
 # 已实现模块返回真实数据，待开发模块返回占位+status="planned"
 # ============================================================
@@ -9,7 +9,7 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
-from app.core.utils import greeting_by_hour
+from app.core.utils import greeting_by_hour, local_day_bounds_utc
 from app.models.user import User
 from app.repositories import DocumentRepository, TaskRepository
 from app.schemas.dashboard import (
@@ -104,9 +104,8 @@ class DashboardService:
         focus_task = next((t for t in all_tasks if t.is_focus), None)
         focus_out = self.task_svc._to_focus_out(focus_task) if focus_task else None
 
-        # 今日统计（内存计算）
-        day_start = datetime(today.year, today.month, today.day)
-        day_end = datetime(today.year, today.month, today.day, 23, 59, 59, 999999)
+        # 今日统计（内存计算；completed_at 为 UTC，本地日边界须换算后比较）
+        day_start, day_end = local_day_bounds_utc(today)
         today_stats = TodayStatsOut(
             must_do=sum(1 for t in all_tasks if t.due_date == today and t.status != "completed"),
             in_progress=sum(1 for t in all_tasks if t.status == "in_progress"),
@@ -114,7 +113,7 @@ class DashboardService:
             completed_today=sum(
                 1 for t in all_tasks
                 if t.status == "completed" and t.completed_at
-                and day_start <= t.completed_at <= day_end
+                and day_start <= t.completed_at < day_end
             ),
         )
 

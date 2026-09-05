@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.core.exceptions import NotFoundException
 from app.core.utils import WEEKDAYS, format_date_cn, greeting_by_hour
+from app.models.base import utcnow
 from app.models.panel import QuickTodo, Reminder
 from app.models.user import User
 from app.repositories import QuickTodoRepository, ReminderRepository, TaskRepository
@@ -76,7 +77,8 @@ class PanelService:
         payload = data.model_dump(exclude_unset=True)
         if "completed" in payload:
             todo.completed = payload["completed"]
-            todo.completed_at = datetime.utcnow() if payload["completed"] else None
+            # 与 models.base 的 aware utcnow() 保持一致（datetime.utcnow 已废弃且返回 naive）
+            todo.completed_at = utcnow() if payload["completed"] else None
         if "title" in payload:
             todo.title = payload["title"]
         self.db.commit()

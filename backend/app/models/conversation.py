@@ -13,8 +13,9 @@ from app.models.types import StringListType
 class Conversation(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
     __tablename__ = "conversations"
 
+    # 会话列表按 user_id 过滤，加索引
     user_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
     title: Mapped[str | None] = mapped_column(String(200), nullable=True)
     scene: Mapped[str] = mapped_column(String(30), default="general")
