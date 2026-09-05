@@ -1,0 +1,402 @@
+// ============================================================
+// 启明星系统 · 设计令牌体系（唯一视觉来源）
+// 依据: docs/design/03-UI组件index.md §0
+// 硬约束: 全库组件只出现以下 token，组件文件内 grep '#' 零命中
+// 结构: :root(奶油日) + [data-theme="dark"](可可夜)
+// ============================================================
+
+:root {
+  // ---------- 色彩系统：基础色 ----------
+  --bg-cream: #FFFBF5;      // 奶油底（页面底）
+  --bg-panel: #FFFFFF;      // 糖纸白（卡片/侧栏）
+  --bg-raised: #FFFFFF;     // 浮层（弹窗/下拉/抽屉）
+  --bg-inset: #FBF1E7;      // 内嵌（输入框/表格底/代码块）
+  --line: #F2E4D8;          // 奶咖线（边框/分割线 1px）
+  --text-hi: #5C4A45;       // 可可深（标题/数值，暖棕黑）
+  --text-mid: #9B7E72;      // 焦糖（正文）
+  --text-low: #C0A89B;      // 奶茶（辅助/禁用/占位）
+  --primary: #FF8FA3;       // 启明粉（唯一主色）
+  --mint: #7BD3B2;          // 薄荷绿（成功/已完成/在线）
+  --butter: #FFD97A;        // 奶黄（提醒/进行中/待办）
+  --sky: #8FC1F0;           // 云朵蓝（信息提示/引用/链接）
+  --lilac: #C9AEE8;         // 淡紫（趣味点缀/标签/插画）
+  --strawberry: #FF6B7D;    // 草莓红（高危/删除/阻断/逾期）
+  --gold: #F5C842;          // 星尘金（灵感/成就/星级/桌宠高光）
+
+  // ---------- 色彩系统：语义衍生深色（文字/图标） ----------
+  --primary-ink: #D96579;   // 主色深色文字
+  --mint-ink: #2F9E76;      // 成功态文字
+  --butter-ink: #B0872A;    // 提醒态文字
+  --sky-ink: #3A7BC0;       // 信息态文字
+  --lilac-ink: #9A7BB8;     // 点缀态文字
+  --straw-ink: #E24A5E;     // 危险态文字
+  --gold-ink: #B8901A;      // 星尘金文字
+
+  // ---------- 色彩系统：功能派生 ----------
+  --white: #FFFFFF;             // 纯白（按钮文字/图标）
+  --on-primary: #FFFFFF;        // 主按钮上的文字
+  --primary-soft: rgba(255,143,163,.12); // 激活态背景
+  --mint-soft: rgba(123,211,178,.18);    // 薄荷绿状态背景
+  --butter-soft: rgba(255,217,122,.2);   // 奶黄状态背景
+  --sky-soft: rgba(143,193,240,.18);     // 云朵蓝状态背景
+  --lilac-soft: rgba(201,174,232,.18);   // 淡紫状态背景
+  --straw-soft: rgba(255,107,125,.14);   // 草莓红状态背景
+  --gold-soft: rgba(245,200,66,.18);     // 星尘金状态背景
+  --overlay: rgba(92,74,69,.4); // 遮罩
+  --dot: rgba(255,143,163,.05); // 页面奶油波点
+  --focus-ring: rgba(255,143,163,.35);  // 键盘焦点环
+
+  // ---------- 字体 ----------
+  --font-cute: 'ZCOOL KuaiLe', 'HarmonyOS Sans SC', 'PingFang SC', sans-serif;
+  --font-body: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+
+  // ---------- 字号阶梯 ----------
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-base: 13px;
+  --text-md: 15px;
+  --text-lg: 18px;
+  --text-xl: 24px;
+  --text-2xl: 32px;
+
+  // ---------- 几何：圆角 ----------
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --radius-xl: 32px;
+  --radius-pill: 999px;
+
+  // ---------- 几何：投影（糖果软影，粉调） ----------
+  --shadow-card: 0 6px 16px rgba(255,143,163,.18);
+  --shadow-raise: 0 12px 32px rgba(255,143,163,.28);
+  --glow: 0 0 20px rgba(255,143,163,.30);
+  --glow-gold: 0 0 16px rgba(245,200,66,.35);
+  --shadow-danger: 0 6px 16px rgba(255,107,125,.3); // 危险按钮/删除辉光
+  --dot-shadow: 0 2px 6px rgba(92,74,69,.25);       // 滑块/小圆点阴影
+
+  // ---------- 间距 ----------
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+
+  // ---------- 缓动（动效唯一来源） ----------
+  --ease-spring: cubic-bezier(.34,1.56,.64,1); // 软弹簧
+  --ease-soft: cubic-bezier(.22,1,.36,1);     // 柔和
+
+  // ---------- 组件尺寸基线 ----------
+  --control-h: 40px;          // 控件默认高
+  --control-h-sm: 32px;
+  --control-h-lg: 48px;
+  --row-h: 44px;              // 列表/侧边栏项高
+  --table-row-h: 40px;        // 表格行高
+}
+
+// ============================================================
+// 可可夜（暗色）
+// ============================================================
+[data-theme='dark'] {
+  --bg-cream: #2B2222;
+  --bg-panel: #3A2F2E;
+  --bg-raised: #453838;
+  --bg-inset: #332828;
+  --line: #574641;
+  --text-hi: #FCEFE6;
+  --text-mid: #C9AFA3;
+  --text-low: #8A6F66;
+  --primary: #FF9EB0;
+  --mint: #8FE3C2;
+  --butter: #FFE29A;
+  --sky: #A6D2F5;
+  --lilac: #D8C2F0;
+  --strawberry: #FF8C9A;
+  --gold: #FFD966;
+
+  --primary-ink: #FFB8C4;
+  --mint-ink: #63C9A6;
+  --butter-ink: #E4B95C;
+  --sky-ink: #8FC6F2;
+  --lilac-ink: #C9B1E8;
+  --straw-ink: #F07C8C;
+  --gold-ink: #E0B830;
+
+  --on-primary: #3A2F2E;
+  --primary-soft: rgba(255,158,176,.14);
+  --mint-soft: rgba(143,227,194,.18);
+  --butter-soft: rgba(255,226,154,.2);
+  --sky-soft: rgba(166,210,245,.18);
+  --lilac-soft: rgba(216,194,240,.18);
+  --straw-soft: rgba(255,140,154,.16);
+  --gold-soft: rgba(255,217,102,.18);
+  --overlay: rgba(0,0,0,.5);
+  --dot: rgba(255,158,176,.05);
+  --focus-ring: rgba(255,158,176,.4);
+
+  --shadow-card: 0 6px 16px rgba(0,0,0,.3);
+  --shadow-raise: 0 12px 32px rgba(0,0,0,.45);
+  --glow: 0 0 20px rgba(255,158,176,.25);
+  --glow-gold: 0 0 16px rgba(255,217,102,.25);
+  --shadow-danger: 0 6px 16px rgba(255,140,154,.3);
+  --dot-shadow: 0 2px 6px rgba(0,0,0,.35);
+}
+
+// ============================================================
+// 主题二：国风雅集 · 宣纸日（亮色）
+// 参考: UI组件画廊-国风雅集.html :root
+// ============================================================
+[data-theme='guofeng'] {
+  // ---------- 色彩系统：基础色 ----------
+  --bg-cream: #FAF6EC;
+  --bg-panel: #FFFDF6;
+  --bg-raised: #FFFDF6;
+  --bg-inset: #F6F0E3;
+  --line: #E0D6C4;
+  --text-hi: #2F2A24;
+  --text-mid: #8A8378;
+  --text-low: #B5AC9C;
+  --primary: #C4442A;       // 朱砂红
+  --mint: #7A8B63;          // 竹青
+  --butter: #C9A24B;        // 鎏金
+  --sky: #4A5D6E;           // 黛蓝
+  --lilac: #B89BA8;         // 藕荷
+  --strawberry: #A8321E;    // 朱砂深（危险）
+  --gold: #C9A24B;          // 鎏金
+
+  // ---------- 语义深色 ----------
+  --primary-ink: #9E3520;
+  --mint-ink: #5A6B45;
+  --butter-ink: #9A7A35;
+  --sky-ink: #364554;
+  --lilac-ink: #947885;
+  --straw-ink: #8A2818;
+  --gold-ink: #9A7A35;
+
+  // ---------- 功能派生 ----------
+  --white: #FFFDF6;
+  --on-primary: #FFFDF6;
+  --primary-soft: rgba(196,68,42,.10);
+  --mint-soft: rgba(122,139,99,.15);
+  --butter-soft: rgba(201,162,75,.15);
+  --sky-soft: rgba(74,93,110,.12);
+  --lilac-soft: rgba(184,155,168,.15);
+  --straw-soft: rgba(168,50,30,.12);
+  --gold-soft: rgba(201,162,75,.15);
+  --overlay: rgba(47,42,36,.45);
+  --dot: rgba(196,68,42,.04);
+  --focus-ring: rgba(196,68,42,.35);
+
+  // ---------- 字体（衬线书法风） ----------
+  --font-cute: 'ZCOOL XiaoWei', 'Noto Serif SC', 'Songti SC', serif;
+  --font-body: 'Noto Serif SC', 'Songti SC', 'PingFang SC', serif;
+
+  // ---------- 圆角（小角度，东方韵味） ----------
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+
+  // ---------- 投影（墨色淡影） ----------
+  --shadow-card: 0 4px 16px rgba(47,42,36,.10);
+  --shadow-raise: 0 12px 32px rgba(47,42,36,.18);
+  --glow: 0 0 0 1px rgba(196,68,42,.3);
+  --glow-gold: 0 0 0 1px rgba(201,162,75,.4);
+  --shadow-danger: 0 4px 12px rgba(168,50,30,.25);
+  --dot-shadow: 0 2px 4px rgba(47,42,36,.2);
+
+  // ---------- 缓动（水墨气韵） ----------
+  --ease-spring: cubic-bezier(.2,.9,.3,1.4);
+  --ease-soft: cubic-bezier(.4,0,.2,1);
+}
+
+// ============================================================
+// 主题二：国风雅集 · 墨夜（暗色）
+// ============================================================
+[data-theme='guofeng-dark'] {
+  --bg-cream: #26221C;
+  --bg-panel: #332E26;
+  --bg-raised: #3A342C;
+  --bg-inset: #211D17;
+  --line: #4A4337;
+  --text-hi: #EFE9DD;
+  --text-mid: #A79E8E;
+  --text-low: #7A7264;
+  --primary: #D05A3C;
+  --mint: #93A476;
+  --butter: #D4B15E;
+  --sky: #7C93A6;
+  --lilac: #C3A7B5;
+  --strawberry: #D05A3C;
+  --gold: #D4B15E;
+
+  --primary-ink: #E07A5C;
+  --mint-ink: #A8B88A;
+  --butter-ink: #E0C070;
+  --sky-ink: #94A8B8;
+  --lilac-ink: #D0B8C5;
+  --straw-ink: #E07A5C;
+  --gold-ink: #E0C070;
+
+  --on-primary: #26221C;
+  --primary-soft: rgba(208,90,60,.14);
+  --mint-soft: rgba(147,164,118,.16);
+  --butter-soft: rgba(212,177,94,.18);
+  --sky-soft: rgba(124,147,166,.16);
+  --lilac-soft: rgba(195,167,181,.16);
+  --straw-soft: rgba(208,90,60,.16);
+  --gold-soft: rgba(212,177,94,.18);
+  --overlay: rgba(0,0,0,.55);
+  --dot: rgba(208,90,60,.04);
+  --focus-ring: rgba(208,90,60,.4);
+
+  --font-cute: 'ZCOOL XiaoWei', 'Noto Serif SC', 'Songti SC', serif;
+  --font-body: 'Noto Serif SC', 'Songti SC', 'PingFang SC', serif;
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+
+  --shadow-card: 0 4px 16px rgba(0,0,0,.3);
+  --shadow-raise: 0 12px 32px rgba(0,0,0,.45);
+  --glow: 0 0 0 1px rgba(208,90,60,.35);
+  --glow-gold: 0 0 0 1px rgba(212,177,94,.4);
+  --shadow-danger: 0 4px 12px rgba(208,90,60,.3);
+  --dot-shadow: 0 2px 4px rgba(0,0,0,.4);
+
+  --ease-spring: cubic-bezier(.2,.9,.3,1.4);
+  --ease-soft: cubic-bezier(.4,0,.2,1);
+}
+
+// ============================================================
+// 主题三：深渊档案 · 深渊（暗色，默认）
+// 参考: UI组件画廊-深渊档案.html :root
+// ============================================================
+[data-theme='abyss'] {
+  // ---------- 色彩系统：基础色 ----------
+  --bg-cream: #0B1116;
+  --bg-panel: #101B20;
+  --bg-raised: #16242A;
+  --bg-inset: #0C1419;
+  --line: #22323A;
+  --text-hi: #D6E4E0;
+  --text-mid: #7E9793;
+  --text-low: #4E6262;
+  --primary: #6CC6B8;       // 磷火青
+  --mint: #6CC6B8;
+  --butter: #C7A45F;        // 旧金
+  --sky: #7FA6B5;           // 冰蓝
+  --lilac: #9C8BBF;         // 藕荷紫
+  --strawberry: #C96A5F;    // 血月
+  --gold: #C7A45F;
+
+  // ---------- 语义深色 ----------
+  --primary-ink: #A8E0D6;
+  --mint-ink: #A8E0D6;
+  --butter-ink: #DBC07A;
+  --sky-ink: #9DBECC;
+  --lilac-ink: #B8A8D8;
+  --straw-ink: #E08A80;
+  --gold-ink: #DBC07A;
+
+  // ---------- 功能派生 ----------
+  --white: #D6E4E0;
+  --on-primary: #0B1116;
+  --primary-soft: rgba(108,198,184,.14);
+  --mint-soft: rgba(108,198,184,.16);
+  --butter-soft: rgba(199,164,95,.16);
+  --sky-soft: rgba(127,166,181,.14);
+  --lilac-soft: rgba(156,139,191,.16);
+  --straw-soft: rgba(201,106,95,.16);
+  --gold-soft: rgba(199,164,95,.16);
+  --overlay: rgba(0,0,0,.6);
+  --dot: rgba(108,198,184,.04);
+  --focus-ring: rgba(108,198,184,.4);
+
+  // ---------- 字体（Cinzel衬线+庄重感） ----------
+  --font-cute: 'Cinzel', 'Noto Serif SC', 'Songti SC', serif;
+  --font-body: 'Noto Serif SC', 'Songti SC', 'PingFang SC', serif;
+
+  // ---------- 圆角（棱角分明，末世观测风） ----------
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+
+  // ---------- 投影（深海暗涌+磷火辉光） ----------
+  --shadow-card: 0 3px 14px rgba(0,0,0,.4);
+  --shadow-raise: 0 14px 40px rgba(0,0,0,.5);
+  --glow: 0 0 18px rgba(108,198,184,.28);
+  --glow-gold: 0 0 14px rgba(199,164,95,.3);
+  --shadow-danger: 0 0 18px rgba(201,106,95,.35);
+  --dot-shadow: 0 2px 6px rgba(0,0,0,.5);
+
+  // ---------- 缓动（深海沉稳） ----------
+  --ease-spring: cubic-bezier(.2,.9,.3,1.3);
+  --ease-soft: cubic-bezier(.4,0,.2,1);
+}
+
+// ============================================================
+// 主题三：深渊档案 · 碧涛（亮色）
+// 参考: UI组件画廊-深渊档案.html [data-theme="bitao"]
+// ============================================================
+[data-theme='abyss-light'] {
+  --bg-cream: #F3F6F5;
+  --bg-panel: #EAF1EF;
+  --bg-raised: #FBFDFC;
+  --bg-inset: #E2ECE9;
+  --line: #CBD9D6;
+  --text-hi: #16323B;
+  --text-mid: #5C7479;
+  --text-low: #96A8AB;
+  --primary: #2E9D8F;
+  --mint: #2E9D8F;
+  --butter: #AE8D52;
+  --sky: #6E97A6;
+  --lilac: #7A6B9E;
+  --strawberry: #C2564B;
+  --gold: #AE8D52;
+
+  --primary-ink: #1F6E64;
+  --mint-ink: #1F6E64;
+  --butter-ink: #8A6E38;
+  --sky-ink: #4E7582;
+  --lilac-ink: #5A4D7A;
+  --straw-ink: #9E3D34;
+  --gold-ink: #8A6E38;
+
+  --white: #FBFDFC;
+  --on-primary: #FBFDFC;
+  --primary-soft: rgba(46,157,143,.12);
+  --mint-soft: rgba(46,157,143,.14);
+  --butter-soft: rgba(174,141,82,.14);
+  --sky-soft: rgba(110,151,166,.12);
+  --lilac-soft: rgba(122,107,158,.14);
+  --straw-soft: rgba(194,86,75,.12);
+  --gold-soft: rgba(174,141,82,.14);
+  --overlay: rgba(22,50,59,.5);
+  --dot: rgba(46,157,143,.04);
+  --focus-ring: rgba(46,157,143,.35);
+
+  --font-cute: 'Cinzel', 'Noto Serif SC', 'Songti SC', serif;
+  --font-body: 'Noto Serif SC', 'Songti SC', 'PingFang SC', serif;
+
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+
+  --shadow-card: 0 3px 14px rgba(22,50,59,.07);
+  --shadow-raise: 0 14px 40px rgba(22,50,59,.14);
+  --glow: 0 0 16px rgba(46,157,143,.28);
+  --glow-gold: 0 0 14px rgba(174,141,82,.25);
+  --shadow-danger: 0 0 14px rgba(194,86,75,.25);
+  --dot-shadow: 0 2px 4px rgba(22,50,59,.15);
+
+  --ease-spring: cubic-bezier(.2,.9,.3,1.3);
+  --ease-soft: cubic-bezier(.4,0,.2,1);
+}

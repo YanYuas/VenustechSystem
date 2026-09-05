@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✨</text></svg>" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>启明星</title>
+    <style>
+      /* 首屏底色，避免白闪 —— 仅此处使用一次 token 外色值，工程内 grep 白名单 */
+      html { background: #FFFBF5; }
+      html[data-theme="dark"] { background: #2B2222; }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/app/main.ts"></script>
+  </body>
+</html>

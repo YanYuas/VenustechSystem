@@ -1,0 +1,2048 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="data:,">
+<title>启明星 · 奶油糖果 v2.0 · 组件画廊 95</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&display=swap" rel="stylesheet">
+<style>
+/* ============ design tokens ============ */
+:root{
+  --bg-cream:#FFFBF5;--bg-panel:#FFFFFF;--bg-raised:#FFFFFF;--bg-inset:#FBF1E7;
+  --line:#F2E4D8;--text-hi:#5C4A45;--text-mid:#9B7E72;--text-low:#C0A89B;
+  --primary:#FF8FA3;--mint:#7BD3B2;--butter:#FFD97A;--sky:#8FC1F0;
+  --lilac:#C9AEE8;--strawberry:#FF6B7D;--gold:#F5C842;
+  --primary-ink:#D96579;--mint-ink:#2F9E76;--butter-ink:#B0872A;--sky-ink:#3A7BC0;
+  --lilac-ink:#9A7BB8;--straw-ink:#E24A5E;--gold-ink:#B8901A;
+  --primary-soft:rgba(255,143,163,.12);--mint-soft:rgba(123,211,178,.18);
+  --butter-soft:rgba(255,217,122,.20);--sky-soft:rgba(143,193,240,.18);
+  --lilac-soft:rgba(201,174,232,.18);--straw-soft:rgba(255,107,125,.14);--gold-soft:rgba(245,200,66,.18);
+  --white:#FFFFFF;--on-primary:#FFFFFF;--overlay:rgba(92,74,69,.4);
+  --radius-sm:10px;--radius-md:16px;--radius-lg:24px;--radius-xl:32px;--radius-pill:999px;
+  --shadow-card:0 6px 16px rgba(255,143,163,.18);
+  --shadow-raise:0 12px 32px rgba(255,143,163,.28);
+  --glow:0 0 20px rgba(255,143,163,.30);
+  --glow-gold:0 0 16px rgba(245,200,66,.35);
+  --shadow-danger:0 6px 16px rgba(255,107,125,.3);
+  --space-1:4px;--space-2:8px;--space-3:12px;--space-4:16px;--space-5:20px;--space-6:24px;--space-8:32px;--space-10:40px;
+  --ease-spring:cubic-bezier(.34,1.56,.64,1);
+  --ease-soft:cubic-bezier(.22,1,.36,1);
+  --font-cute:'ZCOOL KuaiLe','PingFang SC',sans-serif;
+  --font-body:'PingFang SC','Microsoft YaHei',sans-serif;
+  --font-mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --text-xs:11px;--text-sm:12px;--text-base:13px;--text-md:15px;--text-lg:18px;--text-xl:24px;--text-2xl:32px;
+}
+[data-theme="dark"]{
+  --bg-cream:#2B2222;--bg-panel:#3A2F2E;--bg-raised:#453838;--bg-inset:#332828;
+  --line:#574641;--text-hi:#FCEFE6;--text-mid:#C9AFA3;--text-low:#8A6F66;
+  --primary:#FF9EB0;--mint:#8FE3C2;--butter:#FFE29A;--sky:#A6D2F5;
+  --lilac:#D8C2F0;--strawberry:#FF8C9A;--gold:#FFD966;
+  --primary-ink:#FFB8C4;--mint-ink:#63C9A6;--butter-ink:#E4B95C;--sky-ink:#8FC6F2;
+  --lilac-ink:#C9B1E8;--straw-ink:#F07C8C;--gold-ink:#E0B830;
+  --primary-soft:rgba(255,158,176,.14);--mint-soft:rgba(143,227,194,.18);
+  --butter-soft:rgba(255,226,154,.2);--sky-soft:rgba(166,210,245,.18);
+  --lilac-soft:rgba(216,194,240,.18);--straw-soft:rgba(255,140,154,.16);--gold-soft:rgba(255,217,102,.18);
+  --on-primary:#3A2F2E;--overlay:rgba(0,0,0,.5);
+  --shadow-card:0 6px 16px rgba(0,0,0,.3);--shadow-raise:0 12px 32px rgba(0,0,0,.45);
+  --glow:0 0 20px rgba(255,158,176,.25);--glow-gold:0 0 16px rgba(255,217,102,.25);
+  --shadow-danger:0 6px 16px rgba(255,140,154,.3);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{
+  background:
+    radial-gradient(circle at 15% 0,rgba(255,143,163,.12),transparent 380px),
+    radial-gradient(circle at 85% 5%,rgba(201,174,232,.10),transparent 320px),
+    radial-gradient(circle at 50% 100%,rgba(245,200,66,.06),transparent 500px),
+    radial-gradient(rgba(255,143,163,.04) 1px,transparent 1px),
+    var(--bg-cream);
+  background-size:auto,auto,auto,22px 22px,auto;
+  color:var(--text-hi);font-family:var(--font-body);font-size:13px;line-height:1.6;
+  min-height:100vh;transition:background .4s var(--ease-soft),color .4s var(--ease-soft);
+  overflow-x:hidden;
+}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+kbd{font-family:var(--font-mono);font-size:10px;padding:1px 5px;border:1px solid var(--line);border-radius:5px;color:var(--text-low)}
+code{font-family:var(--font-mono);font-size:11px;background:var(--bg-inset);padding:1px 5px;border-radius:5px;color:var(--text-mid)}
+::selection{background:var(--primary-soft);color:var(--primary-ink)}
+
+/* ============ 动效关键帧 ============ */
+@keyframes gudu{0%{opacity:0;transform:scale(.92) translateY(8px)}60%{opacity:1;transform:scale(1.015) translateY(-2px)}100%{opacity:1;transform:scale(1) translateY(0)}}
+@keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+@keyframes floaty-slow{0%,100%{transform:translateY(0) rotate(0deg)}50%{transform:translateY(-5px) rotate(1.5deg)}}
+@keyframes breathe{0%,100%{box-shadow:0 0 0 0 currentColor;opacity:1}50%{box-shadow:0 0 0 6px transparent;opacity:.5}}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+@keyframes ping{0%{transform:scale(1);opacity:.8}100%{transform:scale(2.4);opacity:0}}
+@keyframes jelly{0%{transform:scale(.96)}60%{transform:scale(1.05)}100%{transform:scale(1)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes shimmer{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
+@keyframes glow-pulse{0%,100%{box-shadow:var(--glow)}50%{box-shadow:0 0 28px rgba(255,143,163,.45)}}
+@keyframes gold-sparkle{0%{opacity:0;transform:scale(.4) rotate(-20deg)}50%{opacity:1;transform:scale(1.2) rotate(10deg)}100%{opacity:1;transform:scale(1) rotate(0)}}
+@keyframes twinkle{0%,100%{opacity:.2;transform:scale(.8)}50%{opacity:1;transform:scale(1.15)}}
+@keyframes drift{0%{transform:translateX(0)}50%{transform:translateX(12px)}100%{transform:translateX(0)}}
+@keyframes typing-cursor{0%,100%{opacity:1}50%{opacity:0}}
+@keyframes slide-up{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+@keyframes draw-line{to{stroke-dashoffset:0}}
+@keyframes bar-grow{from{height:0}to{height:var(--h)}}
+@keyframes ring-draw{to{stroke-dashoffset:var(--offset)}}
+@keyframes wiggle{0%,100%{transform:rotate(0)}25%{transform:rotate(-5deg)}75%{transform:rotate(5deg)}}
+@keyframes heart-beat{0%,100%{transform:scale(1)}15%{transform:scale(1.15)}30%{transform:scale(1)}45%{transform:scale(1.1)}}
+
+.bp{animation:gudu .5s var(--ease-spring) both}
+.bp-d1{animation-delay:.05s}.bp-d2{animation-delay:.1s}.bp-d3{animation-delay:.15s}.bp-d4{animation-delay:.2s}
+.bp-d5{animation-delay:.25s}.bp-d6{animation-delay:.3s}.bp-d7{animation-delay:.35s}.bp-d8{animation-delay:.4s}
+
+/* ============ 页面骨架 ============ */
+.hero{padding:52px 32px 12px;text-align:center;position:relative;overflow:hidden}
+.hero h1{font-family:var(--font-cute);font-weight:400;font-size:clamp(28px,4.5vw,42px);letter-spacing:2px;
+  background:linear-gradient(135deg,var(--primary),var(--lilac),var(--gold));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero .ver{font-family:var(--font-cute);font-size:13px;color:var(--primary);margin-left:10px;
+  background:var(--primary-soft);padding:3px 12px;border-radius:var(--radius-pill);-webkit-text-fill-color:var(--primary)}
+.hero p{color:var(--text-mid);margin-top:10px;font-size:15px}
+.hero .sub{color:var(--text-low);margin-top:4px;font-size:12px}
+/* 装饰：启明星星座 */
+.constellation{position:absolute;opacity:.35;pointer-events:none}
+.constellation svg{width:100%;height:100%}
+.constellation .star{animation:twinkle 3s ease-in-out infinite}
+.constellation .star:nth-child(2){animation-delay:.5s}.constellation .star:nth-child(3){animation-delay:1s}
+.constellation .star:nth-child(4){animation-delay:1.5s}.constellation .star:nth-child(5){animation-delay:2s}
+.cloud-deco{position:absolute;pointer-events:none;opacity:.4}
+.cloud-deco svg{width:100%;height:100%}
+.cd1{top:30px;left:5%;width:80px;animation:floaty 7s var(--ease-soft) infinite}
+.cd2{top:50px;right:8%;width:60px;animation:floaty 9s var(--ease-soft) 1s infinite}
+.cd3{top:80px;left:25%;width:45px;animation:drift 12s ease-in-out infinite;opacity:.25}
+
+.toolbar{position:fixed;top:18px;right:24px;display:flex;gap:8px;z-index:100}
+.tb-btn{font-family:var(--font-cute);font-size:13px;color:var(--text-mid);background:var(--bg-panel);
+  border:1px solid var(--line);border-radius:var(--radius-pill);padding:8px 18px;cursor:pointer;
+  transition:transform .25s var(--ease-spring),color .3s,border-color .3s,box-shadow .3s;
+  display:inline-flex;align-items:center;gap:6px}
+.tb-btn:hover{transform:translateY(-2px);color:var(--primary);border-color:var(--primary);box-shadow:var(--shadow-card)}
+.tb-btn svg{width:14px;height:14px}
+
+main{max-width:1320px;margin:0 auto;padding:24px 28px 100px}
+section{margin-top:44px;position:relative}
+.sec-head{display:flex;align-items:center;gap:14px;margin-bottom:20px;flex-wrap:wrap;position:relative}
+.sec-head::before{content:'';position:absolute;left:-16px;top:50%;transform:translateY(-50%);
+  width:4px;height:28px;border-radius:var(--radius-pill);background:linear-gradient(var(--primary),var(--lilac))}
+.sec-head h2{font-family:var(--font-cute);font-weight:400;font-size:24px;display:flex;align-items:center;gap:10px}
+.sec-head h2 .sec-icon{width:28px;height:28px;color:var(--primary)}
+.sec-head .badge{font-family:var(--font-cute);font-size:12px;color:var(--white);background:var(--primary);
+  padding:3px 14px;border-radius:var(--radius-pill);box-shadow:var(--glow)}
+.sec-head .note{color:var(--text-low);font-size:12px;margin-left:auto}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:24px}
+.ccard{background:var(--bg-panel);border:1px solid var(--line);border-radius:var(--radius-lg);
+  box-shadow:var(--shadow-card);padding:20px;position:relative;overflow:hidden;
+  transition:transform .35s var(--ease-soft),box-shadow .35s var(--ease-soft),border-color .3s}
+.ccard:hover{transform:translateY(-4px);box-shadow:var(--shadow-raise);border-color:var(--primary-soft)}
+.ccard .num{position:absolute;top:16px;right:18px;font-family:var(--font-cute);font-size:12px;
+  color:var(--text-low);letter-spacing:1px;background:var(--bg-inset);padding:2px 10px;border-radius:var(--radius-pill)}
+.ccard .t{font-family:var(--font-cute);font-weight:400;font-size:16px;color:var(--text-hi);
+  display:flex;align-items:center;gap:10px;margin-bottom:16px;padding-right:60px}
+.ccard .t .dot{width:10px;height:10px;border-radius:50%;flex:none;
+  background:linear-gradient(135deg,var(--primary),var(--lilac));box-shadow:0 0 8px rgba(255,143,163,.4)}
+.ccard .land{color:var(--text-low);font-size:11px;margin-top:16px;border-top:1px dashed var(--line);padding-top:12px;line-height:1.8}
+.ccard .land b{color:var(--primary);font-weight:600}
+.ccard .land .pri{display:inline-block;font-family:var(--font-cute);font-size:10px;padding:1px 8px;border-radius:var(--radius-pill);vertical-align:1px;margin-right:6px}
+.ccard .land .pri.r{background:var(--straw-soft);color:var(--straw-ink)}
+.ccard .land .pri.y{background:var(--butter-soft);color:var(--butter-ink)}
+.ccard .land .pri.b{background:var(--sky-soft);color:var(--sky-ink)}
+
+/* ============ 通用原子 ============ */
+.icon{width:1em;height:1em;vertical-align:-.125em;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--text-low);display:inline-block;flex:none}
+.dot.on{background:var(--mint);animation:breathe 2s ease-in-out infinite}
+.dot.busy{background:var(--butter);animation:breathe 1.2s ease-in-out infinite}
+.dot.alert{background:var(--strawberry);animation:breathe .7s ease-in-out infinite}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border-radius:var(--radius-sm);
+  font-family:var(--font-cute);font-size:13px;font-weight:500;padding:0 18px;height:38px;white-space:nowrap;
+  transition:transform .25s var(--ease-spring),box-shadow .25s var(--ease-soft),background .25s,border-color .3s,color .3s;user-select:none}
+.btn:active{transform:scale(.96)}
+.btn.pri{background:var(--primary);color:var(--on-primary)}
+.btn.pri:hover{box-shadow:var(--glow);filter:brightness(1.05)}
+.btn.sec{background:var(--bg-panel);border:1px solid var(--line);color:var(--text-hi)}
+.btn.sec:hover{border-color:var(--primary);color:var(--primary)}
+.btn.txt{background:transparent;color:var(--primary)}
+.btn.txt:hover{background:var(--bg-inset)}
+.btn.danger{background:var(--strawberry);color:var(--white)}
+.btn.danger:hover{box-shadow:var(--shadow-danger)}
+.btn.pill{background:var(--bg-inset);color:var(--text-mid);border-radius:var(--radius-pill)}
+.btn.pill:hover{background:var(--primary-soft);color:var(--primary)}
+.btn.gold{background:var(--gold);color:var(--white)}
+.btn.gold:hover{box-shadow:var(--glow-gold)}
+.btn.sm{height:32px;padding:0 12px;font-size:12px}
+.btn.lg{height:48px;padding:0 24px;font-size:15px}
+.btn.disabled{opacity:.5;cursor:not-allowed;pointer-events:none}
+.btn .spin{animation:spin .8s linear infinite}
+.chip{font-size:12px;padding:3px 12px;border-radius:var(--radius-pill);background:var(--bg-inset);color:var(--text-mid);display:inline-flex;align-items:center;gap:4px}
+.chip.lilac{background:var(--lilac-soft);color:var(--lilac-ink)}
+.chip.mint{background:var(--mint-soft);color:var(--mint-ink)}
+.chip.butter{background:var(--butter-soft);color:var(--butter-ink)}
+.chip.sky{background:var(--sky-soft);color:var(--sky-ink)}
+.chip.straw{background:var(--straw-soft);color:var(--straw-ink)}
+.chip.gold{background:var(--gold-soft);color:var(--gold-ink)}
+.chip.primary{background:var(--primary-soft);color:var(--primary-ink)}
+.chip .x{margin-left:3px;opacity:.6;cursor:pointer;font-size:10px}
+
+/* ============ A01 标题栏 ============ */
+.titlebar{height:36px;background:var(--bg-panel);border:1px solid var(--line);border-radius:var(--radius-md) var(--radius-md) 0 0;
+  display:flex;align-items:center;padding:0 14px;gap:8px;border-bottom:none}
+.traffic{display:flex;gap:7px}
+.traffic span{width:12px;height:12px;border-radius:50%;transition:transform .2s}
+.traffic span:nth-child(1){background:#FF5F57}.traffic span:nth-child(2){background:#FEBC2E}.traffic span:nth-child(3){background:#28C840}
+.traffic:hover span:nth-child(1){transform:scale(1.15)}
+.tb-title{flex:1;text-align:center;font-family:var(--font-cute);font-size:13px;color:var(--text-mid)}
+.win-ctrl{display:flex;gap:4px}
+.win-ctrl button{width:24px;height:24px;border-radius:6px;display:grid;place-items:center;color:var(--text-low);transition:background .2s,color .2s}
+.win-ctrl button:hover{background:var(--bg-inset);color:var(--primary)}
+
+/* ============ A02 侧边栏 ============ */
+.sidebar-demo{display:flex;border:1px solid var(--line);border-radius:0 0 var(--radius-md) var(--radius-md);overflow:hidden;height:220px}
+.sb{width:180px;background:var(--bg-panel);border-right:1px solid var(--line);display:flex;flex-direction:column;padding:12px 8px;gap:2px}
+.sb-logo{display:flex;align-items:center;gap:8px;padding:0 8px 12px;border-bottom:1px solid var(--line);margin-bottom:8px}
+.sb-logo .lg-icon{width:30px;height:30px;border-radius:10px;background:linear-gradient(135deg,var(--primary),var(--lilac));display:grid;place-items:center;color:var(--white);box-shadow:var(--glow)}
+.sb-logo .lg-name{font-family:var(--font-cute);font-size:16px;color:var(--text-hi)}
+.sb-item{display:flex;align-items:center;gap:10px;height:40px;padding:0 10px;border-radius:var(--radius-sm);font-size:14px;font-family:var(--font-cute);color:var(--text-mid);cursor:pointer;transition:background .2s,color .2s;position:relative}
+.sb-item:hover{background:var(--bg-inset);color:var(--text-hi)}
+.sb-item.active{background:var(--primary-soft);color:var(--primary);box-shadow:var(--glow)}
+.sb-item.active::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:3px;height:18px;border-radius:var(--radius-pill);background:var(--primary)}
+.sb-item svg{width:18px;height:18px;flex:none}
+.sb-content{flex:1;padding:16px;background:var(--bg-cream);display:grid;place-items:center;color:var(--text-low);font-size:12px}
+
+/* ============ A03 顶栏 ============ */
+.topbar{height:48px;background:var(--bg-panel);border:1px solid var(--line);border-radius:var(--radius-md);
+  display:flex;align-items:center;padding:0 16px;gap:14px;box-shadow:var(--shadow-card)}
+.tb-search{flex:1;max-width:360px;display:flex;align-items:center;gap:8px;background:var(--bg-inset);
+  border:1px solid transparent;border-radius:var(--radius-pill);padding:8px 14px;transition:border .3s,background .3s;cursor:text}
+.tb-search:hover,.tb-search:focus-within{border-color:var(--primary);background:var(--bg-panel)}
+.tb-search input{border:none;outline:none;background:transparent;color:var(--text-hi);font-family:var(--font-body);font-size:13px;width:100%}
+.tb-search svg{width:14px;height:14px;color:var(--text-low);flex:none}
+.icon-btn{width:36px;height:36px;border-radius:50%;border:1px solid var(--line);background:var(--bg-panel);
+  display:grid;place-items:center;cursor:pointer;color:var(--text-mid);position:relative;flex:none;
+  transition:transform .25s var(--ease-spring),border-color .3s,color .3s}
+.icon-btn:hover{transform:translateY(-2px);border-color:var(--primary);color:var(--primary)}
+.icon-btn .ping-dot{position:absolute;top:7px;right:8px;width:7px;height:7px;border-radius:50%;background:var(--strawberry)}
+.icon-btn .ping-dot::after{content:'';position:absolute;inset:-3px;border-radius:50%;border:2px solid var(--strawberry);animation:ping 1.8s ease-out infinite}
+.avatar-sm{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--lilac),var(--primary));display:grid;place-items:center;font-family:var(--font-cute);color:var(--white);font-size:14px;cursor:pointer;flex:none}
+
+/* ============ A04 全局搜索 ============ */
+.search-panel{background:var(--bg-raised);border:1px solid var(--line);border-radius:var(--radius-lg);box-shadow:var(--shadow-raise);overflow:hidden}
+.sp-input{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--line)}
+.sp-input svg{width:18px;height:18px;color:var(--primary)}
+.sp-input input{border:none;outline:none;background:transparent;font-family:var(--font-cute);font-size:16px;color:var(--text-hi);width:100%}
+.sp-results{padding:8px;max-height:200px;overflow-y:auto}
+.sp-group-title{font-size:10px;color:var(--text-low);padding:8px 10px 4px;font-family:var(--font-cute);letter-spacing:1px}
+.sp-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:var(--radius-sm);cursor:pointer;transition:background .2s}
+.sp-item:hover{background:var(--bg-inset)}
+.sp-item .kind{font-size:10px;padding:2px 8px;border-radius:6px;flex:none;font-family:var(--font-cute)}
+.sp-item .kind.task{background:var(--primary-soft);color:var(--primary-ink)}
+.sp-item .kind.doc{background:var(--lilac-soft);color:var(--lilac-ink)}
+.sp-item .kind.conv{background:var(--mint-soft);color:var(--mint-ink)}
+.sp-item .hit{flex:1;font-size:13px}
+.sp-item .hit mark{background:var(--butter-soft);border-radius:3px;padding:0 2px;color:var(--butter-ink)}
+
+/* ============ B01 焦点任务卡 ============ */
+.focus-card{background:linear-gradient(135deg,var(--primary-soft),var(--lilac-soft));border-radius:var(--radius-xl);padding:24px;position:relative;overflow:hidden;border:1px solid rgba(255,143,163,.2)}
+.focus-card::before{content:'';position:absolute;top:-30px;right:-30px;width:120px;height:120px;border-radius:50%;background:radial-gradient(circle,var(--gold-soft),transparent 70%);animation:glow-pulse 4s ease-in-out infinite}
+.f-tag{display:inline-flex;align-items:center;gap:6px;font-family:var(--font-cute);font-size:12px;color:var(--white);background:var(--primary);padding:4px 14px;border-radius:var(--radius-pill);box-shadow:var(--glow);position:relative;z-index:1}
+.f-tag svg{width:12px;height:12px}
+.f-title{font-family:var(--font-cute);font-size:22px;color:var(--text-hi);margin-top:14px;line-height:1.3;position:relative;z-index:1}
+.f-sub{font-size:13px;color:var(--text-mid);margin-top:6px;position:relative;z-index:1}
+.f-prog{display:flex;align-items:center;gap:12px;margin-top:18px;position:relative;z-index:1}
+.f-prog .bar{flex:1;height:8px;background:var(--bg-inset);border-radius:var(--radius-pill);overflow:hidden}
+.f-prog .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--primary),var(--lilac));border-radius:var(--radius-pill);transition:width .6s var(--ease-soft)}
+.f-prog .count{font-family:var(--font-cute);font-size:14px;color:var(--primary-ink)}
+.f-acts{display:flex;gap:10px;margin-top:18px;position:relative;z-index:1}
+
+/* ============ B02 统计卡组 ============ */
+.stats4{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.st4{background:var(--bg-inset);border-radius:var(--radius-md);padding:14px;position:relative;overflow:hidden;transition:transform .3s var(--ease-soft)}
+.st4:hover{transform:translateY(-2px)}
+.st4 .ic{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;margin-bottom:8px}
+.st4 .ic.primary{background:var(--primary-soft);color:var(--primary)}
+.st4 .ic.mint{background:var(--mint-soft);color:var(--mint-ink)}
+.st4 .ic.lilac{background:var(--lilac-soft);color:var(--lilac-ink)}
+.st4 .ic.butter{background:var(--butter-soft);color:var(--butter-ink)}
+.st4 .ic svg{width:18px;height:18px}
+.st4 .v{font-family:var(--font-cute);font-size:26px;color:var(--text-hi);line-height:1;font-variant-numeric:tabular-nums}
+.st4 .l{font-size:11px;color:var(--text-low);margin-top:4px}
+.st4 .tr{position:absolute;top:12px;right:12px;font-size:11px;font-family:var(--font-cute)}
+.st4 .tr.up{color:var(--mint-ink)}.st4 .tr.down{color:var(--straw-ink)}
+
+/* ============ B03 快捷入口 ============ */
+.qgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.qitem{display:flex;flex-direction:column;align-items:center;gap:8px;padding:14px 6px;border-radius:var(--radius-md);cursor:pointer;transition:background .25s,transform .25s var(--ease-spring)}
+.qitem:hover{background:var(--bg-inset);transform:translateY(-2px)}
+.qitem .ic{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;transition:transform .3s var(--ease-spring)}
+.qitem:hover .ic{transform:scale(1.12)}
+.qitem .ic.primary{background:var(--primary-soft);color:var(--primary)}
+.qitem .ic.lilac{background:var(--lilac-soft);color:var(--lilac-ink)}
+.qitem .ic.butter{background:var(--butter-soft);color:var(--butter-ink)}
+.qitem .ic.mint{background:var(--mint-soft);color:var(--mint-ink)}
+.qitem .ic.sky{background:var(--sky-soft);color:var(--sky-ink)}
+.qitem .ic.gold{background:var(--gold-soft);color:var(--gold-ink)}
+.qitem .ic svg{width:20px;height:20px}
+.qitem .nm{font-size:11px;color:var(--text-mid);text-align:center}
+
+/* ============ B04 最近文档 ============ */
+.recent .rh{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.recent .rh b{font-family:var(--font-cute);font-size:14px}
+.recent .rh a{font-size:11px;color:var(--primary);cursor:pointer}
+.doc-row{display:flex;align-items:center;gap:10px;padding:9px 8px;border-radius:var(--radius-sm);cursor:pointer;transition:background .2s}
+.doc-row:hover{background:var(--bg-inset)}
+.doc-row .dic{width:28px;height:28px;border-radius:8px;background:var(--lilac-soft);display:grid;place-items:center;color:var(--lilac-ink);flex:none}
+.doc-row .dic svg{width:14px;height:14px}
+.doc-row .dinfo{flex:1;min-width:0}
+.doc-row .dinfo b{font-size:13px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.doc-row .dinfo span{font-size:10px;color:var(--text-low)}
+.doc-row time{font-size:10px;color:var(--text-low);flex:none}
+
+/* ============ B05 灵感气泡 ============ */
+.inspire{display:flex;gap:12px;align-items:flex-start;background:linear-gradient(135deg,var(--gold-soft),var(--butter-soft));border-radius:var(--radius-md);padding:16px;border:1px solid rgba(245,200,66,.25)}
+.inspire .bulb{width:36px;height:36px;border-radius:50%;background:var(--gold);display:grid;place-items:center;color:var(--white);flex:none;box-shadow:var(--glow-gold);animation:gold-sparkle 2s ease-in-out infinite}
+.inspire .bulb svg{width:18px;height:18px}
+.inspire .ib{flex:1}
+.inspire .ib p{font-size:13px;color:var(--text-hi);line-height:1.6}
+.inspire .ib .ref{color:var(--sky-ink);cursor:pointer;text-decoration:underline;text-decoration-style:dotted}
+.inspire .acts{display:flex;gap:8px;margin-top:10px}
+
+/* ============ B06 进度环 ============ */
+.ring-wrap{display:flex;flex-direction:column;align-items:center;gap:6px;position:relative}
+.ring-wrap svg{width:100px;height:100px;transform:rotate(-90deg)}
+.ring-wrap .rb{fill:none;stroke:var(--bg-inset);stroke-width:8}
+.ring-wrap .rf{fill:none;stroke:url(#ringGrad);stroke-width:8;stroke-linecap:round;stroke-dasharray:264;stroke-dashoffset:264;transition:stroke-dashoffset 1s var(--ease-soft)}
+.ring-wrap.visible .rf{stroke-dashoffset:95}
+.ring-wrap .rv{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-family:var(--font-cute);font-size:22px;color:var(--text-hi)}
+.ring-wrap .rl{font-size:11px;color:var(--text-low)}
+
+/* ============ B07 英雄区 ============ */
+.hero-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0}
+.hero-row h2{font-family:var(--font-cute);font-size:22px;color:var(--text-hi)}
+.hero-row p{font-size:13px;color:var(--text-mid);margin-top:4px}
+.hero-deco{position:relative;width:80px;height:50px;flex:none}
+.hero-deco .h-cloud{position:absolute;animation:floaty-slow 6s ease-in-out infinite}
+.hero-deco .h-star{position:absolute;color:var(--gold);animation:twinkle 2.5s ease-in-out infinite}
+
+/* ============ B08 今日待办 ============ */
+.todos .th{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.todos .th b{font-family:var(--font-cute);font-size:14px}
+.todos .cnt{font-family:var(--font-cute);font-size:11px;background:var(--primary-soft);color:var(--primary);padding:1px 8px;border-radius:var(--radius-pill)}
+.todo-item{display:flex;align-items:center;gap:10px;padding:8px 6px;border-radius:var(--radius-sm);cursor:pointer;transition:background .2s}
+.todo-item:hover{background:var(--bg-inset)}
+.todo-item .ck{width:18px;height:18px;border-radius:50%;border:2px solid var(--line);display:grid;place-items:center;flex:none;transition:all .25s var(--ease-spring);cursor:pointer}
+.todo-item .ck.on{background:var(--mint);border-color:var(--mint)}
+.todo-item .ck.on svg{width:10px;height:10px;color:var(--white)}
+.todo-item .tt{flex:1;font-size:13px;transition:color .3s}
+.todo-item.done .tt{color:var(--text-low);text-decoration:line-through}
+.todo-item .st{font-size:10px;padding:2px 8px;border-radius:var(--radius-pill);font-family:var(--font-cute);flex:none}
+.todo-item .st.butter{background:var(--butter-soft);color:var(--butter-ink)}
+.todo-item .st.mint{background:var(--mint-soft);color:var(--mint-ink)}
+.todo-item .st.straw{background:var(--straw-soft);color:var(--straw-ink)}
+.todo-item.overdue .tt{color:var(--straw-ink)}
+
+/* ============ B09 打卡徽章 ============ */
+.streak{display:flex;align-items:center;gap:14px}
+.streak .badge{width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,var(--gold),var(--butter));display:grid;place-items:center;color:var(--white);box-shadow:var(--glow-gold);position:relative;animation:heart-beat 2s ease-in-out infinite}
+.streak .badge svg{width:22px;height:22px}
+.streak .badge .n{position:absolute;bottom:-4px;right:-4px;background:var(--strawberry);color:var(--white);font-family:var(--font-cute);font-size:11px;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;border:2px solid var(--bg-panel)}
+.streak p{font-size:13px;color:var(--text-mid)}
+.streak p b{font-family:var(--font-cute);font-size:18px;color:var(--gold-ink)}
+
+/* ============ 桌宠动作CSS ============ */
+.pet{transition:transform .4s var(--ease-spring)}
+.pet .pet-face,.pet .pet-arm-l,.pet .pet-arm-r,.pet .pet-eyes,.pet .pet-ahoge{transform-box:view-box;transform-origin:center}
+.pet .pet-face{transform-origin:80px 72px;transition:transform .3s var(--ease-soft)}
+.pet .pet-arm-l{transform-origin:48px 125px;transition:transform .4s var(--ease-spring)}
+.pet .pet-arm-r{transform-origin:112px 125px;transition:transform .4s var(--ease-spring)}
+.pet .pet-eyes{transition:transform .2s;transform-origin:center}
+.pet .pet-ahoge{transform-origin:80px 28px;animation:wiggle 3s ease-in-out infinite}
+.pet.idle{animation:floaty 4s ease-in-out infinite}
+.pet.idle .pet-eyes{animation:blink 4s ease-in-out infinite}
+.pet.thinking .pet-face{transform:rotate(-12deg) translateY(-4px)}
+.pet.thinking .pet-arm-r{transform:rotate(-60deg) translate(-12px,-28px)}
+.pet.thinking .pet-eyes{transform:scaleY(.7) translateY(-1px)}
+.pet.celebrating{animation:heart-beat .8s ease-in-out infinite}
+.pet.celebrating .pet-arm-l{transform:rotate(-95deg) translate(-14px,-38px)}
+.pet.celebrating .pet-arm-r{transform:rotate(95deg) translate(14px,-38px)}
+.pet.celebrating .pet-eyes{transform:scaleY(.4)}
+.pet.worried .pet-face{transform:translateY(4px)}
+.pet.worried .pet-arm-l{transform:rotate(15deg)}
+.pet.worried .pet-eyes{transform:scaleY(.85) translateY(1px)}
+.pet.pointing .pet-arm-r{transform:rotate(-80deg) translate(8px,-32px)}
+.pet.pointing .pet-face{transform:rotate(8deg)}
+.typing-dots{display:inline-flex;gap:2px;margin-left:2px}
+.typing-dots i{width:4px;height:4px;border-radius:50%;background:var(--text-low);animation:breathe 1.2s ease-in-out infinite}
+.typing-dots i:nth-child(2){animation-delay:.2s}.typing-dots i:nth-child(3){animation-delay:.4s}
+.input-wrap{position:relative}
+.input-wrap input,.input-wrap textarea{width:100%;border:1px solid var(--line);border-radius:var(--radius-sm);padding:10px 14px;font-family:var(--font-body);font-size:13px;color:var(--text-hi);background:var(--bg-panel);outline:none;transition:border .3s,box-shadow .3s}
+.input-wrap input:focus,.input-wrap textarea:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft)}
+.input-wrap .input-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-low);width:16px;height:16px}
+.input-wrap.has-icon input{padding-left:36px}
+.toggle{width:40px;height:22px;border-radius:var(--radius-pill);background:var(--line);position:relative;cursor:pointer;transition:background .3s;flex:none}
+.toggle::after{content:'';position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 2px 4px rgba(0,0,0,.2);transition:transform .3s var(--ease-spring)}
+.toggle.on{background:var(--primary)}
+.toggle.on::after{transform:translateX(18px)}
+.progress-bar{height:8px;background:var(--bg-inset);border-radius:var(--radius-pill);overflow:hidden}
+.progress-bar i{display:block;height:100%;background:linear-gradient(90deg,var(--primary),var(--lilac));border-radius:var(--radius-pill);transition:width .6s var(--ease-soft)}
+.toast{display:inline-flex;align-items:center;gap:8px;padding:10px 18px;border-radius:var(--radius-md);background:var(--bg-raised);box-shadow:var(--shadow-raise);border:1px solid var(--line);font-size:13px}
+.toast .ticon{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;flex:none}
+.toast.success .ticon{background:var(--mint-soft);color:var(--mint-ink)}
+.toast.error .ticon{background:var(--straw-soft);color:var(--straw-ink)}
+.toast.info .ticon{background:var(--sky-soft);color:var(--sky-ink)}
+.empty-state{text-align:center;padding:30px 20px;color:var(--text-low)}
+.empty-state .eicon{width:64px;height:64px;margin:0 auto 12px;opacity:.5}
+.skeleton{background:linear-gradient(90deg,var(--bg-inset) 25%,var(--bg-cream) 50%,var(--bg-inset) 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:var(--radius-sm)}
+
+</style>
+</head>
+<body>
+
+<!-- ============ SVG sprite ============ -->
+<svg width="0" height="0" style="position:absolute">
+<defs>
+<linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="var(--primary)"/><stop offset="100%" stop-color="var(--lilac)"/></linearGradient>
+<symbol id="i-home" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></symbol>
+<symbol id="i-doc" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></symbol>
+<symbol id="i-refresh" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></symbol>
+<symbol id="i-send" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></symbol>
+<symbol id="i-cloud" viewBox="0 0 24 24"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></symbol>
+<symbol id="i-setting" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></symbol>
+<symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8l-6.2 4.5 2.4-7.4L2 9.4h7.6z"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></symbol>
+<symbol id="i-star" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></symbol>
+<symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></symbol>
+<symbol id="i-trash" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></symbol>
+<symbol id="i-close" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></symbol>
+<symbol id="i-chevron-left" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></symbol>
+<symbol id="i-chevron-right" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></symbol>
+<symbol id="i-flame" viewBox="0 0 24 24"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></symbol>
+<symbol id="i-edit" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></symbol>
+<symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></symbol>
+<symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></symbol>
+<symbol id="i-bell" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></symbol>
+<symbol id="i-folder" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></symbol>
+<symbol id="i-tag" viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></symbol>
+<symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></symbol>
+<symbol id="i-menu" viewBox="0 0 24 24"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></symbol>
+<symbol id="i-list" viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></symbol>
+<symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></symbol>
+<symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></symbol>
+</defs>
+</svg>
+
+<!-- ============ 装饰背景 ============ -->
+<div class="cloud-deco cd1"><svg viewBox="0 0 64 40"><path d="M20 30c-8 0-14-5-14-12s6-12 13-12c2 0 4 .5 6 1.5C27 3 32 0 38 0c8 0 14 6 14 14s-5 16-13 16H20z" fill="currentColor" opacity=".5"/></svg></div>
+<div class="cloud-deco cd2"><svg viewBox="0 0 64 40"><path d="M20 30c-8 0-14-5-14-12s6-12 13-12c2 0 4 .5 6 1.5C27 3 32 0 38 0c8 0 14 6 14 14s-5 16-13 16H20z" fill="currentColor" opacity=".4"/></svg></div>
+<div class="cloud-deco cd3"><svg viewBox="0 0 64 40"><path d="M20 30c-8 0-14-5-14-12s6-12 13-12c2 0 4 .5 6 1.5C27 3 32 0 38 0c8 0 14 6 14 14s-5 16-13 16H20z" fill="currentColor" opacity=".3"/></svg></div>
+
+<!-- ============ 画廊头部 ============ -->
+<div class="hero">
+  <div class="constellation" style="top:10px;left:12%;width:120px;height:80px">
+    <svg viewBox="0 0 120 80"><g stroke="var(--lilac)" stroke-width="1" opacity=".4"><line x1="20" y1="20" x2="50" y2="35"/><line x1="50" y1="35" x2="80" y2="15"/><line x1="50" y1="35" x2="65" y2="60"/><line x1="65" y1="60" x2="100" y2="50"/></g>
+    <circle class="star" cx="20" cy="20" r="3" fill="var(--gold)"/><circle class="star" cx="50" cy="35" r="4" fill="var(--primary)"/><circle class="star" cx="80" cy="15" r="2.5" fill="var(--lilac)"/><circle class="star" cx="65" cy="60" r="3" fill="var(--gold)"/><circle class="star" cx="100" cy="50" r="2" fill="var(--sky)"/></svg>
+  </div>
+  <div class="constellation" style="top:20px;right:15%;width:100px;height:70px">
+    <svg viewBox="0 0 100 70"><g stroke="var(--primary)" stroke-width="1" opacity=".3"><line x1="15" y1="50" x2="40" y2="25"/><line x1="40" y1="25" x2="70" y2="40"/><line x1="70" y1="40" x2="85" y2="15"/></g>
+    <circle class="star" cx="15" cy="50" r="2.5" fill="var(--lilac)"/><circle class="star" cx="40" cy="25" r="3.5" fill="var(--gold)"/><circle class="star" cx="70" cy="40" r="2" fill="var(--primary)"/><circle class="star" cx="85" cy="15" r="3" fill="var(--gold)"/></svg>
+  </div>
+  <h1>启明星 <span class="ver">Cream Candy v2.0</span></h1>
+  <p>方向启明 · 人生推演 — 95 组件理论最优设计</p>
+  <div class="sub">奶油暖底 · 马卡龙糖果色 · 圆润可亲笔触 · 治愈系个人工具</div>
+</div>
+
+<div class="toolbar">
+  <button class="tb-btn" id="themeToggle"><svg class="icon"><use href="#i-sun"/></svg><span id="themeLabel">可可夜</span></button>
+  <button class="tb-btn" id="petActionBtn"><svg class="icon"><use href="#i-spark"/></svg>桌宠动作</button>
+</div>
+
+<main>
+
+<!-- ============ A 区 · 应用壳 ============ -->
+<section>
+  <div class="sec-head">
+    <h2><svg class="icon sec-icon"><use href="#i-menu"/></svg>A · 应用壳</h2><span class="badge">8</span>
+    <span class="note">自定义窗口 + 沉浸式导航 + 全局搜索，桌面应用外壳</span>
+  </div>
+  <div class="grid">
+
+  <article class="ccard bp">
+    <span class="num">A01</span>
+    <div class="t"><i class="dot"></i>窗口标题栏（Traffic Light）</div>
+    <div class="titlebar">
+      <div class="traffic"><span></span><span></span><span></span></div>
+      <div class="tb-title">启明星 — 首页</div>
+      <div class="win-ctrl"><button><svg class="icon" style="width:12px"><use href="#i-chevron-left"/></svg></button><button>□</button><button><svg class="icon" style="width:12px"><use href="#i-close"/></svg></button></div>
+    </div>
+    <div style="height:80px;background:var(--bg-cream);border:1px solid var(--line);border-top:none;border-radius:0 0 var(--radius-md) var(--radius-md);display:grid;place-items:center;color:var(--text-low);font-size:11px">内容区</div>
+    <div class="land"><span class="pri r">🔴</span><b>规格</b>：高36px，Traffic Light红黄绿，双击最大化，拖拽移动窗口。<br><b>动效</b>：Traffic Light hover放大。</div>
+  </article>
+
+  <article class="ccard bp bp-d1">
+    <span class="num">A02</span>
+    <div class="t"><i class="dot"></i>侧边栏导航（可折叠）</div>
+    <div class="sidebar-demo">
+      <div class="sb">
+        <div class="sb-logo"><div class="lg-icon"><svg class="icon" style="width:16px"><use href="#i-spark"/></svg></div><span class="lg-name">启明星</span></div>
+        <div class="sb-item active"><svg class="icon"><use href="#i-home"/></svg>首页</div>
+        <div class="sb-item"><svg class="icon"><use href="#i-check"/></svg>任务</div>
+        <div class="sb-item"><svg class="icon"><use href="#i-doc"/></svg>知识</div>
+        <div class="sb-item"><svg class="icon"><use href="#i-refresh"/></svg>复盘</div>
+        <div class="sb-item"><svg class="icon"><use href="#i-setting"/></svg>设置</div>
+      </div>
+      <div class="sb-content">内容区域</div>
+    </div>
+    <div class="land"><span class="pri r">🔴</span><b>规格</b>：220px↔64px折叠，激活项 primary-soft 背景+3px竖条+glow。<br><b>动效</b>：宽度切换300ms ease-soft，激活项咕嘟弹入。</div>
+  </article>
+
+  <article class="ccard bp bp-d2">
+    <span class="num">A03</span>
+    <div class="t"><i class="dot"></i>顶栏（搜索+通知+头像）</div>
+    <div class="topbar">
+      <div class="tb-search"><svg class="icon"><use href="#i-search"/></svg><input placeholder="搜索文档、任务、对话…" readonly><kbd>⌘K</kbd></div>
+      <button class="icon-btn"><svg class="icon" style="width:16px"><use href="#i-bell"/></svg><span class="ping-dot"></span></button>
+      <div class="avatar-sm">旅</div>
+    </div>
+    <div class="land"><span class="pri r">🔴</span><b>规格</b>：高52px，胶囊搜索框focus变primary边框，通知铃ping扩散。<br><b>动效</b>：icon-btn hover上浮2px。</div>
+  </article>
+
+  <article class="ccard bp bp-d3">
+    <span class="num">A04</span>
+    <div class="t"><i class="dot"></i>全局搜索面板（⌘K）</div>
+    <div class="search-panel">
+      <div class="sp-input"><svg class="icon"><use href="#i-search"/></svg><input value="复盘" readonly></div>
+      <div class="sp-results">
+        <div class="sp-group-title">任务</div>
+        <div class="sp-item"><span class="kind task">任务</span><span class="hit">完成<mark>复盘</mark>方法论文档</span></div>
+        <div class="sp-group-title">文档</div>
+        <div class="sp-item"><span class="kind doc">文档</span><span class="hit"><mark>复盘</mark>方法论 v2.0</span></div>
+        <div class="sp-item"><span class="kind doc">文档</span><span class="hit">周<mark>复盘</mark>模板</span></div>
+        <div class="sp-group-title">对话</div>
+        <div class="sp-item"><span class="kind conv">对话</span><span class="hit">与分身讨论<mark>复盘</mark>节奏</span></div>
+      </div>
+    </div>
+    <div class="land"><span class="pri r">🔴</span><b>规格</b>：居中模态560px，分区结果，↑↓导航，Enter跳转，Esc关闭。<br><b>动效</b>：咕嘟弹入，结果错峰slideup。</div>
+  </article>
+
+  </div>
+</section>
+
+<!-- ============ B 区 · 首页 ============ -->
+<section>
+  <div class="sec-head">
+    <h2><svg class="icon sec-icon"><use href="#i-home"/></svg>B · 首页</h2><span class="badge">9</span>
+    <span class="note">温暖问候开场，焦点任务是视觉中心，一屏内状态感知+任务聚焦+功能导航</span>
+  </div>
+  <div class="grid">
+
+  <article class="ccard bp">
+    <span class="num">B01</span>
+    <div class="t"><i class="dot"></i>焦点任务卡（今日最重要）</div>
+    <div class="focus-card">
+      <span class="f-tag"><svg class="icon"><use href="#i-target"/></svg>今日焦点</span>
+      <div class="f-title">完善启明星系统技术架构文档</div>
+      <div class="f-sub">下一步：完成渲染性能优化章节</div>
+      <div class="f-prog"><span class="bar"><i style="width:67%"></i></span><span class="count">6/9</span></div>
+      <div class="f-acts"><button class="btn pri sm">继续工作</button><button class="btn sec sm">提交成果</button></div>
+    </div>
+    <div class="land"><span class="pri r">🔴</span><b>规格</b>：radius-xl 32px + glow辉光 + padding28，渐变背景+星尘金光晕。无焦点态显示引导。<br><b>动效</b>：glow呼吸3s，完成时星尘金闪烁。</div>
+  </article>
+
+  <article class="ccard bp bp-d1">
+    <span class="num">B02</span>
+    <div class="t"><i class="dot"></i>今日统计卡组（4宫格）</div>
+    <div class="stats4">
+      <div class="st4"><div class="ic primary"><svg class="icon"><use href="#i-check"/></svg></div><div class="v" data-count="12">0</div><div class="l">今日待办</div><div class="tr up">↑2</div></div>
+      <div class="st4"><div class="ic mint"><svg class="icon"><use href="#i-check"/></svg></div><div class="v" data-count="8">0</div><div class="l">已完成</div><div class="tr up">↑3</div></div>
+      <div class="st4"><div class="ic lilac"><svg class="icon"><use href="#i-doc"/></svg></div><div class="v" data-count="3">0</div><div class="l">新增文档</div><div class="tr down">↓1</div></div>
+      <div class="st4"><div class="ic butter"><svg class="icon"><use href="#i-refresh"/></svg></div><div class="v" data-count="6">0</div><div class="l">连续复盘</div><div class="tr up">↑1</div></div>
+    </div>
+    <div class="land"><span class="pri r">🔴</span><b>规格</b>：4宫格，图标语义色，大数字快乐体 tabular-nums，趋势箭头。<br><b>动效</b>：数字翻滚（滚动时触发），hover上浮。</div>
+  </article>
+
+  <article class="ccard bp bp-d2">
+    <span class="num">B03</span>
+    <div class="t"><i class="dot"></i>快捷入口宫格</div>
+    <div class="qgrid">
+      <div class="qitem"><span class="ic primary"><svg class="icon"><use href="#i-plus"/></svg></span><span class="nm">新建任务</span></div>
+      <div class="qitem"><span class="ic lilac"><svg class="icon"><use href="#i-doc"/></svg></span><span class="nm">新建文档</span></div>
+      <div class="qitem"><span class="ic butter"><svg class="icon"><use href="#i-refresh"/></svg></span><span class="nm">开始复盘</span></div>
+      <div class="qitem"><span class="ic mint"><svg class="icon"><use href="#i-send"/></svg></span><span class="nm">打开对话</span></div>
+      <div class="qitem"><span class="ic sky"><svg class="icon"><use href="#i-cloud"/></svg></span><span class="nm">导入数据</span></div>
+      <div class="qitem"><span class="ic gold"><svg class="icon"><use href="#i-search"/></svg></span><span class="nm">搜索</span></div>
+      <div class="qitem"><span class="ic primary"><svg class="icon"><use href="#i-setting"/></svg></span><span class="nm">设置</span></div>
+      <div class="qitem"><span class="ic gold"><svg class="icon"><use href="#i-spark"/></svg></span><span class="nm">桌宠设置</span></div>
+    </div>
+    <div class="land"><span class="pri r">🔴</span><b>规格</b>：4×2网格，图标28px语义色底圆。<br><b>动效</b>：hover上浮2px+图标scale(1.12)。</div>
+  </article>
+
+  <article class="ccard bp bp-d3">
+    <span class="num">B04</span>
+    <div class="t"><i class="dot"></i>最近文档列表</div>
+    <div class="recent">
+      <div class="rh"><b>最近文档</b><a>查看全部</a></div>
+      <div class="doc-row"><span class="dic"><svg class="icon"><use href="#i-doc"/></svg></span><div class="dinfo"><b>启明星系统技术架构 v2.1</b><span>架构 · 12.4k字</span></div><time>10分钟前</time></div>
+      <div class="doc-row"><span class="dic"><svg class="icon"><use href="#i-doc"/></svg></span><div class="dinfo"><b>个人知识库搭建方法论</b><span>知识 · 3.2k字</span></div><time>2小时前</time></div>
+      <div class="doc-row"><span class="dic"><svg class="icon"><use href="#i-doc"/></svg></span><div class="dinfo"><b>第二分身 Prompt 合集</b><span>指令 · 1.8k字</span></div><time>昨天</time></div>
+    </div>
+    <div class="land"><span class="pri r">🔴</span><b>规格</b>：列表项高48，图标淡紫，标题14+摘要11，时间11。<br><b>契约</b>：<code>{ id,title,excerpt,updatedAt,folder }</code>。</div>
+  </article>
+
+  <article class="ccard bp bp-d4">
+    <span class="num">B05</span>
+    <div class="t"><i class="dot"></i>灵感气泡卡（AI推送）</div>
+    <div class="inspire">
+      <span class="bulb"><svg class="icon"><use href="#i-spark"/></svg></span>
+      <div class="ib">
+        <p>把本周复盘沉淀为一篇<span class="ref">《复盘方法论》</span>文档，参考你的周复盘模板 v2</p>
+        <div class="acts"><button class="btn gold sm">采纳</button><button class="btn pill sm">忽略</button></div>
+      </div>
+    </div>
+    <div class="land"><span class="pri r">🔴</span><b>规格</b>：星尘金灯泡 glow-gold，渐变背景。采纳→创建任务/文档。<br><b>动效</b>：入场星尘金闪烁800ms，灯泡呼吸。</div>
+  </article>
+
+  <article class="ccard bp bp-d5">
+    <span class="num">B06</span>
+    <div class="t"><i class="dot"></i>本周进度环</div>
+    <div class="ring-wrap" id="ringDemo">
+      <svg viewBox="0 0 100 100"><circle class="rb" cx="50" cy="50" r="42"/><circle class="rf" cx="50" cy="50" r="42"/></svg>
+      <div class="rv">64%</div>
+      <div class="rl">本周完成率</div>
+    </div>
+    <div class="land"><span class="pri y">🟡</span><b>规格</b>：SVG环 stroke-dashoffset，渐变色，中心百分比。<br><b>动效</b>：环绘制600ms + 数字翻滚（滚动触发）。</div>
+  </article>
+
+  <article class="ccard bp bp-d6">
+    <span class="num">B07</span>
+    <div class="t"><i class="dot"></i>首页英雄区</div>
+    <div class="hero-row">
+      <div><h2>早上好，旅人</h2><p>今天是 8月28日，星期五，适合专注一件大事。</p></div>
+      <div class="hero-deco">
+        <svg class="h-cloud" style="width:50px;height:30px;top:5px;left:0" viewBox="0 0 64 40"><path d="M20 30c-8 0-14-5-14-12s6-12 13-12c2 0 4 .5 6 1.5C27 3 32 0 38 0c8 0 14 6 14 14s-5 16-13 16H20z" fill="var(--lilac)" opacity=".4"/></svg>
+        <svg class="h-star" style="width:16px;height:16px;top:0;right:10px" viewBox="0 0 24 24"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8l-6.2 4.5 2.4-7.4L2 9.4h7.6z" fill="var(--gold)"/></svg>
+        <svg class="h-star" style="width:10px;height:10px;top:20px;right:35px;animation-delay:.8s" viewBox="0 0 24 24"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8l-6.2 4.5 2.4-7.4L2 9.4h7.6z" fill="var(--primary)"/></svg>
+      </div>
+    </div>
+    <div class="land"><span class="pri r">🔴</span><b>规格</b>：问候28px快乐体渐变文字+日期副标题，右侧启明星星座装饰。<br><b>动效</b>：入场fade+slideup 500ms，云朵漂浮，星星闪烁。</div>
+  </article>
+
+  <article class="ccard bp bp-d7">
+    <span class="num">B08</span>
+    <div class="t"><i class="dot"></i>今日待办速览</div>
+    <div class="todos">
+      <div class="th"><b>今日待办</b><span class="cnt">5</span></div>
+      <div class="todo-item" onclick="this.classList.toggle('done');this.querySelector('.ck').classList.toggle('on')">
+        <span class="ck on"><svg class="icon"><use href="#i-check"/></svg></span>
+        <span class="tt">完成技术架构渲染优化章节</span>
+        <span class="st butter">进行中</span>
+      </div>
+      <div class="todo-item" onclick="this.classList.toggle('done');this.querySelector('.ck').classList.toggle('on')">
+        <span class="ck"></span><span class="tt">回复导师邮件</span><span class="st mint">待办</span>
+      </div>
+      <div class="todo-item done" onclick="this.classList.toggle('done');this.querySelector('.ck').classList.toggle('on')">
+        <span class="ck on"><svg class="icon"><use href="#i-check"/></svg></span><span class="tt">晨间复盘</span><span class="st mint">已完成</span>
+      </div>
+      <div class="todo-item overdue" onclick="this.classList.toggle('done');this.querySelector('.ck').classList.toggle('on')">
+        <span class="ck"></span><span class="tt">CNPipeParts 网站报价</span><span class="st straw">逾期</span>
+      </div>
+    </div>
+    <div class="land"><span class="pri r">🔴</span><b>规格</b>：最多5条，逾期straw文字+左竖条。点击勾选（可交互）。<br><b>动效</b>：完成划线过渡300ms，勾选果冻回弹。</div>
+  </article>
+
+  <article class="ccard bp bp-d8">
+    <span class="num">B09</span>
+    <div class="t"><i class="dot"></i>连续打卡徽章</div>
+    <div class="streak">
+      <div class="badge"><svg class="icon"><use href="#i-flame"/></svg><span class="n">12</span></div>
+      <p>已连续复盘 <b>12</b> 天<br><span style="font-size:11px;color:var(--text-low)">再坚持3天达成"半月之星"成就</span></p>
+    </div>
+    <div class="land"><span class="pri y">🟡</span><b>规格</b>：金色渐变徽章+火焰+天数角标，成就进度提示。<br><b>动效</b>：心跳动画2s，达成时星尘金粒子爆发。</div>
+  </article>
+
+  </div>
+</section>
+
+<!-- ============ C 区 · 任务 ============ -->
+<section>
+  <div class="sec-head">
+    <h2><svg class="icon sec-icon"><use href="#i-check"/></svg>C · 任务</h2><span class="badge">12</span>
+    <span class="note">列表/看板/四象限，状态流转清晰，焦点任务视觉突出</span>
+  </div>
+  <div class="grid">
+
+  <article class="ccard bp">
+    <span class="num">C01</span>
+    <div class="t"><i class="dot"></i>任务卡（列表项）</div>
+    <div style="border-left:3px solid var(--primary);border-radius:0 var(--radius-md) var(--radius-md) 0;padding:14px 16px;background:var(--bg-panel);box-shadow:var(--glow);margin-left:-3px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span class="ck on" style="width:18px;height:18px;border-radius:50%;background:var(--mint);display:grid;place-items:center;flex:none"><svg class="icon" style="width:10px;height:10px;color:#fff"><use href="#i-check"/></svg></span>
+        <span style="font-family:var(--font-cute);font-size:15px;flex:1">完善启明星系统技术架构</span>
+        <span style="font-size:10px;padding:2px 8px;border-radius:var(--radius-pill);background:var(--butter-soft);color:var(--butter-ink);font-family:var(--font-cute);display:flex;align-items:center;gap:4px"><span class="dot busy" style="width:6px;height:6px"></span>进行中</span>
+        <svg class="icon" style="width:18px;height:18px;color:var(--gold)"><use href="#i-star"/></svg>
+      </div>
+      <div style="font-size:12px;color:var(--text-mid);margin:8px 0 0 28px;line-height:1.5">明确渲染性能优化方案，产出防卡顿专项章节</div>
+      <div style="display:flex;align-items:center;gap:10px;margin:10px 0 0 28px;flex-wrap:wrap">
+        <span style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-mid)"><span style="width:50px;height:5px;background:var(--bg-inset);border-radius:var(--radius-pill);overflow:hidden"><i style="display:block;width:64%;height:100%;background:linear-gradient(90deg,var(--primary),var(--lilac))"></i></span>6/9</span>
+        <span class="chip sky">架构</span><span class="chip lilac">文档</span>
+        <time style="font-size:11px;color:var(--straw-ink);margin-left:auto">8/30 截止</time>
+      </div>
+    </div>
+    <div class="land"><span class="pri r">🔴</span><b>规格</b>：焦点任务=左3px primary条+glow+金星标。摘要2行截断，标签+截止日期。<br><b>契约</b>：<code>{ id,title,excerpt,status,priority,dueDate,tags,subTasks,isFocus }</code>。</div>
+  </article>
+
+  <article class="ccard bp bp-d1">
+    <span class="num">C02</span>
+    <div class="t"><i class="dot"></i>任务列表行（紧凑）</div>
+    <div style="border:1px solid var(--line);border-radius:var(--radius-md);overflow:hidden">
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer" onclick="this.querySelector('.ck').classList.toggle('on');this.querySelector('.tt').classList.toggle('done')">
+        <span class="ck on" style="width:16px;height:16px;border-radius:50%;border:2px solid var(--mint);background:var(--mint);display:grid;place-items:center;flex:none"><svg class="icon" style="width:8px;height:8px;color:#fff"><use href="#i-check"/></svg></span>
+        <span class="tt done" style="flex:1;font-size:13px;color:var(--text-low);text-decoration:line-through">晨间复盘</span>
+        <span class="chip mint" style="font-size:10px">完成</span><time style="font-size:10px;color:var(--text-low)">08:20</time>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg-inset);cursor:pointer" onclick="this.querySelector('.ck').classList.toggle('on');this.querySelector('.tt').classList.toggle('done')">
+        <span class="ck" style="width:16px;height:16px;border-radius:50%;border:2px solid var(--line);flex:none"></span>
+        <span class="tt" style="flex:1;font-size:13px">完善技术架构文档</span>
+        <span class="chip butter" style="font-size:10px">进行中</span><time style="font-size:10px;color:var(--text-low)">09:00</time>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer" onclick="this.querySelector('.ck').classList.toggle('on');this.querySelector('.tt').classList.toggle('done')">
+        <span class="ck" style="width:16px;height:16px;border-radius:50%;border:2px solid var(--line);flex:none"></span>
+        <span class="tt" style="flex:1;font-size:13px;color:var(--straw-ink)">网站报价确认</span>
+        <span style="display:inline-flex;gap:2px"><i style="width:3px;height:10px;background:var(--strawberry);border-radius:1px"></i><i style="width:3px;height:10px;background:var(--strawberry);border-radius:1px"></i><i style="width:3px;height:10px;background:var(--strawberry);border-radius:1px"></i></span>
+        <time style="font-size:10px;color:var(--straw-ink)">逾期</time>
+      </div>
+    </div>
+    <div class="land"><span class="pri r">🔴</span><b>规格</b>：高44，交替行 bg-inset。点击勾选可交互。适合高密度列表。</div>
+  </article>
+
+  <article class="ccard bp bp-d2">
+    <span class="num">C03</span>
+    <div class="t"><i class="dot"></i>看板列（拖拽容器）</div>
+    <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:4px">
+      <div style="min-width:130px;flex:1;background:var(--bg-inset);border-radius:var(--radius-md);padding:8px">
+        <div style="display:flex;align-items:center;gap:6px;font-family:var(--font-cute);font-size:12px;margin-bottom:8px;padding:0 4px"><span class="dot"></span>待办<span style="margin-left:auto;font-size:10px;color:var(--text-low)">3</span></div>
+        <div style="background:var(--bg-panel);border-radius:10px;padding:8px;margin-bottom:6px;box-shadow:0 2px 6px rgba(0,0,0,.05)"><div style="font-size:11px;font-weight:600">读书计划</div><span class="chip sky" style="font-size:9px;margin-top:4px">等待</span></div>
+        <div style="background:var(--bg-panel);border-radius:10px;padding:8px;margin-bottom:6px;box-shadow:0 2px 6px rgba(0,0,0,.05)"><div style="font-size:11px;font-weight:600">回复邮件</div></div>
+      </div>
+      <div style="min-width:130px;flex:1;background:var(--primary-soft);border-radius:var(--radius-md);padding:8px;border:1px dashed var(--primary)">
+        <div style="display:flex;align-items:center;gap:6px;font-family:var(--font-cute);font-size:12px;margin-bottom:8px;padding:0 4px;color:var(--primary)"><span class="dot busy"></span>进行中<span style="margin-left:auto;font-size:10px">2</span></div>
+        <div style="background:var(--bg-panel);border-radius:10px;padding:8px;margin-bottom:6px;box-shadow:var(--glow)"><div style="font-size:11px;font-weight:600">架构文档</div><span class="chip butter" style="font-size:9px;margin-top:4px">67%</span></div>
+      </div>
+      <div style="min-width:130px;flex:1;background:var(--mint-soft);border-radius:var(--radius-md);padding:8px">
+        <div style="display:flex;align-items:center;gap:6px;font-family:var(--font-cute);font-size:12px;margin-bottom:8px;padding:0 4px;color:var(--mint-ink)"><span class="dot on"></span>已完成<span style="margin-left:auto;font-size:10px">4</span></div>
+        <div style="background:var(--bg-panel);border-radius:10px;padding:8px;margin-bottom:6px;opacity:.6"><div style="font-size:11px;font-weight:600;text-decoration:line-through">晨间复盘</div></div>
+      </div>
+    </div>
+    <div class="land"><span class="pri r">🔴</span><b>规格</b>：4列，列头=状态+计数，拖拽目标列 primary虚线高亮。<br><b>动效</b>：拖拽卡 scale(1.02)+glow，放置咕嘟弹入。</div>
+  </article>
+
+  <article class="ccard bp bp-d3">
+    <span class="num">C05</span>
+    <div class="t"><i class="dot"></i>子任务列表</div>
+    <div style="display:flex;flex-direction:column;gap:2px">
+      <div style="display:flex;align-items:center;gap:10px;padding:7px 6px;border-radius:8px">
+        <span style="width:14px;height:14px;border-radius:50%;background:var(--mint);display:grid;place-items:center;flex:none"><svg class="icon" style="width:8px;height:8px;color:#fff"><use href="#i-check"/></svg></span>
+        <span style="flex:1;font-size:12px;color:var(--text-low);text-decoration:line-through">收集技术架构参考</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;padding:7px 6px;border-radius:8px">
+        <span style="width:14px;height:14px;border-radius:50%;background:var(--mint);display:grid;place-items:center;flex:none"><svg class="icon" style="width:8px;height:8px;color:#fff"><use href="#i-check"/></svg></span>
+        <span style="flex:1;font-size:12px;color:var(--text-low);text-decoration:line-through">绘制进程架构图</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;padding:7px 6px;border-radius:8px;background:var(--bg-inset)">
+        <span style="width:14px;height:14px;border-radius:50%;border:2px solid var(--line);flex:none"></span>
+        <span style="flex:1;font-size:12px">完成渲染性能优化章节</span>
+        <svg class="icon" style="width:12px;height:12px;color:var(--text-low);cursor:pointer"><use href="#i-trash"/></svg>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;padding:7px 6px;color:var(--text-low);font-size:12px;cursor:pointer;border-top:1px dashed var(--line);margin-top:4px;padding-top:10px">
+        <svg class="icon" style="width:12px;height:12px"><use href="#i-plus"/></svg>添加子任务
+      </div>
+    </div>
+    <div class="land"><span class="pri r">🔴</span><b>规格</b>：嵌套任务详情，Enter添加，Backspace空行删除，拖拽排序。</div>
+  </article>
+
+  <article class="ccard bp bp-d4">
+    <span class="num">C07</span>
+    <div class="t"><i class="dot"></i>任务筛选器栏</div>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <div style="display:flex;background:var(--bg-inset);border-radius:var(--radius-pill);padding:3px">
+        <button style="padding:5px 14px;border-radius:var(--radius-pill);font-family:var(--font-cute);font-size:12px;background:var(--primary);color:#fff;box-shadow:var(--glow)">列表</button>
+        <button style="padding:5px 14px;border-radius:var(--radius-pill);font-family:var(--font-cute);font-size:12px;color:var(--text-mid)">看板</button>
+        <button style="padding:5px 14px;border-radius:var(--radius-pill);font-family:var(--font-cute);font-size:12px;color:var(--text-mid)">四象限</button>
+      </div>
+      <button class="chip primary" style="cursor:pointer">全部</button>
+      <button class="chip" style="cursor:pointer">进行中</button>
+      <button class="chip" style="cursor:pointer">已完成</button>
+      <button class="chip straw" style="cursor:pointer">逾期</button>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:6px;background:var(--bg-inset);border-radius:var(--radius-pill);padding:6px 12px">
+        <svg class="icon" style="width:12px;height:12px;color:var(--text-low)"><use href="#i-search"/></svg>
+        <span style="font-size:11px;color:var(--text-low)">筛选任务…</span>
+      </div>
+    </div>
+    <div class="land"><span class="pri r">🔴</span><b>规格</b>：高44，视图分段控件+筛选chips+搜索。视图切换fade 200ms。</div>
+  </article>
+
+  </div>
+</section>
+
+<!-- ============ D 区 · 知识 ============ -->
+<section>
+  <div class="sec-head">
+    <h2><svg class="icon sec-icon"><use href="#i-doc"/></svg>D · 知识库</h2><span class="badge">10</span>
+    <span class="note">文档编辑器沉浸，文件夹组织清晰，双向链接是知识网络核心</span>
+  </div>
+  <div class="grid">
+
+  <article class="ccard bp">
+    <span class="num">D01</span>
+    <div class="t"><i class="dot"></i>文档卡（网格）</div>
+    <div style="background:var(--bg-panel);border:1px solid var(--line);border-radius:var(--radius-md);padding:14px;transition:transform .3s,box-shadow .3s;cursor:pointer" onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='var(--shadow-raise)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+        <span class="chip lilac" style="font-size:10px">架构</span>
+        <svg class="icon" style="width:14px;height:14px;color:var(--text-low);cursor:pointer"><use href="#i-menu"/></svg>
+      </div>
+      <div style="font-family:var(--font-cute);font-size:15px;color:var(--text-hi);line-height:1.3;margin-bottom:6px">启明星技术架构 v2.1</div>
+      <div style="font-size:11px;color:var(--text-mid);line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">Electron+SQLite本地桌面架构，三进程模型，渲染性能防卡顿专项设计…</div>
+      <div style="display:flex;align-items:center;gap:6px;margin-top:10px;flex-wrap:wrap">
+        <span class="chip sky" style="font-size:9px">架构</span><span class="chip primary" style="font-size:9px">性能</span>
+        <span style="margin-left:auto;font-size:10px;color:var(--text-low)">12.4k字 · 10分钟前</span>
+      </div>
+    </div>
+    <div class="land"><span class="pri r">🔴</span><b>规格</b>：radius-md+shadow-card，hover上浮。标题2行+摘要3行截断。<br><b>契约</b>：<code>{ id,title,excerpt,tags,wordCount,folder,updatedAt }</code>。</div>
+  </article>
+
+  <article class="ccard bp bp-d1">
+    <span class="num">D03</span>
+    <div class="t"><i class="dot"></i>文件夹树</div>
+    <div style="font-size:13px">
+      <div style="display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:8px;cursor:pointer;background:var(--primary-soft)">
+        <svg class="icon" style="width:14px;height:14px;color:var(--primary);transform:rotate(90deg)"><use href="#i-chevron-right"/></svg>
+        <svg class="icon" style="width:14px;height:14px;color:var(--primary)"><use href="#i-folder"/></svg>
+        <span style="color:var(--primary);font-family:var(--font-cute)">知识库</span>
+        <span style="margin-left:auto;font-size:10px;background:var(--bg-inset);border-radius:var(--radius-pill);padding:0 6px;color:var(--text-low)">24</span>
+      </div>
+      <div style="padding-left:22px">
+        <div style="display:flex;align-items:center;gap:6px;padding:5px 8px;border-radius:8px;cursor:pointer" onmouseover="this.style.background='var(--bg-inset)'" onmouseout="this.style.background=''">
+          <svg class="icon" style="width:14px;height:14px;color:var(--text-low)"><use href="#i-chevron-right"/></svg>
+          <svg class="icon" style="width:14px;height:14px;color:var(--lilac-ink)"><use href="#i-folder"/></svg>
+          <span style="color:var(--text-mid)">架构文档</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;padding:5px 8px 5px 28px;border-radius:8px;cursor:pointer" onmouseover="this.style.background='var(--bg-inset)'" onmouseout="this.style.background=''">
+          <svg class="icon" style="width:12px;height:12px;color:var(--text-low)"><use href="#i-doc"/></svg>
+          <span style="font-size:12px;color:var(--text-mid)">技术架构v2.1</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;padding:5px 8px;border-radius:8px;cursor:pointer" onmouseover="this.style.background='var(--bg-inset)'" onmouseout="this.style.background=''">
+          <svg class="icon" style="width:14px;height:14px;color:var(--text-low)"><use href="#i-chevron-right"/></svg>
+          <svg class="icon" style="width:14px;height:14px;color:var(--lilac-ink)"><use href="#i-folder"/></svg>
+          <span style="color:var(--text-mid)">学习笔记</span>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:8px;cursor:pointer;color:var(--primary);font-size:12px;margin-top:4px">
+        <svg class="icon" style="width:12px;height:12px"><use href="#i-plus"/></svg>新建文件夹
+      </div>
+    </div>
+    <div class="land"><span class="pri r">🔴</span><b>规格</b>：缩进层级16px，激活项 primary-soft 背景。展开箭头旋转90°。</div>
+  </article>
+
+  <article class="ccard bp bp-d2">
+    <span class="num">D04</span>
+    <div class="t"><i class="dot"></i>文档编辑器（Tiptap）</div>
+    <div style="border:1px solid var(--line);border-radius:var(--radius-md);overflow:hidden">
+      <div style="display:flex;align-items:center;gap:4px;padding:8px 12px;border-bottom:1px solid var(--line);background:var(--bg-inset)">
+        <button style="width:26px;height:26px;border-radius:6px;display:grid;place-items:center;color:var(--text-mid);font-weight:700;font-family:var(--font-cute)">B</button>
+        <button style="width:26px;height:26px;border-radius:6px;display:grid;place-items:center;color:var(--text-mid);font-style:italic">I</button>
+        <button style="width:26px;height:26px;border-radius:6px;display:grid;place-items:center;color:var(--text-mid);text-decoration:underline">U</button>
+        <div style="width:1px;height:16px;background:var(--line);margin:0 4px"></div>
+        <button style="width:26px;height:26px;border-radius:6px;display:grid;place-items:center;color:var(--text-mid)"><svg class="icon" style="width:14px"><use href="#i-list"/></svg></button>
+        <button style="width:26px;height:26px;border-radius:6px;display:grid;place-items:center;color:var(--text-mid)"><svg class="icon" style="width:14px"><use href="#i-tag"/></svg></button>
+        <div style="margin-left:auto;display:flex;gap:4px">
+          <button style="padding:4px 10px;border-radius:var(--radius-pill);background:var(--primary);color:#fff;font-family:var(--font-cute);font-size:11px;display:flex;align-items:center;gap:4px"><svg class="icon" style="width:11px"><use href="#i-spark"/></svg>AI摘要</button>
+        </div>
+      </div>
+      <div style="padding:16px 20px;max-height:140px;overflow-y:auto">
+        <div style="font-family:var(--font-cute);font-size:18px;color:var(--text-hi);margin-bottom:10px">渲染性能优化专项</div>
+        <p style="font-size:13px;color:var(--text-hi);line-height:1.8;margin-bottom:8px">本章聚焦用户感知到的卡顿，核心指标：交互响应 ≤100ms，动画稳定 <b style="color:var(--primary)">60fps</b>。</p>
+        <blockquote style="border-left:3px solid var(--primary);background:var(--bg-inset);padding:8px 12px;border-radius:0 8px 8px 0;font-size:12px;color:var(--text-mid);margin:8px 0">长任务拆分：任何同步代码超过50ms必须拆分，用 requestIdleCallback 或 Web Worker。</blockquote>
+        <p style="font-size:13px;color:var(--text-hi);line-height:1.8">虚拟滚动用于超过100条的列表<span style="color:var(--sky-ink);border-bottom:1px dotted var(--sky);cursor:pointer"> [双向链接示例]</span>。</p>
+      </div>
+    </div>
+    <div class="land"><span class="pri r">🔴</span><b>规格</b>：居中最大宽760，标题快乐体，引用块 primary竖条，[[]]双向链接 sky色。<br><b>动效</b>：工具栏hover图标scale(1.1)，保存状态右下角淡入。</div>
+  </article>
+
+  <article class="ccard bp bp-d3">
+    <span class="num">D05</span>
+    <div class="t"><i class="dot"></i>标签输入器</div>
+    <div style="background:var(--bg-inset);border-radius:var(--radius-sm);padding:8px 10px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;border:1px solid transparent;transition:border .3s" onfocusin="this.style.borderColor='var(--primary)'" onfocusout="this.style.borderColor='transparent'">
+      <span class="chip primary" style="font-size:11px">架构 <span class="x" style="cursor:pointer">×</span></span>
+      <span class="chip lilac" style="font-size:11px">性能优化 <span class="x" style="cursor:pointer">×</span></span>
+      <span class="chip sky" style="font-size:11px">Electron <span class="x" style="cursor:pointer">×</span></span>
+      <input placeholder="输入标签…" style="border:none;outline:none;background:transparent;font-size:12px;color:var(--text-hi);flex:1;min-width:80px;font-family:var(--font-body)">
+    </div>
+    <div style="margin-top:8px;padding:6px;background:var(--bg-raised);border:1px solid var(--line);border-radius:var(--radius-sm);box-shadow:var(--shadow-card)">
+      <div style="font-size:10px;color:var(--text-low);padding:2px 6px;margin-bottom:2px">建议标签</div>
+      <div style="display:flex;gap:4px;flex-wrap:wrap">
+        <span class="chip mint" style="font-size:10px;cursor:pointer">SQLite</span>
+        <span class="chip butter" style="font-size:10px;cursor:pointer">桌宠</span>
+        <span class="chip" style="font-size:10px;cursor:pointer">AI对话</span>
+      </div>
+    </div>
+    <div class="land"><span class="pri r">🔴</span><b>规格</b>：inset底+已选chip可删+输入+建议下拉。Enter确认，Backspace删最后。</div>
+  </article>
+
+  </div>
+</section>
+
+<!-- ============ E 区 · 第二分身 ============ -->
+<section>
+  <div class="sec-head">
+    <h2><svg class="icon sec-icon"><use href="#i-send"/></svg>E · 第二分身</h2><span class="badge">10</span>
+    <span class="note">对话即工作流，第二分身沉淀用户思维，本地运行全私密</span>
+  </div>
+  <div class="grid">
+
+  <article class="ccard bp">
+    <span class="num">E01</span>
+    <div class="t"><i class="dot"></i>对话消息流</div>
+    <div style="display:flex;flex-direction:column;gap:12px;max-height:220px;overflow-y:auto;padding:4px">
+      <div style="display:flex;gap:10px;align-items:flex-end">
+        <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--lilac),var(--primary));display:grid;place-items:center;font-family:var(--font-cute);color:#fff;font-size:13px;flex:none;box-shadow:var(--glow)">分</div>
+        <div style="background:var(--bg-panel);border:1px solid var(--line);border-radius:16px 16px 16px 4px;padding:10px 14px;max-width:75%;font-size:13px;line-height:1.6;box-shadow:var(--shadow-card)">
+          我已经读完你最近的3篇复盘，发现你在「任务拆解」环节经常卡壳。要不要我帮你把今天的焦点任务拆成可执行的子步骤？
+          <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
+            <button class="btn sm" style="background:var(--primary-soft);color:var(--primary-ink);height:28px;padding:0 10px;font-size:11px">好，帮我拆</button>
+            <button class="btn sm pill" style="height:28px;padding:0 10px;font-size:11px">不用了</button>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;align-items:flex-end;flex-direction:row-reverse">
+        <div style="width:32px;height:32px;border-radius:50%;background:var(--bg-inset);display:grid;place-items:center;font-family:var(--font-cute);color:var(--text-mid);font-size:13px;flex:none">我</div>
+        <div style="background:var(--primary);color:#fff;border-radius:16px 16px 4px 16px;padding:10px 14px;max-width:75%;font-size:13px;line-height:1.6;box-shadow:var(--glow)">好的，帮我拆成5步以内</div>
+      </div>
+      <div style="display:flex;gap:10px;align-items:flex-end">
+        <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--lilac),var(--primary));display:grid;place-items:center;font-family:var(--font-cute);color:#fff;font-size:13px;flex:none;box-shadow:var(--glow)">分</div>
+        <div style="background:var(--bg-panel);border:1px solid var(--line);border-radius:16px 16px 16px 4px;padding:10px 14px;max-width:75%;font-size:13px;line-height:1.6;box-shadow:var(--shadow-card)">
+          <div id="typingDemo" style="min-height:20px">正在拆解<span class="typing-dots"><i>.</i><i>.</i><i>.</i></span></div>
+        </div>
+      </div>
+    </div>
+    <div class="land"><span class="pri r">🔴</span><b>规格</b>：用户消息 primary右对齐，分身消息 panel左对齐，头像32px圆形。<br><b>动效</b>：流式输出打字机，消息入场slideup 300ms。</div>
+  </article>
+
+  <article class="ccard bp bp-d1">
+    <span class="num">E02</span>
+    <div class="t"><i class="dot"></i>消息输入框</div>
+    <div style="background:var(--bg-panel);border:1px solid var(--line);border-radius:var(--radius-lg);padding:10px;box-shadow:var(--shadow-card)">
+      <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">
+        <span class="chip primary" style="font-size:10px;cursor:pointer">📎 附件</span>
+        <span class="chip lilac" style="font-size:10px;cursor:pointer">@ 引用文档</span>
+        <span class="chip mint" style="font-size:10px;cursor:pointer">🔧 工具调用</span>
+        <span class="chip butter" style="font-size:10px;cursor:pointer">💡 灵感模式</span>
+      </div>
+      <div style="display:flex;align-items:flex-end;gap:8px">
+        <textarea placeholder="和第二分身聊聊…（Shift+Enter换行）" style="flex:1;border:none;outline:none;resize:none;font-family:var(--font-body);font-size:13px;color:var(--text-hi);background:transparent;min-height:40px;max-height:120px;line-height:1.5"></textarea>
+        <button class="btn pri" style="height:36px;width:36px;padding:0;border-radius:50%;flex:none"><svg class="icon" style="width:16px"><use href="#i-send"/></svg></button>
+      </div>
+    </div>
+    <div class="land"><span class="pri r">🔴</span><b>规格</b>：附件/引用/工具/模式chips + 自适应textarea + 圆形发送按钮。Enter发送，Shift+Enter换行。</div>
+  </article>
+
+  <article class="ccard bp bp-d2">
+    <span class="num">E03</span>
+    <div class="t"><i class="dot"></i>引用文档卡片</div>
+    <div style="background:var(--lilac-soft);border-radius:var(--radius-md);padding:12px;display:flex;gap:10px;align-items:center;border:1px solid rgba(201,174,232,.3)">
+      <div style="width:36px;height:36px;border-radius:10px;background:var(--lilac);display:grid;place-items:center;color:#fff;flex:none"><svg class="icon" style="width:18px"><use href="#i-doc"/></svg></div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;font-weight:600;color:var(--text-hi);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">启明星技术架构 v2.1</div>
+        <div style="font-size:10px;color:var(--text-low);margin-top:2px">第17章 · 渲染性能防卡顿 · 已引用3处</div>
+      </div>
+      <button style="width:24px;height:24px;border-radius:6px;display:grid;place-items:center;color:var(--text-low);flex:none"><svg class="icon" style="width:12px"><use href="#i-close"/></svg></button>
+    </div>
+    <div class="land"><span class="pri r">🔴</span><b>规格</b>：lilac-soft背景，文档图标+标题+引用位置+移除。@触发文档搜索。</div>
+  </article>
+
+  <article class="ccard bp bp-d3">
+    <span class="num">E05</span>
+    <div class="t"><i class="dot"></i>分身状态指示</div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--mint-soft);border-radius:var(--radius-md)">
+        <span class="dot on"></span><span style="font-family:var(--font-cute);font-size:13px;color:var(--mint-ink)">在线 · 本地模型就绪</span>
+        <span style="margin-left:auto;font-size:10px;color:var(--text-low)">LM Studio · 7B</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--butter-soft);border-radius:var(--radius-md)">
+        <span class="dot busy"></span><span style="font-family:var(--font-cute);font-size:13px;color:var(--butter-ink)">思考中… 正在分析你的知识库</span>
+        <div style="margin-left:auto;display:flex;gap:2px"><span style="width:4px;height:4px;border-radius:50%;background:var(--butter-ink);animation:breathe .6s infinite"></span><span style="width:4px;height:4px;border-radius:50%;background:var(--butter-ink);animation:breathe .6s .2s infinite"></span><span style="width:4px;height:4px;border-radius:50%;background:var(--butter-ink);animation:breathe .6s .4s infinite"></span></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--bg-inset);border-radius:var(--radius-md)">
+        <span class="dot"></span><span style="font-family:var(--font-cute);font-size:13px;color:var(--text-mid)">离线 · 未配置模型</span>
+        <button class="btn sm pri" style="margin-left:auto;height:28px;padding:0 12px;font-size:11px">配置</button>
+      </div>
+    </div>
+    <div class="land"><span class="pri r">🔴</span><b>规格</b>：在线mint/思考butter/离线gray，状态点呼吸动画。模型名称右侧显示。</div>
+  </article>
+
+  </div>
+</section>
+
+<!-- ============ F 区 · 复盘 ============ -->
+<section>
+  <div class="sec-head">
+    <h2><svg class="icon sec-icon"><use href="#i-refresh"/></svg>F · 复盘</h2><span class="badge">8</span>
+    <span class="note">结构化反思，AI辅助自动填充，复盘沉淀为可检索知识</span>
+  </div>
+  <div class="grid">
+
+  <article class="ccard bp">
+    <span class="num">F01</span>
+    <div class="t"><i class="dot"></i>复盘编辑器（结构化）</div>
+    <div style="border:1px solid var(--line);border-radius:var(--radius-md);overflow:hidden">
+      <div style="display:flex;gap:0;border-bottom:1px solid var(--line);background:var(--bg-inset)">
+        <button style="padding:10px 16px;font-family:var(--font-cute);font-size:13px;color:var(--primary);border-bottom:2px solid var(--primary)">今日复盘</button>
+        <button style="padding:10px 16px;font-family:var(--font-cute);font-size:13px;color:var(--text-mid)">周复盘</button>
+        <button style="padding:10px 16px;font-family:var(--font-cute);font-size:13px;color:var(--text-mid)">月复盘</button>
+      </div>
+      <div style="padding:16px">
+        <div style="margin-bottom:14px">
+          <div style="font-family:var(--font-cute);font-size:13px;color:var(--text-mid);margin-bottom:6px;display:flex;align-items:center;gap:6px">
+            <span style="width:18px;height:18px;border-radius:50%;background:var(--primary-soft);color:var(--primary);display:grid;place-items:center;font-size:11px">1</span>今天做了什么？
+            <button style="margin-left:auto;font-size:10px;color:var(--sky-ink);display:flex;align-items:center;gap:3px"><svg class="icon" style="width:11px"><use href="#i-spark"/></svg>AI填充</button>
+          </div>
+          <div style="background:var(--bg-inset);border-radius:var(--radius-sm);padding:10px 12px;font-size:12px;color:var(--text-mid);min-height:40px;line-height:1.6">完成技术架构渲染优化章节初稿，回复了3封邮件，和导师确认了路演时间…</div>
+        </div>
+        <div style="margin-bottom:14px">
+          <div style="font-family:var(--font-cute);font-size:13px;color:var(--text-mid);margin-bottom:6px;display:flex;align-items:center;gap:6px">
+            <span style="width:18px;height:18px;border-radius:50%;background:var(--mint-soft);color:var(--mint-ink);display:grid;place-items:center;font-size:11px">2</span>做得好的地方？
+          </div>
+          <div style="border:1px dashed var(--line);border-radius:var(--radius-sm);padding:10px 12px;font-size:12px;color:var(--text-low);min-height:30px;display:flex;align-items:center">点击或按Tab开始记录…</div>
+        </div>
+        <div>
+          <div style="font-family:var(--font-cute);font-size:13px;color:var(--text-mid);margin-bottom:6px;display:flex;align-items:center;gap:6px">
+            <span style="width:18px;height:18px;border-radius:50%;background:var(--butter-soft);color:var(--butter-ink);display:grid;place-items:center;font-size:11px">3</span>可以改进的？
+          </div>
+          <div style="border:1px dashed var(--line);border-radius:var(--radius-sm);padding:10px 12px;font-size:12px;color:var(--text-low);min-height:30px;display:flex;align-items:center">点击或按Tab开始记录…</div>
+        </div>
+      </div>
+    </div>
+    <div class="land"><span class="pri r">🔴</span><b>规格</b>：Tab切换日/周/月，编号问题卡，AI填充按钮。已填inset底，未填虚线。<br><b>动效</b>：Tab切换内容fade 200ms，AI填充时骨架屏→内容。</div>
+  </article>
+
+  <article class="ccard bp bp-d1">
+    <span class="num">F02</span>
+    <div class="t"><i class="dot"></i>反思问题卡</div>
+    <div style="background:linear-gradient(135deg,var(--lilac-soft),var(--primary-soft));border-radius:var(--radius-xl);padding:20px;position:relative;overflow:hidden">
+      <div style="position:absolute;top:-20px;right:-20px;width:80px;height:80px;border-radius:50%;background:radial-gradient(circle,var(--gold-soft),transparent 70%)"></div>
+      <div style="font-family:var(--font-cute);font-size:11px;color:var(--lilac-ink);letter-spacing:2px;margin-bottom:8px;position:relative">今日灵魂拷问</div>
+      <div style="font-family:var(--font-cute);font-size:18px;color:var(--text-hi);line-height:1.4;position:relative">如果今天只能做一件事，你会选哪件？为什么是它？</div>
+      <div style="display:flex;gap:8px;margin-top:14px;position:relative">
+        <button class="btn sm" style="background:#fff;color:var(--primary);height:30px;padding:0 12px;font-size:11px">记录答案</button>
+        <button class="btn sm pill" style="height:30px;padding:0 12px;font-size:11px;color:var(--text-mid)">换一个问题</button>
+      </div>
+    </div>
+    <div class="land"><span class="pri y">🟡</span><b>规格</b>：渐变背景+光晕，问题快乐体18px，换一题随机。<br><b>动效</b>：入场咕嘟弹入，换题时文字淡入淡出。</div>
+  </article>
+
+  <article class="ccard bp bp-d2">
+    <span class="num">F03</span>
+    <div class="t"><i class="dot"></i>情绪记录</div>
+    <div style="text-align:center;padding:8px">
+      <div style="font-family:var(--font-cute);font-size:13px;color:var(--text-mid);margin-bottom:12px">今天的心情是？</div>
+      <div style="display:flex;justify-content:center;gap:14px">
+        <div class="mood" data-mood="great" style="cursor:pointer;transition:transform .25s var(--ease-spring)" onmouseover="this.style.transform='scale(1.2)'" onmouseout="this.style.transform=''">
+          <div style="font-size:32px">😄</div><div style="font-size:10px;color:var(--text-low);margin-top:2px">超棒</div>
+        </div>
+        <div class="mood" data-mood="good" style="cursor:pointer;transition:transform .25s var(--ease-spring)" onmouseover="this.style.transform='scale(1.2)'" onmouseout="this.style.transform=''">
+          <div style="font-size:32px">🙂</div><div style="font-size:10px;color:var(--text-low);margin-top:2px">不错</div>
+        </div>
+        <div class="mood selected" data-mood="ok" style="cursor:pointer;transform:scale(1.2)">
+          <div style="font-size:32px">😐</div><div style="font-size:10px;color:var(--primary);margin-top:2px;font-weight:600">一般</div>
+        </div>
+        <div class="mood" data-mood="tired" style="cursor:pointer;transition:transform .25s var(--ease-spring)" onmouseover="this.style.transform='scale(1.2)'" onmouseout="this.style.transform=''">
+          <div style="font-size:32px">😴</div><div style="font-size:10px;color:var(--text-low);margin-top:2px">疲惫</div>
+        </div>
+        <div class="mood" data-mood="bad" style="cursor:pointer;transition:transform .25s var(--ease-spring)" onmouseover="this.style.transform='scale(1.2)'" onmouseout="this.style.transform=''">
+          <div style="font-size:32px">😔</div><div style="font-size:10px;color:var(--text-low);margin-top:2px">低落</div>
+        </div>
+      </div>
+      <div style="margin-top:14px;padding:8px 12px;background:var(--bg-inset);border-radius:var(--radius-sm);font-size:11px;color:var(--text-mid);text-align:left">
+        <b style="color:var(--primary)">分身洞察：</b>你最近3天都是"一般"，可能需要安排一次放松活动？
+      </div>
+    </div>
+    <div class="land"><span class="pri r">🔴</span><b>规格</b>：5档emoji，选中scale(1.2)+primary文字。连续情绪触发分身洞察。</div>
+  </article>
+
+  </div>
+</section>
+
+<!-- ============ G 区 · 桌宠（核心升级） ============ -->
+<section>
+  <div class="sec-head">
+    <h2><svg class="icon sec-icon"><use href="#i-spark"/></svg>G · 桌宠 · 第二分身形象</h2><span class="badge">8</span>
+    <span class="note">二次元平面绘图，桌宠/人形炫酷切换，参考Marvis互动，全程本地运行</span>
+  </div>
+  <div class="grid">
+
+  <article class="ccard bp" style="grid-column:span 2">
+    <span class="num">G01</span>
+    <div class="t"><i class="dot"></i>桌宠角色（二次元Q版 · 多动作）</div>
+    <div style="display:flex;gap:24px;align-items:center;flex-wrap:wrap">
+      <!-- 二次元SVG角色 -->
+      <div style="position:relative;width:160px;height:180px;flex:none">
+        <!-- 底座阴影 -->
+        <div style="position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:80px;height:16px;background:radial-gradient(ellipse,rgba(255,143,163,.3),transparent 70%);border-radius:50%"></div>
+        <svg id="petChar" class="pet idle" viewBox="0 0 160 180" width="160" height="180" style="position:relative;z-index:1">
+          <!-- 头发后层 -->
+          <g class="pet-hair-back">
+            <ellipse cx="80" cy="68" rx="48" ry="44" fill="#FFB6C1"/>
+            <path d="M35 70 Q30 110 42 140 L50 140 Q44 105 48 75 Z" fill="#FF9EB0"/>
+            <path d="M125 70 Q130 110 118 140 L110 140 Q116 105 112 75 Z" fill="#FF9EB0"/>
+          </g>
+          <!-- 身体/裙子 -->
+          <g class="pet-body">
+            <path d="M55 120 Q50 155 45 175 L115 175 Q110 155 105 120 Z" fill="#C9AEE8"/>
+            <path d="M55 120 Q80 128 105 120 L108 130 Q80 138 52 130 Z" fill="#B895DD"/>
+            <!-- 领口 -->
+            <ellipse cx="80" cy="118" rx="12" ry="6" fill="#FFE4EC"/>
+          </g>
+          <!-- 左手臂 -->
+          <g class="pet-arm-l">
+            <ellipse cx="48" cy="135" rx="8" ry="16" fill="#FFE4EC" transform="rotate(-15 48 135)"/>
+            <circle cx="44" cy="150" r="7" fill="#FFE4EC"/>
+          </g>
+          <!-- 右手臂 -->
+          <g class="pet-arm-r">
+            <ellipse cx="112" cy="135" rx="8" ry="16" fill="#FFE4EC" transform="rotate(15 112 135)"/>
+            <circle cx="116" cy="150" r="7" fill="#FFE4EC"/>
+          </g>
+          <!-- 脸 -->
+          <g class="pet-face">
+            <ellipse cx="80" cy="72" rx="36" ry="34" fill="#FFF0F5"/>
+            <!-- 腮红 -->
+            <ellipse cx="58" cy="80" rx="8" ry="5" fill="#FFB6C1" opacity=".6"/>
+            <ellipse cx="102" cy="80" rx="8" ry="5" fill="#FFB6C1" opacity=".6"/>
+            <!-- 眼睛 -->
+            <g class="pet-eyes">
+              <ellipse cx="66" cy="72" rx="6" ry="8" fill="#5C4A45"/>
+              <ellipse cx="94" cy="72" rx="6" ry="8" fill="#5C4A45"/>
+              <circle cx="68" cy="69" r="2.5" fill="#fff"/>
+              <circle cx="96" cy="69" r="2.5" fill="#fff"/>
+              <circle cx="65" cy="75" r="1.2" fill="#fff" opacity=".7"/>
+              <circle cx="93" cy="75" r="1.2" fill="#fff" opacity=".7"/>
+            </g>
+            <!-- 嘴巴 -->
+            <path class="pet-mouth" d="M74 86 Q80 92 86 86" stroke="#E89AA8" stroke-width="2" fill="none" stroke-linecap="round"/>
+          </g>
+          <!-- 头发前层/刘海 -->
+          <g class="pet-hair-front">
+            <path d="M44 58 Q50 30 80 28 Q110 30 116 58 Q110 48 95 50 Q88 40 80 42 Q72 40 65 50 Q50 48 44 58 Z" fill="#FFB6C1"/>
+            <path d="M52 55 Q60 42 72 48" stroke="#FF9EB0" stroke-width="1.5" fill="none"/>
+            <path d="M108 55 Q100 42 88 48" stroke="#FF9EB0" stroke-width="1.5" fill="none"/>
+            <!-- 呆毛 -->
+            <path class="pet-ahoge" d="M80 28 Q78 18 82 14 Q86 18 84 28" fill="#FFB6C1"/>
+          </g>
+          <!-- 发饰：星星 -->
+          <g class="pet-accessory" transform="translate(108,42)">
+            <path d="M0 -6 L1.8 -1.8 L6 -1.8 L2.6 1 L4 5.5 L0 2.8 L-4 5.5 L-2.6 1 L-6 -1.8 L-1.8 -1.8 Z" fill="#F5C842"/>
+          </g>
+        </svg>
+        <!-- 动作标签 -->
+        <div style="position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);background:var(--primary);color:#fff;font-family:var(--font-cute);font-size:11px;padding:3px 14px;border-radius:var(--radius-pill);box-shadow:var(--glow);white-space:nowrap" id="petActionLabel">idle · 待机</div>
+      </div>
+      <!-- 动作说明 -->
+      <div style="flex:1;min-width:200px">
+        <div style="font-family:var(--font-cute);font-size:15px;color:var(--text-hi);margin-bottom:10px">启明星 · 小星</div>
+        <div style="font-size:12px;color:var(--text-mid);line-height:1.8;margin-bottom:12px">
+          你的第二分身形象。粉色双马尾+紫色连衣裙+星尘金发饰。<br>
+          支持5种动作状态，可在桌宠/人形间炫酷切换。
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn sm" onclick="setPetAction('idle')" style="background:var(--primary-soft);color:var(--primary-ink);height:28px;padding:0 10px;font-size:11px">待机</button>
+          <button class="btn sm" onclick="setPetAction('thinking')" style="background:var(--butter-soft);color:var(--butter-ink);height:28px;padding:0 10px;font-size:11px">思考</button>
+          <button class="btn sm" onclick="setPetAction('celebrating')" style="background:var(--mint-soft);color:var(--mint-ink);height:28px;padding:0 10px;font-size:11px">庆祝</button>
+          <button class="btn sm" onclick="setPetAction('worried')" style="background:var(--straw-soft);color:var(--straw-ink);height:28px;padding:0 10px;font-size:11px">担心</button>
+          <button class="btn sm" onclick="setPetAction('pointing')" style="background:var(--sky-soft);color:var(--sky-ink);height:28px;padding:0 10px;font-size:11px">指引</button>
+        </div>
+      </div>
+    </div>
+    <div class="land"><span class="pri r">🔴</span><b>规格</b>：SVG二次元Q版，160×180，5动作（idle呼吸/thinking托腮/celebrating举手/worried皱眉/pointing指方向）。桌宠模式缩小至64px悬浮桌面。<br><b>动效</b>：idle身体上下浮动3px+眨眼3s随机；thinking手托腮+问号气泡；celebrating举手+星星粒子；worried皱眉+汗滴；pointing手臂伸出+箭头。</div>
+  </article>
+
+  <article class="ccard bp">
+    <span class="num">G02</span>
+    <div class="t"><i class="dot"></i>桌宠对话气泡</div>
+    <div style="position:relative;padding:10px 0 10px 50px;min-height:60px">
+      <div style="position:absolute;left:0;top:50%;transform:translateY(-50%);width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--lilac));display:grid;place-items:center;color:#fff;font-family:var(--font-cute);font-size:14px;box-shadow:var(--glow)">星</div>
+      <div style="background:var(--bg-panel);border:1px solid var(--line);border-radius:16px 16px 16px 4px;padding:10px 14px;font-size:12px;color:var(--text-hi);line-height:1.5;box-shadow:var(--shadow-card);position:relative">
+        该休息啦！你已经连续工作2小时了，要不要喝杯水？
+        <div style="display:flex;gap:6px;margin-top:8px">
+          <button class="btn sm" style="background:var(--mint-soft);color:var(--mint-ink);height:24px;padding:0 8px;font-size:10px">好的</button>
+          <button class="btn sm pill" style="height:24px;padding:0 8px;font-size:10px">再等5分钟</button>
+        </div>
+      </div>
+    </div>
+    <div class="land"><span class="pri r">🔴</span><b>规格</b>：头像+气泡+快捷回复。气泡尖角指向桌宠。5秒无操作自动收起。</div>
+  </article>
+
+  <article class="ccard bp bp-d1">
+    <span class="num">G03</span>
+    <div class="t"><i class="dot"></i>桌宠悬浮模式（桌面角落）</div>
+    <div style="position:relative;height:100px;background:var(--bg-inset);border-radius:var(--radius-md);overflow:hidden">
+      <div style="position:absolute;bottom:8px;right:12px;width:56px;height:64px;cursor:pointer;animation:floaty 4s ease-in-out infinite">
+        <svg viewBox="0 0 160 180" width="56" height="64">
+          <ellipse cx="80" cy="68" rx="48" ry="44" fill="#FFB6C1"/>
+          <path d="M55 120 Q50 155 45 175 L115 175 Q110 155 105 120 Z" fill="#C9AEE8"/>
+          <ellipse cx="80" cy="72" rx="36" ry="34" fill="#FFF0F5"/>
+          <ellipse cx="58" cy="80" rx="8" ry="5" fill="#FFB6C1" opacity=".6"/>
+          <ellipse cx="102" cy="80" rx="8" ry="5" fill="#FFB6C1" opacity=".6"/>
+          <ellipse cx="66" cy="72" rx="5" ry="7" fill="#5C4A45"/>
+          <ellipse cx="94" cy="72" rx="5" ry="7" fill="#5C4A45"/>
+          <circle cx="68" cy="69" r="2" fill="#fff"/>
+          <circle cx="96" cy="69" r="2" fill="#fff"/>
+          <path d="M74 86 Q80 91 86 86" stroke="#E89AA8" stroke-width="2" fill="none" stroke-linecap="round"/>
+          <path d="M44 58 Q50 30 80 28 Q110 30 116 58 Q110 48 95 50 Q88 40 80 42 Q72 40 65 50 Q50 48 44 58 Z" fill="#FFB6C1"/>
+        </svg>
+        <div style="position:absolute;top:-4px;right:-2px;width:10px;height:10px;border-radius:50%;background:var(--strawberry);border:2px solid var(--bg-inset)"></div>
+      </div>
+      <div style="position:absolute;bottom:12px;left:12px;font-size:10px;color:var(--text-low)">桌宠悬浮模式 · 56px · 桌面右下角</div>
+    </div>
+    <div class="land"><span class="pri r">🔴</span><b>规格</b>：56px缩小版，悬浮桌面角落，always-on-top，拖拽移动，双击展开对话。未读消息红点。</div>
+  </article>
+
+  </div>
+</section>
+
+<!-- ============ H 区 · 设置 ============ -->
+<section>
+  <div class="sec-head">
+    <h2><svg class="icon sec-icon"><use href="#i-setting"/></svg>H · 设置</h2><span class="badge">9</span>
+    <span class="note">分组清晰，AI配置是核心，数据加密与导出保障隐私</span>
+  </div>
+  <div class="grid">
+
+  <article class="ccard bp">
+    <span class="num">H01</span>
+    <div class="t"><i class="dot"></i>设置导航分组</div>
+    <div style="display:flex;flex-direction:column;gap:2px">
+      <div style="font-family:var(--font-cute);font-size:11px;color:var(--text-low);padding:6px 10px;letter-spacing:1px">通用</div>
+      <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:var(--radius-sm);background:var(--primary-soft);color:var(--primary);cursor:pointer"><svg class="icon" style="width:16px"><use href="#i-setting"/></svg>外观主题<span style="margin-left:auto;font-size:10px;color:var(--text-low)">奶油日</span></div>
+      <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:var(--radius-sm);color:var(--text-mid);cursor:pointer" onmouseover="this.style.background='var(--bg-inset)'" onmouseout="this.style.background=''"><svg class="icon" style="width:16px"><use href="#i-sun"/></svg>显示设置</div>
+      <div style="font-family:var(--font-cute);font-size:11px;color:var(--text-low);padding:10px 10px 4px;letter-spacing:1px">AI 与分身</div>
+      <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:var(--radius-sm);color:var(--text-mid);cursor:pointer" onmouseover="this.style.background='var(--bg-inset)'" onmouseout="this.style.background=''"><svg class="icon" style="width:16px"><use href="#i-spark"/></svg>模型配置<span style="margin-left:auto;font-size:10px;color:var(--mint-ink)">已连接</span></div>
+      <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:var(--radius-sm);color:var(--text-mid);cursor:pointer" onmouseover="this.style.background='var(--bg-inset)'" onmouseout="this.style.background=''"><svg class="icon" style="width:16px"><use href="#i-send"/></svg>第二分身</div>
+      <div style="font-family:var(--font-cute);font-size:11px;color:var(--text-low);padding:10px 10px 4px;letter-spacing:1px">数据与安全</div>
+      <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:var(--radius-sm);color:var(--text-mid);cursor:pointer" onmouseover="this.style.background='var(--bg-inset)'" onmouseout="this.style.background=''"><svg class="icon" style="width:16px"><use href="#i-cloud"/></svg>数据管理</div>
+    </div>
+    <div class="land"><span class="pri r">🔴</span><b>规格</b>：分组标题11px快乐体，激活项 primary-soft。右侧显示当前值摘要。</div>
+  </article>
+
+  <article class="ccard bp bp-d1">
+    <span class="num">H02</span>
+    <div class="t"><i class="dot"></i>AI 模型配置</div>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div>
+        <div style="font-size:11px;color:var(--text-mid);margin-bottom:5px;font-family:var(--font-cute)">API 提供商</div>
+        <div style="display:flex;gap:6px">
+          <button style="padding:6px 14px;border-radius:var(--radius-pill);background:var(--primary);color:#fff;font-family:var(--font-cute);font-size:12px;box-shadow:var(--glow)">DeepSeek</button>
+          <button style="padding:6px 14px;border-radius:var(--radius-pill);background:var(--bg-inset);color:var(--text-mid);font-family:var(--font-cute);font-size:12px">LM Studio</button>
+          <button style="padding:6px 14px;border-radius:var(--radius-pill);background:var(--bg-inset);color:var(--text-mid);font-family:var(--font-cute);font-size:12px">Ollama</button>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--text-mid);margin-bottom:5px;font-family:var(--font-cute)">API Key</div>
+        <div style="display:flex;gap:6px">
+          <div class="input-wrap has-icon" style="flex:1"><svg class="icon input-icon"><use href="#i-info"/></svg><input type="password" value="sk-••••••••••••••••" readonly></div>
+          <button class="btn sec sm" style="height:38px">显示</button>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--mint-soft);border-radius:var(--radius-sm)">
+        <span class="dot on"></span><span style="font-size:12px;color:var(--mint-ink);font-family:var(--font-cute)">连接成功 · DeepSeek-V3</span>
+        <button class="btn sm" style="margin-left:auto;height:26px;padding:0 10px;font-size:10px;background:#fff;color:var(--mint-ink)">测试</button>
+      </div>
+    </div>
+    <div class="land"><span class="pri r">🔴</span><b>规格</b>：提供商chips+API Key密码框(DPAPI加密)+连接状态。Key本地加密存储，不上传。</div>
+  </article>
+
+  <article class="ccard bp bp-d2">
+    <span class="num">H03</span>
+    <div class="t"><i class="dot"></i>开关设置项</div>
+    <div style="display:flex;flex-direction:column;gap:2px">
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 4px;border-bottom:1px solid var(--line)">
+        <div style="flex:1"><div style="font-size:13px;color:var(--text-hi)">开机自启动</div><div style="font-size:10px;color:var(--text-low)">启动时最小化到托盘</div></div>
+        <div class="toggle" onclick="this.classList.toggle('on')"></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 4px;border-bottom:1px solid var(--line)">
+        <div style="flex:1"><div style="font-size:13px;color:var(--text-hi)">桌宠常驻桌面</div><div style="font-size:10px;color:var(--text-low)">关闭窗口后台运行</div></div>
+        <div class="toggle on" onclick="this.classList.toggle('on')"></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 4px;border-bottom:1px solid var(--line)">
+        <div style="flex:1"><div style="font-size:13px;color:var(--text-hi)">第二分身主动提醒</div><div style="font-size:10px;color:var(--text-low)">基于知识库分析推送灵感</div></div>
+        <div class="toggle on" onclick="this.classList.toggle('on')"></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 4px">
+        <div style="flex:1"><div style="font-size:13px;color:var(--text-hi)">数据加密存储</div><div style="font-size:10px;color:var(--text-low)">AES-256加密本地数据库</div></div>
+        <div class="toggle on" onclick="this.classList.toggle('on')"></div>
+      </div>
+    </div>
+    <div class="land"><span class="pri r">🔴</span><b>规格</b>：标题+副标题+toggle，toggle 40×22，开启primary色。点击可交互。</div>
+  </article>
+
+  <article class="ccard bp bp-d3">
+    <span class="num">H04</span>
+    <div class="t"><i class="dot"></i>数据导出/导入</div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:center;gap:12px;padding:14px;background:var(--bg-inset);border-radius:var(--radius-md)">
+        <div style="width:40px;height:40px;border-radius:12px;background:var(--mint-soft);display:grid;place-items:center;color:var(--mint-ink);flex:none"><svg class="icon" style="width:20px"><use href="#i-cloud"/></svg></div>
+        <div style="flex:1"><div style="font-size:13px;font-weight:600">导出全部数据</div><div style="font-size:10px;color:var(--text-low)">包含文档、任务、对话、配置 · 2.4MB</div></div>
+        <button class="btn pri sm" style="height:32px;padding:0 14px;font-size:11px">导出</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;padding:14px;background:var(--bg-inset);border-radius:var(--radius-md)">
+        <div style="width:40px;height:40px;border-radius:12px;background:var(--sky-soft);display:grid;place-items:center;color:var(--sky-ink);flex:none"><svg class="icon" style="width:20px"><use href="#i-folder"/></svg></div>
+        <div style="flex:1"><div style="font-size:13px;font-weight:600">从备份导入</div><div style="font-size:10px;color:var(--text-low)">支持 .venus 格式 · 合并或覆盖</div></div>
+        <button class="btn sec sm" style="height:32px;padding:0 14px;font-size:11px">选择文件</button>
+      </div>
+      <div style="padding:10px 12px;background:var(--straw-soft);border-radius:var(--radius-sm);font-size:11px;color:var(--straw-ink);display:flex;align-items:center;gap:6px">
+        <svg class="icon" style="width:14px"><use href="#i-info"/></svg>数据完全本地存储，无云端同步，导出文件需自行保管。
+      </div>
+    </div>
+    <div class="land"><span class="pri r">🔴</span><b>规格</b>：导出/导入卡片+隐私提示。导出为加密.venus包，导入前预览冲突。</div>
+  </article>
+
+  <article class="ccard bp bp-d4" style="grid-column:span 2">
+    <span class="num">H05</span>
+    <div class="t"><i class="dot"></i>内置主题切换器</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+      <div style="border:2px solid var(--primary);border-radius:var(--radius-md);box-shadow:var(--shadow-raise);position:relative">
+        <div style="position:absolute;top:6px;right:6px;background:var(--primary);color:#fff;font-family:var(--font-cute);font-size:9px;padding:1px 8px;border-radius:var(--radius-sm);z-index:2;letter-spacing:1px">使用中</div>
+        <div style="height:70px;background:linear-gradient(135deg,#E8F5E9 0%,#FFF8E1 50%,#FCE4EC 100%);position:relative;overflow:hidden">
+          <div style="position:absolute;top:8px;left:8px;width:24px;height:14px;background:#A8E6CF;border-radius:4px"></div>
+          <div style="position:absolute;top:8px;right:8px;width:20px;height:20px;background:#FFD3B6;border-radius:50%"></div>
+          <div style="position:absolute;bottom:8px;left:8px;right:8px;height:8px;background:#FFAAA5;border-radius:4px;opacity:.6"></div>
+        </div>
+        <div style="padding:10px 12px;background:var(--bg-panel)"><div style="font-family:var(--font-cute);font-size:13px;color:var(--primary);letter-spacing:1px;font-weight:600">奶油糖果</div><div style="font-size:10px;color:var(--text-low);margin-top:2px">治愈软萌 · 薄荷绿</div></div>
+      </div>
+      <a href="UI组件画廊-国风雅集.html" style="text-decoration:none;display:block;border:1px solid var(--line);border-radius:var(--radius-md);overflow:hidden;cursor:pointer;transition:transform .25s,border-color .3s" onmouseover="this.style.transform='translateY(-3px)';this.style.borderColor='var(--primary)'" onmouseout="this.style.transform='';this.style.borderColor='var(--line)'">
+        <div style="height:70px;background:linear-gradient(135deg,#F5F0E6 0%,#EDE4D3 100%);position:relative;overflow:hidden">
+          <div style="position:absolute;top:8px;left:8px;width:24px;height:14px;background:#C0392B;border-radius:2px"></div>
+          <div style="position:absolute;top:10px;right:10px;width:18px;height:18px;background:#C9A96E;border-radius:2px;transform:rotate(15deg)"></div>
+          <div style="position:absolute;bottom:8px;left:8px;right:8px;height:6px;background:#2C3E50;border-radius:1px;opacity:.4"></div>
+        </div>
+        <div style="padding:10px 12px;background:var(--bg-panel)"><div style="font-family:var(--font-cute);font-size:13px;color:var(--text-hi);letter-spacing:1px">国风雅集</div><div style="font-size:10px;color:var(--text-low);margin-top:2px">中国古典 · 朱砂红</div></div>
+      </a>
+      <a href="UI组件画廊-深渊档案.html" style="text-decoration:none;display:block;border:1px solid var(--line);border-radius:var(--radius-md);overflow:hidden;cursor:pointer;transition:transform .25s,border-color .3s" onmouseover="this.style.transform='translateY(-3px)';this.style.borderColor='var(--primary)'" onmouseout="this.style.transform='';this.style.borderColor='var(--line)'">
+        <div style="height:70px;background:linear-gradient(135deg,#0B1116 0%,#16242A 100%);position:relative;overflow:hidden">
+          <div style="position:absolute;top:8px;left:8px;width:24px;height:14px;background:#6CC6B8;border-radius:2px;box-shadow:0 0 6px rgba(108,198,184,.5)"></div>
+          <div style="position:absolute;top:10px;right:10px;width:16px;height:16px;background:#6CC6B8;border-radius:50%;opacity:.6;box-shadow:0 0 8px rgba(108,198,184,.4)"></div>
+          <div style="position:absolute;bottom:8px;left:8px;right:8px;height:6px;background:#C96A5F;border-radius:1px;opacity:.5"></div>
+        </div>
+        <div style="padding:10px 12px;background:var(--bg-panel)"><div style="font-family:var(--font-cute);font-size:13px;color:var(--text-hi);letter-spacing:1px">深渊档案</div><div style="font-size:10px;color:var(--text-low);margin-top:2px">海洋神秘 · 磷火青</div></div>
+      </a>
+    </div>
+    <div class="land"><span class="pri r">🔴</span><b>规格</b>：三栏主题预览卡，配色缩略图+名称+风格标签。当前主题薄荷绿边框+「使用中」角标。点击跳转切换，配置写入本地localStorage，下次启动自动应用。</div>
+  </article>
+
+  </div>
+</section>
+
+<!-- ============ I 区 · 通用组件 ============ -->
+<section>
+  <div class="sec-head">
+    <h2><svg class="icon sec-icon"><use href="#i-grid"/></svg>I · 通用组件</h2><span class="badge">14</span>
+    <span class="note">按钮/输入/弹窗/通知/空状态/骨架屏，全局复用基础</span>
+  </div>
+  <div class="grid">
+
+  <article class="ccard bp">
+    <span class="num">I01</span>
+    <div class="t"><i class="dot"></i>按钮体系</div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn pri">主要按钮</button><button class="btn sec">次要按钮</button><button class="btn txt">文字按钮</button><button class="btn danger">危险按钮</button><button class="btn gold">金色按钮</button></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn pri sm">小按钮</button><button class="btn pri">默认</button><button class="btn pri lg">大按钮</button><button class="btn pri disabled">禁用</button></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn pri"><svg class="icon spin" style="width:14px"><use href="#i-refresh"/></svg>加载中</button><button class="btn pill">胶囊按钮</button><button class="icon-btn" style="width:38px;height:38px"><svg class="icon" style="width:16px"><use href="#i-plus"/></svg></button></div>
+    </div>
+    <div class="land"><span class="pri r">🔴</span><b>规格</b>：5种类型(primary/secondary/text/danger/gold)+3尺寸+pill+icon-btn。hover上浮+glow，active scale(.96)。</div>
+  </article>
+
+  <article class="ccard bp bp-d1">
+    <span class="num">I02</span>
+    <div class="t"><i class="dot"></i>输入框体系</div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div class="input-wrap"><input placeholder="默认输入框"></div>
+      <div class="input-wrap has-icon"><svg class="icon input-icon"><use href="#i-search"/></svg><input placeholder="带图标搜索"></div>
+      <div class="input-wrap"><input value="有错误的输入" style="border-color:var(--strawberry);box-shadow:0 0 0 3px var(--straw-soft)"><div style="font-size:10px;color:var(--straw-ink);margin-top:4px">此字段不能为空</div></div>
+      <div class="input-wrap"><input value="已禁用" disabled style="opacity:.5;cursor:not-allowed"></div>
+    </div>
+    <div class="land"><span class="pri r">🔴</span><b>规格</b>：默认/带图标/错误/禁用。focus primary边框+3px光晕。错误strawberry色+提示文字。</div>
+  </article>
+
+  <article class="ccard bp bp-d2">
+    <span class="num">I03</span>
+    <div class="t"><i class="dot"></i>模态弹窗</div>
+    <div style="background:var(--overlay);border-radius:var(--radius-md);padding:20px;display:grid;place-items:center;min-height:160px">
+      <div style="background:var(--bg-panel);border-radius:var(--radius-lg);padding:20px;max-width:320px;width:100%;box-shadow:var(--shadow-raise);animation:gudu .4s var(--ease-spring)">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+          <div style="width:36px;height:36px;border-radius:50%;background:var(--straw-soft);display:grid;place-items:center;color:var(--straw-ink)"><svg class="icon" style="width:18px"><use href="#i-info"/></svg></div>
+          <div style="font-family:var(--font-cute);font-size:16px">确认删除？</div>
+        </div>
+        <p style="font-size:12px;color:var(--text-mid);line-height:1.6;margin-bottom:16px">删除后无法恢复，该任务的所有子任务和记录将一并移除。</p>
+        <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn sec sm">取消</button><button class="btn danger sm">确认删除</button></div>
+      </div>
+    </div>
+    <div class="land"><span class="pri r">🔴</span><b>规格</b>：overlay半透明遮罩+居中卡片radius-lg。图标+标题+内容+操作区。入场咕嘟弹入。</div>
+  </article>
+
+  <article class="ccard bp bp-d3">
+    <span class="num">I04</span>
+    <div class="t"><i class="dot"></i>Toast 通知</div>
+    <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-start">
+      <div class="toast success"><span class="ticon"><svg class="icon" style="width:12px"><use href="#i-check"/></svg></span>保存成功</div>
+      <div class="toast error"><span class="ticon"><svg class="icon" style="width:12px"><use href="#i-close"/></svg></span>网络连接失败，请重试</div>
+      <div class="toast info"><span class="ticon"><svg class="icon" style="width:12px"><use href="#i-info"/></svg></span>第二分身已为你生成灵感</div>
+    </div>
+    <div class="land"><span class="pri r">🔴</span><b>规格</b>：3种状态(success/error/info)，右上角滑入，3秒自动消失，可手动关闭。</div>
+  </article>
+
+  <article class="ccard bp bp-d4">
+    <span class="num">I05</span>
+    <div class="t"><i class="dot"></i>空状态</div>
+    <div class="empty-state">
+      <svg class="eicon" viewBox="0 0 64 64"><g fill="none" stroke="var(--text-low)" stroke-width="2"><circle cx="32" cy="28" r="14"/><path d="M20 44 Q32 36 44 44"/><circle cx="27" cy="26" r="2" fill="var(--text-low)"/><circle cx="37" cy="26" r="2" fill="var(--text-low)"/></g></svg>
+      <div style="font-family:var(--font-cute);font-size:15px;color:var(--text-mid);margin-bottom:4px">还没有文档</div>
+      <div style="font-size:11px;color:var(--text-low);margin-bottom:12px">创建你的第一篇文档，开始沉淀知识</div>
+      <button class="btn pri sm"><svg class="icon" style="width:12px"><use href="#i-plus"/></svg>新建文档</button>
+    </div>
+    <div class="land"><span class="pri y">🟡</span><b>规格</b>：SVG瞌睡小猫头鹰+标题+引导+CTA按钮。每个模块有专属空状态插画。</div>
+  </article>
+
+  <article class="ccard bp bp-d5">
+    <span class="num">I06</span>
+    <div class="t"><i class="dot"></i>骨架屏加载</div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div class="skeleton" style="height:16px;width:60%"></div>
+      <div class="skeleton" style="height:12px;width:90%"></div>
+      <div class="skeleton" style="height:12px;width:75%"></div>
+      <div style="display:flex;gap:8px;margin-top:4px"><div class="skeleton" style="height:32px;width:80px;border-radius:var(--radius-pill)"></div><div class="skeleton" style="height:32px;width:60px;border-radius:var(--radius-pill)"></div></div>
+    </div>
+    <div class="land"><span class="pri r">🔴</span><b>规格</b>：shimmer渐变动画1.5s循环。匹配真实内容布局，加载完成fade过渡。</div>
+  </article>
+
+  </div>
+</section>
+
+<!-- ============ J 区 · 数据可视化 ============ -->
+<section>
+  <div class="sec-head">
+    <h2><svg class="icon sec-icon"><use href="#i-target"/></svg>J · 数据可视化</h2><span class="badge">8</span>
+    <span class="note">统计卡/趋势图/柱状图/热力日历，数据驱动的自我认知</span>
+  </div>
+  <div class="grid">
+
+  <article class="ccard bp">
+    <span class="num">J01</span>
+    <div class="t"><i class="dot"></i>统计卡（带趋势）</div>
+    <div style="background:linear-gradient(135deg,var(--primary-soft),var(--lilac-soft));border-radius:var(--radius-lg);padding:18px;position:relative;overflow:hidden">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+          <div style="font-size:11px;color:var(--text-mid);font-family:var(--font-cute)">本周专注时长</div>
+          <div style="font-family:var(--font-cute);font-size:32px;color:var(--text-hi);margin-top:4px;font-variant-numeric:tabular-nums" data-count="24">0</div>
+          <div style="font-size:11px;color:var(--mint-ink);margin-top:2px">↑ 比上周多 4.2 小时</div>
+        </div>
+        <div style="width:60px;height:40px;display:flex;align-items:flex-end;gap:3px">
+          <div style="flex:1;background:var(--primary);border-radius:3px 3px 0 0;height:40%"></div>
+          <div style="flex:1;background:var(--primary);border-radius:3px 3px 0 0;height:65%"></div>
+          <div style="flex:1;background:var(--primary);border-radius:3px 3px 0 0;height:50%"></div>
+          <div style="flex:1;background:var(--primary);border-radius:3px 3px 0 0;height:80%"></div>
+          <div style="flex:1;background:var(--lilac);border-radius:3px 3px 0 0;height:95%"></div>
+        </div>
+      </div>
+    </div>
+    <div class="land"><span class="pri r">🔴</span><b>规格</b>：渐变背景+大数字+趋势+迷你柱状图。数字翻滚动画。</div>
+  </article>
+
+  <article class="ccard bp bp-d1">
+    <span class="num">J02</span>
+    <div class="t"><i class="dot"></i>趋势折线图</div>
+    <div style="padding:10px 0">
+      <svg viewBox="0 0 280 100" width="100%" height="100" style="overflow:visible">
+        <defs><linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--primary)" stop-opacity=".3"/><stop offset="100%" stop-color="var(--primary)" stop-opacity="0"/></linearGradient></defs>
+        <g stroke="var(--line)" stroke-width="1" opacity=".5"><line x1="0" y1="25" x2="280" y2="25"/><line x1="0" y1="50" x2="280" y2="50"/><line x1="0" y1="75" x2="280" y2="75"/></g>
+        <path d="M0,70 L40,55 L80,60 L120,40 L160,45 L200,25 L240,30 L280,15 L280,100 L0,100 Z" fill="url(#areaGrad)"/>
+        <path d="M0,70 L40,55 L80,60 L120,40 L160,45 L200,25 L240,30 L280,15" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="stroke-dasharray:400;stroke-dashoffset:400;animation:draw-line 1.5s ease-out forwards"/>
+        <g fill="var(--primary)"><circle cx="120" cy="40" r="4"/><circle cx="200" cy="25" r="4"/><circle cx="280" cy="15" r="5" stroke="#fff" stroke-width="2"/></g>
+        <g fill="var(--text-low)" font-size="9" font-family="var(--font-body)"><text x="0" y="95">周一</text><text x="80" y="95">周二</text><text x="160" y="95">周三</text><text x="240" y="95">周四</text></g>
+      </svg>
+    </div>
+    <div class="land"><span class="pri r">🔴</span><b>规格</b>：SVG折线+渐变面积+数据点+网格。绘制动画1.5s，hover显示tooltip。</div>
+  </article>
+
+  <article class="ccard bp bp-d2">
+    <span class="num">J03</span>
+    <div class="t"><i class="dot"></i>任务分布柱状图</div>
+    <div style="display:flex;align-items:flex-end;gap:10px;height:120px;padding:10px 4px 0">
+      <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
+        <div style="width:100%;background:linear-gradient(180deg,var(--primary),var(--lilac));border-radius:6px 6px 0 0;height:70%;transition:height .6s var(--ease-soft)"></div>
+        <span style="font-size:10px;color:var(--text-low)">学习</span>
+      </div>
+      <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
+        <div style="width:100%;background:linear-gradient(180deg,var(--mint),#5BC4A0);border-radius:6px 6px 0 0;height:90%"></div>
+        <span style="font-size:10px;color:var(--text-low)">工作</span>
+      </div>
+      <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
+        <div style="width:100%;background:linear-gradient(180deg,var(--butter),var(--gold));border-radius:6px 6px 0 0;height:45%"></div>
+        <span style="font-size:10px;color:var(--text-low)">生活</span>
+      </div>
+      <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
+        <div style="width:100%;background:linear-gradient(180deg,var(--sky),#6FADE8);border-radius:6px 6px 0 0;height:60%"></div>
+        <span style="font-size:10px;color:var(--text-low)">复盘</span>
+      </div>
+      <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
+        <div style="width:100%;background:linear-gradient(180deg,var(--lilac),#B08DD8);border-radius:6px 6px 0 0;height:35%"></div>
+        <span style="font-size:10px;color:var(--text-low)">其他</span>
+      </div>
+    </div>
+    <div class="land"><span class="pri r">🔴</span><b>规格</b>：5分类柱状，渐变填充，圆角顶部。hover高亮+数值tooltip。入场高度从0增长。</div>
+  </article>
+
+  <article class="ccard bp bp-d3">
+    <span class="num">J04</span>
+    <div class="t"><i class="dot"></i>复盘热力日历</div>
+    <div>
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-low);margin-bottom:6px;padding:0 2px"><span>8月</span><span>连续12天 🔥</span></div>
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px">
+        <div style="aspect-ratio:1;border-radius:4px;background:var(--mint);opacity:.9"></div>
+        <div style="aspect-ratio:1;border-radius:4px;background:var(--mint);opacity:.7"></div>
+        <div style="aspect-ratio:1;border-radius:4px;background:var(--bg-inset)"></div>
+        <div style="aspect-ratio:1;border-radius:4px;background:var(--mint);opacity:.5"></div>
+        <div style="aspect-ratio:1;border-radius:4px;background:var(--mint);opacity:.9"></div>
+        <div style="aspect-ratio:1;border-radius:4px;background:var(--mint);opacity:1;box-shadow:0 0 6px rgba(123,211,178,.5)"></div>
+        <div style="aspect-ratio:1;border-radius:4px;background:var(--mint);opacity:.8"></div>
+        <div style="aspect-ratio:1;border-radius:4px;background:var(--mint);opacity:.6"></div>
+        <div style="aspect-ratio:1;border-radius:4px;background:var(--mint);opacity:1;box-shadow:0 0 6px rgba(123,211,178,.5)"></div>
+        <div style="aspect-ratio:1;border-radius:4px;background:var(--mint);opacity:.7"></div>
+        <div style="aspect-ratio:1;border-radius:4px;background:var(--mint);opacity:.9"></div>
+        <div style="aspect-ratio:1;border-radius:4px;background:var(--mint);opacity:.5"></div>
+        <div style="aspect-ratio:1;border-radius:4px;background:var(--mint);opacity:1;box-shadow:0 0 6px rgba(123,211,178,.5)"></div>
+        <div style="aspect-ratio:1;border-radius:4px;background:var(--primary);opacity:.8;box-shadow:var(--glow)"></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:4px;margin-top:8px;font-size:9px;color:var(--text-low);justify-content:flex-end">
+        <span>少</span><div style="width:10px;height:10px;border-radius:3px;background:var(--bg-inset)"></div><div style="width:10px;height:10px;border-radius:3px;background:var(--mint);opacity:.4"></div><div style="width:10px;height:10px;border-radius:3px;background:var(--mint);opacity:.7"></div><div style="width:10px;height:10px;border-radius:3px;background:var(--mint);opacity:1"></div><span>多</span>
+      </div>
+    </div>
+    <div class="land"><span class="pri y">🟡</span><b>规格</b>：7列网格，mint色4级透明度，今日primary高亮+glow。hover显示日期和复盘内容。</div>
+  </article>
+
+  </div>
+</section>
+
+</main>
+
+<script>
+// 主题切换
+const themeToggle = document.getElementById('themeToggle');
+const themeLabel = document.getElementById('themeLabel');
+themeToggle.addEventListener('click', () => {
+  const html = document.documentElement;
+  const isDark = html.getAttribute('data-theme') === 'dark';
+  html.setAttribute('data-theme', isDark ? 'light' : 'dark');
+  themeLabel.textContent = isDark ? '可可夜' : '奶油日';
+  themeToggle.querySelector('use').setAttribute('href', isDark ? '#i-sun' : '#i-moon');
+});
+
+// 数字翻滚（IntersectionObserver触发）
+const countObserver = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      const el = entry.target;
+      const target = parseInt(el.dataset.count);
+      let current = 0;
+      const step = Math.max(1, Math.ceil(target / 30));
+      const timer = setInterval(() => {
+        current += step;
+        if (current >= target) { current = target; clearInterval(timer); }
+        el.textContent = current;
+      }, 30);
+      countObserver.unobserve(el);
+    }
+  });
+}, { threshold: 0.3 });
+document.querySelectorAll('[data-count]').forEach(el => countObserver.observe(el));
+
+// 进度环触发
+const ringObserver = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.classList.add('visible');
+      ringObserver.unobserve(entry.target);
+    }
+  });
+}, { threshold: 0.3 });
+document.querySelectorAll('.ring-wrap').forEach(el => ringObserver.observe(el));
+
+// 桌宠动作切换
+const petActions = ['idle','thinking','celebrating','worried','pointing'];
+const petActionNames = {idle:'idle · 待机',thinking:'thinking · 思考',celebrating:'celebrating · 庆祝',worried:'worried · 担心',pointing:'pointing · 指引'};
+let petActionIdx = 0;
+function setPetAction(action) {
+  const pet = document.getElementById('petChar');
+  const label = document.getElementById('petActionLabel');
+  if (pet) { pet.setAttribute('class', 'pet ' + action); }
+  if (label) { label.textContent = petActionNames[action] || action; }
+  petActionIdx = petActions.indexOf(action);
+}
+document.getElementById('petActionBtn')?.addEventListener('click', () => {
+  petActionIdx = (petActionIdx + 1) % petActions.length;
+  setPetAction(petActions[petActionIdx]);
+});
+
+// 打字机效果（E01 第二分身流式输出）
+const typingText = '好的，我帮你把「完善技术架构」拆成5步：1.明确性能指标 2.定位瓶颈 3.设计优化方案 4.实施验证 5.文档沉淀。要我现在开始吗？';
+let typingIdx = 0;
+const typingEl = document.getElementById('typingDemo');
+function typeWriter() {
+  if (!typingEl) return;
+  if (typingIdx < typingText.length) {
+    typingEl.innerHTML = typingText.substring(0, typingIdx + 1) + '<span class="typing-cursor" style="display:inline-block;width:2px;height:14px;background:var(--primary);margin-left:1px;vertical-align:-2px;animation:typing-cursor .8s infinite"></span>';
+    typingIdx++;
+    setTimeout(typeWriter, 35 + Math.random() * 30);
+  } else {
+    typingEl.innerHTML = typingText + '<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap"><button class="btn sm" style="background:var(--mint-soft);color:var(--mint-ink);height:26px;padding:0 10px;font-size:10px">开始拆解</button><button class="btn sm pill" style="height:26px;padding:0 10px;font-size:10px">换个方式</button></div>';
+  }
+}
+setTimeout(typeWriter, 1200);
+
+// 情绪选择（F03）
+document.querySelectorAll('.mood').forEach(m => {
+  m.addEventListener('click', () => {
+    document.querySelectorAll('.mood').forEach(x => { x.classList.remove('selected'); x.style.transform=''; x.querySelector('div:last-child').style.color='var(--text-low)'; x.querySelector('div:last-child').style.fontWeight=''; });
+    m.classList.add('selected');
+    m.style.transform='scale(1.2)';
+    m.querySelector('div:last-child').style.color='var(--primary)';
+    m.querySelector('div:last-child').style.fontWeight='600';
+  });
+});
+
+// 统计卡数字翻滚（J区也触发）
+document.querySelectorAll('[data-count]').forEach(el => countObserver.observe(el));
+
+// ============================================================
+// 全页交互增强：让所有组件正常可点击使用
+// ============================================================
+
+// --- 通用工具 ---
+function toast(msg, color) {
+  const t = document.createElement('div');
+  Object.assign(t.style, {
+    position:'fixed', bottom:'32px', left:'50%', transform:'translateX(-50%) translateY(20px)',
+    background: color || 'var(--primary)', color:'#fff',
+    fontFamily:'var(--font-cute)', fontSize:'13px', padding:'10px 24px',
+    borderRadius:'var(--radius-pill)', boxShadow:'var(--shadow-raise)',
+    zIndex:'9999', opacity:'0', transition:'all .3s var(--ease-spring)',
+    pointerEvents:'none',
+  });
+  t.textContent = msg;
+  document.body.appendChild(t);
+  requestAnimationFrame(() => { t.style.opacity='1'; t.style.transform='translateX(-50%) translateY(0)'; });
+  setTimeout(() => { t.style.opacity='0'; t.style.transform='translateX(-50%) translateY(20px)'; }, 1800);
+  setTimeout(() => t.remove(), 2200);
+}
+
+// --- A02 侧边栏导航 ---
+document.querySelectorAll('.sb-item').forEach(item => {
+  item.addEventListener('click', () => {
+    document.querySelectorAll('.sb-item').forEach(i => i.classList.remove('active'));
+    item.classList.add('active');
+    toast('已切换到: ' + item.textContent.trim());
+  });
+});
+
+// --- A04 全局搜索面板（可输入 + 结果可点击） ---
+const spInput = document.querySelector('.sp-input input');
+if (spInput) {
+  spInput.removeAttribute('readonly');
+  spInput.placeholder = '搜索文档、任务、对话…';
+  spInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      toast('搜索: ' + spInput.value || '(空)');
+      spInput.blur();
+    }
+  });
+}
+document.querySelectorAll('.sp-item').forEach(item => {
+  item.addEventListener('click', () => {
+    toast('跳转: ' + item.textContent.trim().slice(0, 20));
+  });
+});
+
+// --- B05 灵感提示按钮 ---
+document.querySelectorAll('.focus-card .btn, .insight .btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    const text = this.textContent.trim();
+    if (text === '采纳') toast('✅ 已采纳，创建为任务');
+    else if (text === '忽略') toast('已忽略此灵感');
+    else if (text === '开始拆解') toast('正在拆解任务…');
+    else if (text === '换个方式') toast('已换一种表达方式');
+  });
+});
+
+// --- C07 任务视图切换 ---
+document.querySelectorAll('.ccard').forEach(card => {
+  const toggle = card.querySelector('[style*="background:var(--primary)"] button, .btn-group button');
+  // 处理列表/看板/四象限切换
+  const viewToggle = card.closest('.ccard')?.querySelector('.ccard')?.querySelector('button');
+});
+// 更精准：查找 C07 的切换按钮组
+document.querySelectorAll('.ccard').forEach(card => {
+  const btns = card.querySelectorAll('button[style*="border-radius:var(--radius-pill)"]');
+  if (btns.length >= 3) {
+    btns.forEach((btn, i) => {
+      btn.addEventListener('click', () => {
+        btns.forEach(b => { b.style.background = ''; b.style.color = ''; b.style.boxShadow = ''; });
+        btn.style.background = 'var(--primary)';
+        btn.style.color = '#fff';
+        btn.style.boxShadow = 'var(--glow)';
+        toast('切换视图: ' + btn.textContent.trim());
+      });
+    });
+  }
+  // 处理筛选 chips（全部/进行中/已完成/逾期）
+  const chips = card.querySelectorAll('.chip[style*="cursor:pointer"], .chip.primary');
+  chips.forEach(chip => {
+    chip.addEventListener('click', () => {
+      const isActive = chip.classList.contains('chip-active');
+      chips.forEach(c => { c.classList.remove('chip-active'); c.style.background = ''; c.style.color = ''; });
+      if (!isActive) {
+        chip.classList.add('chip-active');
+        chip.style.background = 'var(--primary-soft)';
+        chip.style.color = 'var(--primary-ink)';
+      }
+      toast('筛选: ' + chip.textContent.trim());
+    });
+  });
+});
+
+// --- C05 子任务勾选 ---
+document.querySelectorAll('.ccard').forEach(card => {
+  const dots = card.querySelectorAll('span[style*="border-radius:50%"]');
+  dots.forEach(dot => {
+    dot.style.cursor = 'pointer';
+    dot.addEventListener('click', () => {
+      const isFilled = dot.style.background !== 'transparent';
+      if (isFilled) {
+        dot.style.background = '';
+        dot.innerHTML = '';
+        dot.style.border = '2px solid var(--line)';
+      } else {
+        dot.style.background = 'var(--mint)';
+        dot.style.border = 'none';
+        dot.innerHTML = '<svg class="icon" style="width:8px;height:8px;color:#fff"><use href="#i-check"/></svg>';
+      }
+      toast(isFilled ? '取消完成' : '✅ 子任务完成');
+    });
+  });
+  // "添加子任务"行
+  const addBtn = card.querySelector('[style*="border-top:1px dashed"]');
+  if (addBtn) {
+    addBtn.addEventListener('click', () => toast('📝 添加新子任务'));
+  }
+  // 删除图标
+  card.querySelectorAll('svg[style*="cursor:pointer"]').forEach(icon => {
+    icon.addEventListener('click', () => toast('🗑️ 已删除'));
+  });
+});
+
+// --- D01 文档卡点击 ---
+document.querySelectorAll('.ccard').forEach(card => {
+  const docCard = card.querySelector('[style*="border:1px solid var(--line)"][style*="border-radius:var(--radius-md)"]');
+  if (docCard && card.querySelector('.chip.lilac')) {
+    docCard.style.cursor = 'pointer';
+    docCard.addEventListener('click', () => toast('📄 打开文档: ' + (docCard.querySelector('[style*="font-family:var(--font-cute)"]')?.textContent?.trim() || '文档')));
+  }
+});
+
+// --- D03 文件夹树展开/折叠 ---
+document.querySelectorAll('.ccard').forEach(card => {
+  const folderItems = card.querySelectorAll('[style*="cursor:pointer"][style*="padding:6px 8px"]');
+  folderItems.forEach(item => {
+    const chevron = item.querySelector('svg[style*="transform:rotate"]');
+    if (chevron) {
+      item.addEventListener('click', () => {
+        const isExpanded = chevron.style.transform.includes('0deg') || chevron.style.transform.includes('0 deg');
+        chevron.style.transform = isExpanded ? 'rotate(90deg)' : 'rotate(0deg)';
+        toast(isExpanded ? '折叠文件夹' : '展开文件夹');
+      });
+    }
+  });
+  // 新建文件夹
+  const newFolder = card.querySelector('[style*="color:var(--primary)"]');
+  if (newFolder) {
+    newFolder.addEventListener('click', () => toast('📁 新建文件夹'));
+  }
+});
+
+// --- D05 标签输入器 ---
+document.querySelectorAll('.ccard').forEach(card => {
+  const tagInput = card.querySelector('input[placeholder="输入标签"]');
+  if (tagInput) {
+    tagInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && tagInput.value.trim()) {
+        toast('🏷️ 添加标签: ' + tagInput.value.trim());
+        tagInput.value = '';
+      }
+    });
+  }
+  // 建议标签点击
+  card.querySelectorAll('.chip[style*="cursor:pointer"]').forEach(chip => {
+    if (!chip.classList.contains('x')) {
+      chip.addEventListener('click', () => toast('🏷️ 添加标签: ' + chip.textContent.trim()));
+    }
+  });
+  // 删除标签
+  card.querySelectorAll('.chip .x').forEach(x => {
+    x.addEventListener('click', e => {
+      e.stopPropagation();
+      x.parentElement.remove();
+      toast('已删除标签');
+    });
+  });
+});
+
+// --- D04 编辑器工具栏 ---
+document.querySelectorAll('.ccard').forEach(card => {
+  const toolbar = card.querySelector('[style*="border-bottom:1px solid"]');
+  if (toolbar) {
+    toolbar.querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const isActive = btn.style.background === 'var(--primary)';
+        btn.style.background = isActive ? '' : 'var(--primary)';
+        btn.style.color = isActive ? '' : '#fff';
+        toast(isActive ? '关闭格式' : '应用格式');
+      });
+    });
+    // AI摘要按钮
+    const aiBtn = toolbar.querySelector('button[style*="background:var(--primary)"]');
+    if (aiBtn) {
+      aiBtn.addEventListener('click', () => toast('✨ AI 正在生成摘要…'));
+    }
+  }
+});
+
+// --- E02 消息输入框 ---
+document.querySelectorAll('.ccard').forEach(card => {
+  const sendBtn = card.querySelector('.btn[style*="border-radius:50%"]');
+  if (sendBtn) {
+    sendBtn.addEventListener('click', () => toast('💬 消息已发送'));
+  }
+  // 附件/引用/工具 chips
+  card.querySelectorAll('.chip[style*="cursor:pointer"]').forEach(chip => {
+    if (chip.textContent.includes('附件') || chip.textContent.includes('引用') || chip.textContent.includes('工具') || chip.textContent.includes('模式')) {
+      chip.addEventListener('click', () => toast('打开: ' + chip.textContent.trim()));
+    }
+  });
+});
+
+// --- E03 对话模式选择 ---
+document.querySelectorAll('.ccard').forEach(card => {
+  const modeBtns = card.querySelectorAll('.btn[style*="height:32px"]');
+  modeBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      modeBtns.forEach(b => { b.style.background = ''; b.style.color = ''; b.style.boxShadow = ''; });
+      btn.style.background = 'var(--primary)';
+      btn.style.color = '#fff';
+      btn.style.boxShadow = 'var(--glow)';
+      toast('切换模式: ' + btn.textContent.trim());
+    });
+  });
+});
+
+// --- F03 情绪选择（已存在，补充样式） ---
+document.querySelectorAll('.mood').forEach(m => {
+  m.addEventListener('click', () => {
+    document.querySelectorAll('.mood').forEach(x => {
+      x.classList.remove('selected');
+      x.style.transform = '';
+      const label = x.querySelector('div:last-child');
+      if (label) { label.style.color = 'var(--text-low)'; label.style.fontWeight = ''; }
+    });
+    m.classList.add('selected');
+    m.style.transform = 'scale(1.15)';
+    const label = m.querySelector('div:last-child');
+    if (label) { label.style.color = 'var(--primary)'; label.style.fontWeight = '600'; }
+    toast('今日心情: ' + (m.dataset.mood === 'sad' ? '😔 有点低落' : m.dataset.mood === 'ok' ? '😊 还不错' : m.dataset.mood === 'great' ? '🤩 超棒' : m.dataset.mood === 'stressed' ? '😰 压力大' : '😐 一般'));
+  });
+});
+
+// --- G01 桌宠动作（已存在，补充按钮高亮） ---
+document.querySelectorAll('.ccard').forEach(card => {
+  const actionBtns = card.querySelectorAll('button[onclick*="setPetAction"]');
+  actionBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      actionBtns.forEach(b => { b.style.opacity = '0.5'; b.style.transform = ''; });
+      btn.style.opacity = '1';
+      btn.style.transform = 'scale(1.08)';
+    });
+  });
+});
+
+// --- H01 设置导航 ---
+document.querySelectorAll('.ccard').forEach(card => {
+  const settingsItems = card.querySelectorAll('[style*="padding:9px 12px"][style*="border-radius:var(--radius-sm)"]');
+  settingsItems.forEach(item => {
+    item.addEventListener('click', () => {
+      settingsItems.forEach(i => {
+        i.style.background = '';
+        i.style.color = '';
+      });
+      if (item.style.background !== 'var(--primary-soft)') {
+        item.style.background = 'var(--primary-soft)';
+        item.style.color = 'var(--primary)';
+      }
+      toast('进入设置: ' + item.textContent.trim().slice(0, 12));
+    });
+  });
+});
+
+// --- H02 AI提供商切换 ---
+document.querySelectorAll('.ccard').forEach(card => {
+  const providerBtns = card.querySelectorAll('button[style*="border-radius:var(--radius-pill)"]');
+  providerBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      providerBtns.forEach(b => { b.style.background = 'var(--bg-inset)'; b.style.color = 'var(--text-mid)'; b.style.boxShadow = ''; });
+      btn.style.background = 'var(--primary)';
+      btn.style.color = '#fff';
+      btn.style.boxShadow = 'var(--glow)';
+      toast('AI 提供商: ' + btn.textContent.trim());
+    });
+  });
+  // 测试按钮
+  const testBtn = card.querySelector('button[style*="margin-left:auto"]');
+  if (testBtn) {
+    testBtn.addEventListener('click', () => toast('🔗 连接测试成功！DeepSeek-V3'));
+  }
+});
+
+// --- H04 导出/导入 ---
+document.querySelectorAll('.ccard').forEach(card => {
+  const exportBtn = card.querySelector('button');
+  if (exportBtn && exportBtn.textContent.trim() === '导出') {
+    exportBtn.addEventListener('click', () => toast('📦 正在导出数据…'));
+  }
+  const importBtns = card.querySelectorAll('button');
+  importBtns.forEach(btn => {
+    if (btn.textContent.trim() === '选择文件') {
+      btn.addEventListener('click', () => toast('📂 请选择备份文件…'));
+    }
+  });
+});
+
+// --- J02 进度条可点击调节 ---
+document.querySelectorAll('.ccard').forEach(card => {
+  const bar = card.querySelector('.progress-bar i, .f-prog .bar i');
+  if (bar) {
+    const wrap = bar.parentElement;
+    wrap.style.cursor = 'pointer';
+    wrap.addEventListener('click', e => {
+      const rect = wrap.getBoundingClientRect();
+      const pct = Math.round(Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100)));
+      bar.style.width = pct + '%';
+      toast('进度: ' + pct + '%');
+    });
+  }
+});
+
+// --- 所有 chip 点击反馈 ---
+document.querySelectorAll('.chip').forEach(chip => {
+  if (chip.style.cursor === 'pointer' || chip.classList.contains('chip-active')) return;
+  chip.addEventListener('click', function() {
+    this.style.transform = 'scale(1.1)';
+    setTimeout(() => { this.style.transform = ''; }, 150);
+  });
+});
+
+// --- 数字输入框 ---
+document.querySelectorAll('.num-input, input[type="range"]').forEach(input => {
+  input.addEventListener('change', () => toast('值已更新: ' + input.value));
+});
+
+// --- 通知铃铛 ---
+const bellBtn = document.querySelector('.icon-btn');
+if (bellBtn) {
+  bellBtn.addEventListener('click', () => toast('🔔 你有 3 条未读通知'));
+}
+
+// --- 头像 ---
+const avatar = document.querySelector('.avatar-sm');
+if (avatar) {
+  avatar.addEventListener('click', () => toast('👤 打开用户菜单'));
+}
+
+// --- 窗口控制按钮 (A01) ---
+document.querySelectorAll('.win-ctrl button').forEach((btn, i) => {
+  btn.addEventListener('click', () => {
+    const labels = ['最小化', '最大化', '关闭'];
+    toast('窗口操作: ' + labels[i]);
+  });
+});
+
+// --- 快捷入口 (B03) ---
+document.querySelectorAll('.qitem').forEach(item => {
+  item.addEventListener('click', () => {
+    const name = item.querySelector('.nm')?.textContent || '快捷入口';
+    toast('🚀 ' + name);
+  });
+});
+
+// --- 最近文档列表 (B04) ---
+document.querySelectorAll('.doc-row').forEach(row => {
+  row.addEventListener('click', () => {
+    const title = row.querySelector('[style*="font-family"]')?.textContent?.trim() || '文档';
+    toast('📄 打开: ' + title);
+  });
+});
+
+// --- 排行榜标签切换 (F02) ---
+document.querySelectorAll('.leaderboard').forEach(lb => {
+  const tabs = lb.querySelectorAll('[style*="cursor:pointer"]');
+  tabs.forEach((tab, i) => {
+    tab.addEventListener('click', () => {
+      tabs.forEach(t => t.style.background = '');
+      tab.style.background = 'var(--primary-soft)';
+      tab.style.color = 'var(--primary-ink)';
+      toast('切换周期: ' + tab.textContent.trim());
+    });
+  });
+});
+
+// --- 柱状图 hover 提示 ---
+document.querySelectorAll('.bar-wrap, .bar-item').forEach(bar => {
+  bar.addEventListener('mouseenter', () => {
+    bar.style.opacity = '1';
+    bar.style.transform = 'scaleY(1.05)';
+  });
+  bar.addEventListener('mouseleave', () => {
+    bar.style.opacity = '';
+    bar.style.transform = '';
+  });
+});
+
+// --- 按钮通用点击动效 ---
+document.querySelectorAll('.btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    this.style.transform = 'scale(0.95)';
+    setTimeout(() => { this.style.transform = ''; }, 150);
+  });
+});
+
+// --- 文件资源管理器 (D02) ---
+document.querySelectorAll('.ccard').forEach(card => {
+  const fileItems = card.querySelectorAll('[style*="cursor:pointer"][style*="padding:8px 10px"]');
+  fileItems.forEach(item => {
+    item.addEventListener('click', () => {
+      fileItems.forEach(i => i.style.background = '');
+      item.style.background = 'var(--bg-inset)';
+      toast('📄 ' + (item.textContent.trim().slice(0, 15) || '文件'));
+    });
+  });
+});
+</script>
+</body>
+</html>

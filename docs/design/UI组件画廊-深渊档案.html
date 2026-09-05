@@ -1,0 +1,1150 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="data:,">
+<title>启明星 · 深渊档案 v2.0 · 组件画廊</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Noto+Serif+SC:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ============ design tokens · 深渊档案 ============ */
+/* 深渊（默认暗色）— 参考海灵传说 abyss 海渊夜 */
+:root{
+  --bg-cream:#0B1116;--bg-panel:#101B20;--bg-raised:#16242A;--bg-inset:#0C1419;
+  --line:#22323A;--text-hi:#D6E4E0;--text-mid:#7E9793;--text-low:#4E6262;
+  --primary:#6CC6B8;--mint:#6CC6B8;--butter:#C7A45F;--sky:#7FA6B5;
+  --lilac:#9C8BBF;--strawberry:#C96A5F;--gold:#C7A45F;
+  --primary-ink:#A8E0D6;--mint-ink:#A8E0D6;--butter-ink:#DBC07A;--sky-ink:#9DBECC;
+  --lilac-ink:#B8A8D8;--straw-ink:#E08A80;--gold-ink:#DBC07A;
+  --primary-soft:rgba(108,198,184,.14);--mint-soft:rgba(108,198,184,.16);
+  --butter-soft:rgba(199,164,95,.16);--sky-soft:rgba(127,166,181,.14);
+  --lilac-soft:rgba(156,139,191,.16);--straw-soft:rgba(201,106,95,.16);--gold-soft:rgba(199,164,95,.16);
+  --white:#D6E4E0;--on-primary:#0B1116;--overlay:rgba(0,0,0,.6);
+  --radius-sm:2px;--radius-md:4px;--radius-lg:8px;--radius-xl:12px;--radius-pill:999px;
+  --shadow-card:0 3px 14px rgba(0,0,0,.4);
+  --shadow-raise:0 14px 40px rgba(0,0,0,.5);
+  --glow:0 0 18px rgba(108,198,184,.28);
+  --glow-gold:0 0 14px rgba(199,164,95,.3);
+  --shadow-danger:0 0 18px rgba(201,106,95,.35);
+  --ease-spring:cubic-bezier(.2,.9,.3,1.3);
+  --ease-soft:cubic-bezier(.4,0,.2,1);
+  --ease-abyss:cubic-bezier(.4,0,.2,1);
+  --font-cute:'Cinzel','Noto Serif SC',serif;
+  --font-body:'Noto Serif SC','Songti SC',serif;
+  --font-mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+}
+/* 碧涛（亮色）— 参考海灵传说 mist 海雾晨 */
+[data-theme="bitao"]{
+  --bg-cream:#F3F6F5;--bg-panel:#EAF1EF;--bg-raised:#FBFDFC;--bg-inset:#E2ECE9;
+  --line:#CBD9D6;--text-hi:#16323B;--text-mid:#5C7479;--text-low:#96A8AB;
+  --primary:#2E9D8F;--mint:#2E9D8F;--butter:#AE8D52;--sky:#6E97A6;
+  --lilac:#7A6B9E;--strawberry:#C2564B;--gold:#AE8D52;
+  --primary-ink:#1F6E64;--mint-ink:#1F6E64;--butter-ink:#8A6E38;--sky-ink:#4E7582;
+  --lilac-ink:#5A4D7A;--straw-ink:#9E3D34;--gold-ink:#8A6E38;
+  --primary-soft:rgba(46,157,143,.12);--mint-soft:rgba(46,157,143,.14);
+  --butter-soft:rgba(174,141,82,.14);--sky-soft:rgba(110,151,166,.12);
+  --lilac-soft:rgba(122,107,158,.14);--straw-soft:rgba(194,86,75,.12);--gold-soft:rgba(174,141,82,.14);
+  --on-primary:#FBFDFC;--overlay:rgba(22,50,59,.5);
+  --shadow-card:0 3px 14px rgba(22,50,59,.07);
+  --shadow-raise:0 14px 40px rgba(22,50,59,.14);
+  --glow:0 0 16px rgba(46,157,143,.28);
+  --glow-gold:0 0 14px rgba(174,141,82,.25);
+  --shadow-danger:0 0 14px rgba(194,86,75,.25);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{
+  background:
+    radial-gradient(ellipse at 20% 0,rgba(108,198,184,.08),transparent 400px),
+    radial-gradient(ellipse at 80% 10%,rgba(156,139,191,.06),transparent 350px),
+    radial-gradient(ellipse at 50% 100%,rgba(201,106,95,.05),transparent 500px),
+    var(--bg-cream);
+  color:var(--text-hi);font-family:var(--font-body);font-size:13px;line-height:1.7;
+  min-height:100vh;transition:background .6s var(--ease-abyss),color .6s var(--ease-abyss);
+  overflow-x:hidden;position:relative;
+}
+[data-theme="bitao"] body{background:
+  radial-gradient(circle at 18% -5%,rgba(46,157,143,.08),transparent 420px),
+  radial-gradient(circle at 85% 108%,rgba(46,157,143,.10),transparent 460px),
+  linear-gradient(180deg,#F7FAF9 0%,#F0F5F3 45%,#E7EFED 100%);}
+/* CRT扫描线 — 深渊主题可见，碧涛主题隐藏 */
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.025;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(108,198,184,.1) 2px,rgba(108,198,184,.1) 3px);transition:opacity .5s;}
+[data-theme="bitao"] body::before{opacity:0;}
+body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:radial-gradient(ellipse at center,transparent 50%,rgba(0,0,0,.4) 100%);transition:background .5s;}
+[data-theme="bitao"] body::after{background:radial-gradient(ellipse at center,transparent 60%,rgba(22,50,59,.08) 100%);}
+body>*{position:relative;z-index:1}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+kbd{font-family:var(--font-mono);font-size:10px;padding:1px 5px;border:1px solid var(--line);border-radius:2px;color:var(--text-low)}
+code{font-family:var(--font-mono);font-size:11px;background:var(--bg-inset);padding:1px 5px;border-radius:2px;color:var(--text-mid)}
+::selection{background:var(--primary-soft);color:var(--primary-ink)}
+
+/* ============ 动效 · 深渊气韵 ============ */
+@keyframes data-wake{0%{opacity:0;filter:blur(3px);transform:translateY(6px)}100%{opacity:1;filter:blur(0);transform:translateY(0)}}
+@keyframes phosphor-breathe{0%,100%{box-shadow:0 0 8px rgba(127,212,201,.2);opacity:.85}50%{box-shadow:0 0 20px rgba(127,212,201,.45);opacity:1}}
+@keyframes blood-pulse{0%,100%{box-shadow:0 0 6px rgba(194,75,74,.3)}50%{box-shadow:0 0 16px rgba(194,75,74,.6)}}
+@keyframes fog-drift{0%,100%{transform:translateX(0) scale(1)}50%{transform:translateX(15px) scale(1.05)}}
+@keyframes tide-scan{0%{transform:scaleX(0);transform-origin:left}100%{transform:scaleX(1);transform-origin:left}}
+@keyframes jelly-float{0%,100%{transform:translateY(0) scaleY(1)}50%{transform:translateY(-10px) scaleY(1.03)}}
+@keyframes tentacle-wave{0%,100%{transform:rotate(-3deg)}50%{transform:rotate(3deg)}}
+@keyframes glow-pulse{0%,100%{filter:drop-shadow(0 0 4px rgba(127,212,201,.4))}50%{filter:drop-shadow(0 0 12px rgba(127,212,201,.7))}}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.1}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes shimmer{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
+@keyframes draw-line{to{stroke-dashoffset:0}}
+@keyframes typing-cursor{0%,100%{opacity:1}50%{opacity:0}}
+@keyframes wiggle{0%,100%{transform:rotate(0)}25%{transform:rotate(-5deg)}75%{transform:rotate(5deg)}}
+
+.bp{animation:data-wake .6s var(--ease-abyss) both}
+.bp-d1{animation-delay:.08s}.bp-d2{animation-delay:.16s}.bp-d3{animation-delay:.24s}.bp-d4{animation-delay:.32s}
+.bp-d5{animation-delay:.4s}.bp-d6{animation-delay:.48s}.bp-d7{animation-delay:.56s}.bp-d8{animation-delay:.64s}
+
+/* ============ 页面骨架 ============ */
+.hero{padding:52px 32px 12px;text-align:center;position:relative;overflow:hidden}
+.hero h1{font-family:var(--font-cute);font-weight:600;font-size:clamp(26px,4vw,40px);letter-spacing:6px;
+  color:var(--primary);text-shadow:0 0 20px rgba(127,212,201,.3);position:relative;display:inline-block}
+.hero .ver{font-family:var(--font-cute);font-size:12px;color:var(--primary);margin-left:12px;
+  border:1px solid var(--primary);padding:2px 12px;border-radius:2px;letter-spacing:2px;opacity:.8}
+.hero p{color:var(--text-mid);margin-top:16px;font-size:14px;letter-spacing:3px;font-family:var(--font-cute)}
+.hero .sub{color:var(--text-low);margin-top:4px;font-size:11px;letter-spacing:4px}
+/* 漩涡装饰 */
+.vortex-deco{position:absolute;pointer-events:none;opacity:.15}
+.fog-deco{position:absolute;pointer-events:none;opacity:.08}
+.fog-deco svg{width:100%;height:100%}
+.fd1{top:20px;left:5%;width:120px;height:80px;animation:fog-drift 15s ease-in-out infinite}
+.fd2{top:40px;right:8%;width:100px;height:70px;animation:fog-drift 18s ease-in-out 3s infinite}
+
+.toolbar{position:fixed;top:18px;right:24px;display:flex;gap:8px;z-index:100}
+.tb-btn{font-family:var(--font-cute);font-size:12px;color:var(--text-mid);background:var(--bg-panel);
+  border:1px solid var(--line);border-radius:2px;padding:8px 16px;cursor:pointer;letter-spacing:1px;
+  transition:transform .25s,color .3s,border-color .3s,box-shadow .3s;
+  display:inline-flex;align-items:center;gap:6px}
+.tb-btn:hover{transform:translateY(-2px);color:var(--primary);border-color:var(--primary);box-shadow:var(--glow)}
+.tb-btn svg{width:14px;height:14px}
+
+main{max-width:1320px;margin:0 auto;padding:24px 28px 100px}
+section{margin-top:44px;position:relative}
+.sec-head{display:flex;align-items:center;gap:14px;margin-bottom:20px;flex-wrap:wrap;position:relative;padding-bottom:10px;border-bottom:1px solid var(--line)}
+.sec-head::before{content:'';position:absolute;left:0;bottom:-1px;width:60px;height:1px;background:var(--primary);box-shadow:0 0 8px rgba(127,212,201,.5)}
+.sec-head h2{font-family:var(--font-cute);font-weight:600;font-size:22px;display:flex;align-items:center;gap:10px;letter-spacing:3px;color:var(--text-hi)}
+.sec-head h2 .sec-icon{width:22px;height:22px;color:var(--primary)}
+.sec-head .badge{font-family:var(--font-cute);font-size:11px;color:var(--on-primary);background:var(--primary);
+  padding:2px 10px;border-radius:2px;letter-spacing:1px}
+.sec-head .note{color:var(--text-low);font-size:11px;margin-left:auto;letter-spacing:1px}
+/* 潮线装饰 */
+.sec-head::after{content:'';position:absolute;right:0;top:50%;transform:translateY(-50%);width:50px;height:16px;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 50 16'%3E%3Cpath d='M2 8 Q8 2 14 8 Q20 14 26 8 Q32 2 38 8 Q44 14 48 8' fill='none' stroke='%237FD4C9' stroke-width='1' opacity='.3'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right center}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:24px}
+.ccard{background:var(--bg-panel);border:1px solid var(--line);border-radius:var(--radius-md);
+  box-shadow:var(--shadow-card);padding:20px;position:relative;overflow:hidden;
+  transition:transform .35s,box-shadow .35s,border-color .3s;
+  box-shadow:var(--shadow-card),inset 0 1px 0 rgba(127,212,201,.08)}
+.ccard:hover{transform:translateY(-3px);box-shadow:var(--shadow-raise),inset 0 1px 0 rgba(127,212,201,.15);border-color:var(--primary)}
+/* 暗角侵蚀痕 */
+.ccard::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(194,75,74,.15),transparent)}
+.ccard .num{position:absolute;top:16px;right:18px;font-family:var(--font-cute);font-size:11px;
+  color:var(--text-low);letter-spacing:1px;border:1px solid var(--line);padding:1px 10px;border-radius:2px}
+.ccard .t{font-family:var(--font-cute);font-weight:600;font-size:15px;color:var(--text-hi);
+  display:flex;align-items:center;gap:10px;margin-bottom:16px;padding-right:60px;letter-spacing:1px}
+.ccard .t .dot{width:8px;height:8px;border-radius:50%;flex:none;
+  background:var(--primary);box-shadow:0 0 8px rgba(127,212,201,.6);animation:phosphor-breathe 3s infinite}
+.ccard .land{color:var(--text-low);font-size:11px;margin-top:16px;border-top:1px dashed var(--line);padding-top:12px;line-height:1.9}
+.ccard .land b{color:var(--primary-ink);font-weight:500}
+.ccard .land .pri{display:inline-block;font-family:var(--font-cute);font-size:10px;padding:1px 8px;border-radius:2px;vertical-align:1px;margin-right:6px;letter-spacing:1px}
+.ccard .land .pri.r{background:var(--primary-soft);color:var(--primary-ink)}
+.ccard .land .pri.y{background:var(--gold-soft);color:var(--gold-ink)}
+.ccard .land .pri.b{background:var(--sky-soft);color:var(--sky-ink)}
+
+/* ============ 通用原子 ============ */
+.icon{width:1em;height:1em;vertical-align:-.125em;flex:none;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:square;stroke-linejoin:miter}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--text-low);display:inline-block;flex:none}
+.dot.on{background:var(--primary);animation:phosphor-breathe 2.5s infinite}
+.dot.busy{background:var(--gold);animation:phosphor-breathe 1.5s infinite}
+.dot.alert{background:var(--strawberry);animation:blood-pulse .8s infinite}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border-radius:var(--radius-sm);
+  font-family:var(--font-cute);font-size:13px;font-weight:600;padding:0 18px;height:38px;white-space:nowrap;letter-spacing:1px;
+  transition:transform .2s,box-shadow .25s,background .25s,border-color .3s,color .3s;user-select:none}
+.btn:active{transform:scale(.97)}
+.btn.pri{background:var(--primary);color:var(--on-primary)}
+.btn.pri:hover{box-shadow:var(--glow)}
+.btn.sec{background:var(--bg-panel);border:1px solid var(--line);color:var(--text-hi)}
+.btn.sec:hover{border-color:var(--primary);color:var(--primary)}
+.btn.txt{background:transparent;color:var(--primary)}
+.btn.txt:hover{background:var(--bg-inset)}
+.btn.danger{background:var(--strawberry);color:#fff}
+.btn.danger:hover{box-shadow:var(--shadow-danger)}
+.btn.pill{background:var(--bg-inset);color:var(--text-mid);border-radius:var(--radius-pill)}
+.btn.pill:hover{background:var(--primary-soft);color:var(--primary)}
+.btn.gold{background:var(--gold);color:var(--on-primary)}
+.btn.gold:hover{box-shadow:var(--glow-gold)}
+.btn.sm{height:32px;padding:0 12px;font-size:12px}
+.btn.lg{height:48px;padding:0 24px;font-size:15px}
+.btn.disabled{opacity:.5;cursor:not-allowed;pointer-events:none}
+.btn .spin{animation:spin .8s linear infinite}
+.chip{font-size:12px;padding:2px 10px;border-radius:2px;background:var(--bg-inset);color:var(--text-mid);display:inline-flex;align-items:center;gap:4px;letter-spacing:.5px}
+.chip.lilac{background:var(--lilac-soft);color:var(--lilac-ink)}
+.chip.mint{background:var(--mint-soft);color:var(--mint-ink)}
+.chip.butter{background:var(--butter-soft);color:var(--butter-ink)}
+.chip.sky{background:var(--sky-soft);color:var(--sky-ink)}
+.chip.straw{background:var(--straw-soft);color:var(--straw-ink)}
+.chip.gold{background:var(--gold-soft);color:var(--gold-ink)}
+.chip.primary{background:var(--primary-soft);color:var(--primary-ink)}
+.chip .x{margin-left:3px;opacity:.6;cursor:pointer;font-size:10px}
+
+/* ============ 应用壳组件 ============ */
+.titlebar{height:36px;background:var(--bg-panel);border:1px solid var(--line);border-radius:var(--radius-sm) var(--radius-sm) 0 0;
+  display:flex;align-items:center;padding:0 14px;gap:8px;border-bottom:none}
+.traffic{display:flex;gap:7px}
+.traffic span{width:10px;height:10px;border-radius:2px;transition:transform .2s}
+.traffic span:nth-child(1){background:#C24B4A}.traffic span:nth-child(2){background:#A08B5A}.traffic span:nth-child(3){background:#7FD4C9}
+.tb-title{flex:1;text-align:center;font-family:var(--font-cute);font-size:12px;color:var(--text-mid);letter-spacing:2px}
+.win-ctrl{display:flex;gap:4px}
+.win-ctrl button{width:24px;height:24px;border-radius:2px;display:grid;place-items:center;color:var(--text-low);transition:background .2s,color .2s}
+.win-ctrl button:hover{background:var(--bg-inset);color:var(--primary)}
+
+.sidebar-demo{display:flex;border:1px solid var(--line);border-radius:0 0 var(--radius-sm) var(--radius-sm);overflow:hidden;height:220px}
+.sb{width:180px;background:var(--bg-panel);border-right:1px solid var(--line);display:flex;flex-direction:column;padding:12px 8px;gap:2px}
+.sb-logo{display:flex;align-items:center;gap:8px;padding:0 8px 12px;border-bottom:1px solid var(--line);margin-bottom:8px}
+.sb-logo .lg-icon{width:30px;height:30px;border-radius:2px;background:var(--primary);display:grid;place-items:center;color:var(--on-primary);font-family:var(--font-cute);font-size:14px;font-weight:600}
+.sb-logo .lg-name{font-family:var(--font-cute);font-size:15px;color:var(--text-hi);letter-spacing:2px;font-weight:600}
+.sb-item{display:flex;align-items:center;gap:10px;height:40px;padding:0 10px;border-radius:2px;font-size:13px;font-family:var(--font-cute);color:var(--text-mid);cursor:pointer;transition:background .2s,color .2s;position:relative;letter-spacing:1px}
+.sb-item:hover{background:var(--bg-inset);color:var(--text-hi)}
+.sb-item.active{background:var(--primary-soft);color:var(--primary);box-shadow:inset 0 0 12px rgba(127,212,201,.1)}
+.sb-item.active::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:2px;height:18px;background:var(--primary);box-shadow:0 0 6px rgba(127,212,201,.5)}
+.sb-item svg{width:18px;height:18px;flex:none}
+.sb-content{flex:1;padding:16px;background:var(--bg-cream);display:grid;place-items:center;color:var(--text-low);font-size:11px;letter-spacing:2px}
+
+.topbar{height:48px;background:var(--bg-panel);border:1px solid var(--line);border-radius:var(--radius-sm);
+  display:flex;align-items:center;padding:0 16px;gap:14px;box-shadow:var(--shadow-card)}
+.tb-search{flex:1;max-width:360px;display:flex;align-items:center;gap:8px;background:var(--bg-inset);
+  border:1px solid transparent;border-radius:2px;padding:8px 14px;transition:border .3s,background .3s;cursor:text}
+.tb-search:hover,.tb-search:focus-within{border-color:var(--primary);background:var(--bg-panel)}
+.tb-search input{border:none;outline:none;background:transparent;color:var(--text-hi);font-family:var(--font-body);font-size:13px;width:100%}
+.tb-search svg{width:14px;height:14px;color:var(--text-low);flex:none}
+.icon-btn{width:36px;height:36px;border-radius:2px;border:1px solid var(--line);background:var(--bg-panel);
+  display:grid;place-items:center;cursor:pointer;color:var(--text-mid);position:relative;flex:none;
+  transition:transform .25s,border-color .3s,color .3s}
+.icon-btn:hover{transform:translateY(-2px);border-color:var(--primary);color:var(--primary)}
+.icon-btn .ping-dot{position:absolute;top:7px;right:8px;width:7px;height:7px;border-radius:50%;background:var(--strawberry);animation:blood-pulse 1.8s infinite}
+.avatar-sm{width:36px;height:36px;border-radius:2px;background:var(--primary);display:grid;place-items:center;font-family:var(--font-cute);color:var(--on-primary);font-size:14px;cursor:pointer;flex:none;font-weight:600}
+
+.search-panel{background:var(--bg-raised);border:1px solid var(--line);border-radius:var(--radius-md);box-shadow:var(--shadow-raise);overflow:hidden}
+.sp-input{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--line)}
+.sp-input svg{width:18px;height:18px;color:var(--primary)}
+.sp-input input{border:none;outline:none;background:transparent;font-family:var(--font-cute);font-size:16px;color:var(--text-hi);width:100%;letter-spacing:1px}
+.sp-results{padding:8px;max-height:200px;overflow-y:auto}
+.sp-group-title{font-size:10px;color:var(--text-low);padding:8px 10px 4px;font-family:var(--font-cute);letter-spacing:2px}
+.sp-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:2px;cursor:pointer;transition:background .2s}
+.sp-item:hover{background:var(--bg-inset)}
+.sp-item .kind{font-size:10px;padding:2px 8px;border-radius:2px;flex:none;font-family:var(--font-cute);letter-spacing:1px}
+.sp-item .kind.task{background:var(--primary-soft);color:var(--primary-ink)}
+.sp-item .kind.doc{background:var(--lilac-soft);color:var(--lilac-ink)}
+.sp-item .kind.conv{background:var(--mint-soft);color:var(--mint-ink)}
+.sp-item .hit{flex:1;font-size:13px}
+.sp-item .hit mark{background:var(--gold-soft);border-radius:2px;padding:0 2px;color:var(--gold-ink)}
+
+/* ============ 首页组件 ============ */
+.focus-card{background:var(--bg-panel);border:1px solid var(--primary);border-radius:var(--radius-md);padding:24px;position:relative;overflow:hidden;box-shadow:var(--glow)}
+.focus-card::before{content:'';position:absolute;top:-40px;right:-40px;width:120px;height:120px;border-radius:50%;background:radial-gradient(circle,rgba(127,212,201,.15),transparent 70%);animation:phosphor-breathe 4s infinite}
+.f-tag{display:inline-flex;align-items:center;gap:6px;font-family:var(--font-cute);font-size:12px;color:var(--primary);border:1px solid var(--primary);padding:3px 14px;border-radius:2px;letter-spacing:2px}
+.f-tag svg{width:12px;height:12px}
+.f-title{font-family:var(--font-cute);font-size:20px;color:var(--text-hi);margin-top:14px;line-height:1.4;letter-spacing:1px;font-weight:600}
+.f-sub{font-size:13px;color:var(--text-mid);margin-top:6px}
+.f-prog{display:flex;align-items:center;gap:12px;margin-top:18px}
+.f-prog .bar{flex:1;height:4px;background:var(--bg-inset);border-radius:2px;overflow:hidden}
+.f-prog .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--primary),var(--lilac));border-radius:2px;box-shadow:0 0 8px rgba(127,212,201,.4);transition:width .6s}
+.f-prog .count{font-family:var(--font-cute);font-size:14px;color:var(--primary-ink)}
+.f-acts{display:flex;gap:10px;margin-top:18px}
+
+.stats4{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.st4{background:var(--bg-inset);border-radius:2px;padding:14px;position:relative;overflow:hidden;transition:transform .3s;border-left:2px solid transparent}
+.st4:hover{transform:translateY(-2px)}
+.st4.primary{border-left-color:var(--primary)}
+.st4.mint{border-left-color:var(--primary)}
+.st4.lilac{border-left-color:var(--lilac)}
+.st4.butter{border-left-color:var(--gold)}
+.st4 .ic{width:34px;height:34px;border-radius:2px;display:grid;place-items:center;margin-bottom:8px}
+.st4 .ic.primary{background:var(--primary-soft);color:var(--primary)}
+.st4 .ic.mint{background:var(--mint-soft);color:var(--mint-ink)}
+.st4 .ic.lilac{background:var(--lilac-soft);color:var(--lilac-ink)}
+.st4 .ic.butter{background:var(--butter-soft);color:var(--butter-ink)}
+.st4 .ic svg{width:18px;height:18px}
+.st4 .v{font-family:var(--font-cute);font-size:26px;color:var(--text-hi);line-height:1;font-variant-numeric:tabular-nums;font-weight:600}
+.st4 .l{font-size:11px;color:var(--text-low);margin-top:4px;letter-spacing:1px}
+.st4 .tr{position:absolute;top:12px;right:12px;font-size:11px;font-family:var(--font-cute)}
+.st4 .tr.up{color:var(--primary-ink)}.st4 .tr.down{color:var(--straw-ink)}
+
+.qgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.qitem{display:flex;flex-direction:column;align-items:center;gap:8px;padding:14px 6px;border-radius:2px;cursor:pointer;transition:background .25s,transform .25s}
+.qitem:hover{background:var(--bg-inset);transform:translateY(-2px)}
+.qitem .ic{width:38px;height:38px;border-radius:2px;display:grid;place-items:center;transition:transform .3s}
+.qitem:hover .ic{transform:scale(1.1)}
+.qitem .ic.primary{background:var(--primary-soft);color:var(--primary)}
+.qitem .ic.lilac{background:var(--lilac-soft);color:var(--lilac-ink)}
+.qitem .ic.butter{background:var(--butter-soft);color:var(--butter-ink)}
+.qitem .ic.mint{background:var(--mint-soft);color:var(--mint-ink)}
+.qitem .ic.sky{background:var(--sky-soft);color:var(--sky-ink)}
+.qitem .ic.gold{background:var(--gold-soft);color:var(--gold-ink)}
+.qitem .ic svg{width:20px;height:20px}
+.qitem .nm{font-size:11px;color:var(--text-mid);text-align:center;letter-spacing:1px}
+
+.recent .rh{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.recent .rh b{font-family:var(--font-cute);font-size:14px;letter-spacing:1px;font-weight:600}
+.recent .rh a{font-size:11px;color:var(--primary);cursor:pointer}
+.doc-row{display:flex;align-items:center;gap:10px;padding:9px 8px;border-radius:2px;cursor:pointer;transition:background .2s}
+.doc-row:hover{background:var(--bg-inset)}
+.doc-row .dic{width:28px;height:28px;border-radius:2px;background:var(--lilac-soft);display:grid;place-items:center;color:var(--lilac-ink);flex:none}
+.doc-row .dic svg{width:14px;height:14px}
+.doc-row .dinfo{flex:1;min-width:0}
+.doc-row .dinfo b{font-size:13px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500}
+.doc-row .dinfo span{font-size:10px;color:var(--text-low)}
+.doc-row time{font-size:10px;color:var(--text-low);flex:none}
+
+.inspire{display:flex;gap:12px;align-items:flex-start;background:var(--gold-soft);border-radius:2px;padding:16px;border:1px solid rgba(160,139,90,.25)}
+.inspire .bulb{width:36px;height:36px;border-radius:2px;background:var(--gold);display:grid;place-items:center;color:var(--on-primary);flex:none;box-shadow:var(--glow-gold)}
+.inspire .bulb svg{width:18px;height:18px}
+.inspire .ib{flex:1}
+.inspire .ib p{font-size:13px;color:var(--text-hi);line-height:1.7}
+.inspire .ib .ref{color:var(--sky-ink);cursor:pointer;border-bottom:1px dotted var(--sky)}
+.inspire .acts{display:flex;gap:8px;margin-top:10px}
+
+.ring-wrap{display:flex;flex-direction:column;align-items:center;gap:6px;position:relative}
+.ring-wrap svg{width:100px;height:100px;transform:rotate(-90deg)}
+.ring-wrap .rb{fill:none;stroke:var(--bg-inset);stroke-width:6}
+.ring-wrap .rf{fill:none;stroke:var(--primary);stroke-width:6;stroke-linecap:butt;stroke-dasharray:264;stroke-dashoffset:264;transition:stroke-dashoffset 1s;filter:drop-shadow(0 0 4px rgba(127,212,201,.5))}
+.ring-wrap.visible .rf{stroke-dashoffset:95}
+.ring-wrap .rv{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-family:var(--font-cute);font-size:22px;color:var(--primary-ink);font-weight:600}
+.ring-wrap .rl{font-size:11px;color:var(--text-low);letter-spacing:1px}
+
+.hero-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0}
+.hero-row h2{font-family:var(--font-cute);font-size:20px;color:var(--text-hi);letter-spacing:2px;font-weight:600}
+.hero-row p{font-size:13px;color:var(--text-mid);margin-top:4px}
+
+.todos .th{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.todos .th b{font-family:var(--font-cute);font-size:14px;letter-spacing:1px;font-weight:600}
+.todos .cnt{font-family:var(--font-cute);font-size:11px;background:var(--primary-soft);color:var(--primary);padding:1px 8px;border-radius:2px}
+.todo-item{display:flex;align-items:center;gap:10px;padding:8px 6px;border-radius:2px;cursor:pointer;transition:background .2s}
+.todo-item:hover{background:var(--bg-inset)}
+.todo-item .ck{width:18px;height:18px;border-radius:2px;border:1.5px solid var(--line);display:grid;place-items:center;flex:none;transition:all .25s;cursor:pointer}
+.todo-item .ck.on{background:var(--primary);border-color:var(--primary);box-shadow:0 0 8px rgba(127,212,201,.4)}
+.todo-item .ck.on svg{width:10px;height:10px;color:var(--on-primary)}
+.todo-item .tt{flex:1;font-size:13px;transition:color .3s}
+.todo-item.done .tt{color:var(--text-low);text-decoration:line-through}
+.todo-item .st{font-size:10px;padding:2px 8px;border-radius:2px;font-family:var(--font-cute);flex:none;letter-spacing:1px}
+.todo-item .st.butter{background:var(--gold-soft);color:var(--gold-ink)}
+.todo-item .st.mint{background:var(--mint-soft);color:var(--mint-ink)}
+.todo-item .st.straw{background:var(--straw-soft);color:var(--straw-ink)}
+.todo-item.overdue .tt{color:var(--straw-ink)}
+
+.streak{display:flex;align-items:center;gap:14px}
+.streak .badge{width:56px;height:56px;border-radius:2px;background:var(--gold);display:grid;place-items:center;color:var(--on-primary);position:relative;font-family:var(--font-cute);box-shadow:var(--glow-gold)}
+.streak .badge svg{width:22px;height:22px}
+.streak .badge .n{position:absolute;bottom:-6px;right:-6px;background:var(--strawberry);color:#fff;font-family:var(--font-cute);font-size:11px;width:22px;height:22px;border-radius:2px;display:grid;place-items:center;border:2px solid var(--bg-panel)}
+.streak p{font-size:13px;color:var(--text-mid)}
+.streak p b{font-family:var(--font-cute);font-size:18px;color:var(--gold-ink);font-weight:600}
+
+/* ============ 桌宠（深海精灵）CSS ============ */
+.pet{transition:transform .4s var(--ease-abyss)}
+.pet .pet-face,.pet .pet-arm-l,.pet .pet-arm-r,.pet .pet-eyes{transform-box:view-box}
+.pet .pet-face{transform-origin:80px 75px;transition:transform .3s}
+.pet .pet-arm-l{transform-origin:50px 130px;transition:transform .4s}
+.pet .pet-arm-r{transform-origin:110px 130px;transition:transform .4s}
+.pet .pet-eyes{transition:transform .2s;transform-origin:center}
+.pet.idle{animation:jelly-float 4s ease-in-out infinite}
+.pet.idle .pet-eyes{animation:blink 4s ease-in-out infinite}
+.pet.thinking .pet-face{transform:rotate(-10deg) translateY(-3px)}
+.pet.thinking .pet-arm-r{transform:rotate(-55deg) translate(-10px,-25px)}
+.pet.thinking .pet-eyes{transform:scaleY(.7)}
+.pet.celebrating{animation:jelly-float 1s ease-in-out infinite}
+.pet.celebrating .pet-arm-l{transform:rotate(-85deg) translate(-12px,-35px)}
+.pet.celebrating .pet-arm-r{transform:rotate(85deg) translate(12px,-35px)}
+.pet.celebrating .pet-eyes{transform:scaleY(.4)}
+.pet.worried .pet-face{transform:translateY(3px)}
+.pet.worried .pet-arm-l{transform:rotate(12deg)}
+.pet.worried .pet-eyes{transform:scaleY(.85) translateY(1px)}
+.pet.pointing .pet-arm-r{transform:rotate(-75deg) translate(6px,-30px)}
+.pet.pointing .pet-face{transform:rotate(7deg)}
+.typing-dots{display:inline-flex;gap:2px;margin-left:2px}
+.typing-dots i{width:4px;height:4px;border-radius:50%;background:var(--text-low);animation:phosphor-breathe 1.2s infinite}
+.typing-dots i:nth-child(2){animation-delay:.2s}.typing-dots i:nth-child(3){animation-delay:.4s}
+
+/* ============ 通用组件 ============ */
+.input-wrap{position:relative}
+.input-wrap input,.input-wrap textarea{width:100%;border:1px solid var(--line);border-radius:2px;padding:10px 14px;font-family:var(--font-body);font-size:13px;color:var(--text-hi);background:var(--bg-panel);outline:none;transition:border .3s,box-shadow .3s}
+.input-wrap input:focus,.input-wrap textarea:focus{border-color:var(--primary);box-shadow:0 0 0 2px var(--primary-soft)}
+.input-wrap .input-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-low);width:16px;height:16px}
+.input-wrap.has-icon input{padding-left:36px}
+.toggle{width:40px;height:22px;border-radius:2px;background:var(--line);position:relative;cursor:pointer;transition:background .3s;flex:none}
+.toggle::after{content:'';position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:2px;background:var(--bg-panel);box-shadow:0 1px 3px rgba(0,0,0,.4);transition:transform .3s}
+.toggle.on{background:var(--primary)}
+.toggle.on::after{transform:translateX(18px)}
+.toast{display:inline-flex;align-items:center;gap:8px;padding:10px 18px;border-radius:2px;background:var(--bg-raised);box-shadow:var(--shadow-raise);border:1px solid var(--line);font-size:13px}
+.toast .ticon{width:20px;height:20px;border-radius:2px;display:grid;place-items:center;flex:none}
+.toast.success .ticon{background:var(--mint-soft);color:var(--mint-ink)}
+.toast.error .ticon{background:var(--straw-soft);color:var(--straw-ink)}
+.toast.info .ticon{background:var(--sky-soft);color:var(--sky-ink)}
+.empty-state{text-align:center;padding:30px 20px;color:var(--text-low)}
+.empty-state .eicon{width:64px;height:64px;margin:0 auto 12px;opacity:.5}
+.skeleton{background:linear-gradient(90deg,var(--bg-inset) 25%,var(--bg-cream) 50%,var(--bg-inset) 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:2px}
+
+</style>
+</head>
+<body>
+
+<!-- SVG sprite -->
+<svg width="0" height="0" style="position:absolute">
+<defs>
+<symbol id="i-home" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></symbol>
+<symbol id="i-doc" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></symbol>
+<symbol id="i-refresh" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></symbol>
+<symbol id="i-send" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></symbol>
+<symbol id="i-cloud" viewBox="0 0 24 24"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></symbol>
+<symbol id="i-setting" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></symbol>
+<symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8l-6.2 4.5 2.4-7.4L2 9.4h7.6z"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></symbol>
+<symbol id="i-star" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></symbol>
+<symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></symbol>
+<symbol id="i-trash" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></symbol>
+<symbol id="i-close" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></symbol>
+<symbol id="i-chevron-left" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></symbol>
+<symbol id="i-chevron-right" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></symbol>
+<symbol id="i-flame" viewBox="0 0 24 24"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></symbol>
+<symbol id="i-edit" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></symbol>
+<symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></symbol>
+<symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></symbol>
+<symbol id="i-bell" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></symbol>
+<symbol id="i-folder" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></symbol>
+<symbol id="i-tag" viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></symbol>
+<symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></symbol>
+<symbol id="i-menu" viewBox="0 0 24 24"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></symbol>
+<symbol id="i-list" viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></symbol>
+<symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></symbol>
+<symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></symbol>
+</defs>
+</svg>
+
+<!-- 雾霭装饰 -->
+<div class="fog-deco fd1"><svg viewBox="0 0 120 80"><ellipse cx="60" cy="40" rx="55" ry="25" fill="var(--primary)" opacity=".3"/><ellipse cx="40" cy="35" rx="30" ry="18" fill="var(--lilac)" opacity=".2"/></svg></div>
+<div class="fog-deco fd2"><svg viewBox="0 0 100 70"><ellipse cx="50" cy="35" rx="45" ry="20" fill="var(--sky)" opacity=".25"/></svg></div>
+
+<!-- 画廊头部 -->
+<div class="hero">
+  <div class="vortex-deco" style="top:10px;left:15%;width:80px;height:80px">
+    <svg viewBox="0 0 80 80"><g fill="none" stroke="var(--primary)" stroke-width="1" opacity=".3"><circle cx="40" cy="40" r="30"/><circle cx="40" cy="40" r="20"/><circle cx="40" cy="40" r="10"/><path d="M40 10 Q55 25 40 40 Q25 55 40 70" stroke-dasharray="4 4"/></g></svg>
+  </div>
+  <h1>启明星 <span class="ver">深渊档案</span></h1>
+  <p>方向启明 · 人生推演 — 深渊墨蓝 · 磷火点睛 · 末世观测</p>
+  <div class="sub">深渊为底 · 磷火青为骨 · 血月示警 · 旧金铭史</div>
+</div>
+
+<div class="toolbar">
+  <button class="tb-btn" id="themeToggle"><svg class="icon"><use href="#i-sun"/></svg><span id="themeLabel">碧涛</span></button>
+  <button class="tb-btn" id="petActionBtn"><svg class="icon"><use href="#i-spark"/></svg>精灵动作</button>
+</div>
+
+<main>
+
+<!-- A 区 -->
+<section>
+  <div class="sec-head">
+    <h2><svg class="icon sec-icon"><use href="#i-menu"/></svg>观测站外壳</h2><span class="badge">04</span>
+    <span class="note">自定义窗口 + 导航 + 全局搜索</span>
+  </div>
+  <div class="grid">
+  <article class="ccard bp">
+    <span class="num">A-01</span>
+    <div class="t"><i class="dot"></i>窗口标题栏</div>
+    <div class="titlebar"><div class="traffic"><span></span><span></span><span></span></div><div class="tb-title">启明星 — 观测台</div><div class="win-ctrl"><button><svg class="icon" style="width:12px"><use href="#i-chevron-left"/></svg></button><button>□</button><button><svg class="icon" style="width:12px"><use href="#i-close"/></svg></button></div></div>
+    <div style="height:80px;background:var(--bg-cream);border:1px solid var(--line);border-top:none;border-radius:0 0 2px 2px;display:grid;place-items:center;color:var(--text-low);font-size:11px;letter-spacing:2px">观测区</div>
+    <div class="land"><span class="pri r">规格</span>高36px，血月/旧金/磷火Traffic Light，棱角风格。</div>
+  </article>
+  <article class="ccard bp bp-d1">
+    <span class="num">A-02</span>
+    <div class="t"><i class="dot"></i>侧边栏导航</div>
+    <div class="sidebar-demo"><div class="sb"><div class="sb-logo"><div class="lg-icon">星</div><span class="lg-name">启明星</span></div><div class="sb-item active"><svg class="icon"><use href="#i-home"/></svg>首页</div><div class="sb-item"><svg class="icon"><use href="#i-check"/></svg>任务</div><div class="sb-item"><svg class="icon"><use href="#i-doc"/></svg>知识</div><div class="sb-item"><svg class="icon"><use href="#i-refresh"/></svg>复盘</div></div><div class="sb-content">观测区域</div></div>
+    <div class="land"><span class="pri r">规格</span>180px，激活项磷火底+辉光，2px竖条。</div>
+  </article>
+  <article class="ccard bp bp-d2">
+    <span class="num">A-03</span>
+    <div class="t"><i class="dot"></i>顶栏</div>
+    <div class="topbar"><div class="tb-search"><svg class="icon"><use href="#i-search"/></svg><input placeholder="检索档案…" readonly><kbd>⌘K</kbd></div><button class="icon-btn"><svg class="icon" style="width:16px"><use href="#i-bell"/></svg><span class="ping-dot"></span></button><div class="avatar-sm">旅</div></div>
+    <div class="land"><span class="pri r">规格</span>高52px，搜索focus磷火边框，通知血月脉冲。</div>
+  </article>
+  <article class="ccard bp bp-d3">
+    <span class="num">A-04</span>
+    <div class="t"><i class="dot"></i>全局搜索面板</div>
+    <div class="search-panel"><div class="sp-input"><svg class="icon"><use href="#i-search"/></svg><input value="复盘" readonly></div><div class="sp-results"><div class="sp-group-title">档案</div><div class="sp-item"><span class="kind doc">文档</span><span class="hit"><mark>复盘</mark>方法论 v2.0</span></div><div class="sp-item"><span class="kind task">任务</span><span class="hit">完成<mark>复盘</mark>文档</span></div></div></div>
+    <div class="land"><span class="pri r">规格</span>居中模态，分区结果，数据苏醒入场。</div>
+  </article>
+  </div>
+</section>
+
+<!-- B 区 -->
+<section>
+  <div class="sec-head">
+    <h2><svg class="icon sec-icon"><use href="#i-home"/></svg>首页观测</h2><span class="badge">09</span>
+    <span class="note">焦点任务 + 统计 + 快捷入口</span>
+  </div>
+  <div class="grid">
+  <article class="ccard bp">
+    <span class="num">B-01</span>
+    <div class="t"><i class="dot"></i>焦点任务卡</div>
+    <div class="focus-card"><span class="f-tag"><svg class="icon"><use href="#i-target"/></svg>核心目标</span><div class="f-title">完善启明星系统技术架构</div><div class="f-sub">下一步：渲染性能优化章节</div><div class="f-prog"><span class="bar"><i style="width:67%"></i></span><span class="count">6/9</span></div><div class="f-acts"><button class="btn pri sm">继续</button><button class="btn sec sm">提交</button></div></div>
+    <div class="land"><span class="pri r">规格</span>磷火边框+辉光晕，进度条发光。</div>
+  </article>
+  <article class="ccard bp bp-d1">
+    <span class="num">B-02</span>
+    <div class="t"><i class="dot"></i>统计卡组</div>
+    <div class="stats4"><div class="st4 primary"><div class="ic primary"><svg class="icon"><use href="#i-check"/></svg></div><div class="v" data-count="12">0</div><div class="l">今日待办</div><div class="tr up">↑2</div></div><div class="st4 mint"><div class="ic mint"><svg class="icon"><use href="#i-check"/></svg></div><div class="v" data-count="8">0</div><div class="l">已完成</div><div class="tr up">↑3</div></div><div class="st4 lilac"><div class="ic lilac"><svg class="icon"><use href="#i-doc"/></svg></div><div class="v" data-count="3">0</div><div class="l">新增档案</div><div class="tr down">↓1</div></div><div class="st4 butter"><div class="ic butter"><svg class="icon"><use href="#i-refresh"/></svg></div><div class="v" data-count="6">0</div><div class="l">连续复盘</div><div class="tr up">↑1</div></div></div>
+    <div class="land"><span class="pri r">规格</span>4宫格，左竖条语义色，数字翻滚。</div>
+  </article>
+  <article class="ccard bp bp-d2">
+    <span class="num">B-03</span>
+    <div class="t"><i class="dot"></i>快捷入口</div>
+    <div class="qgrid"><div class="qitem"><span class="ic primary"><svg class="icon"><use href="#i-plus"/></svg></span><span class="nm">新建任务</span></div><div class="qitem"><span class="ic lilac"><svg class="icon"><use href="#i-doc"/></svg></span><span class="nm">新建档案</span></div><div class="qitem"><span class="ic butter"><svg class="icon"><use href="#i-refresh"/></svg></span><span class="nm">开始复盘</span></div><div class="qitem"><span class="ic mint"><svg class="icon"><use href="#i-send"/></svg></span><span class="nm">对话</span></div><div class="qitem"><span class="ic sky"><svg class="icon"><use href="#i-cloud"/></svg></span><span class="nm">导入</span></div><div class="qitem"><span class="ic gold"><svg class="icon"><use href="#i-search"/></svg></span><span class="nm">搜索</span></div><div class="qitem"><span class="ic primary"><svg class="icon"><use href="#i-setting"/></svg></span><span class="nm">设置</span></div><div class="qitem"><span class="ic gold"><svg class="icon"><use href="#i-spark"/></svg></span><span class="nm">精灵</span></div></div>
+    <div class="land"><span class="pri r">规格</span>4×2网格，方图标，hover上浮。</div>
+  </article>
+  <article class="ccard bp bp-d3">
+    <span class="num">B-04</span>
+    <div class="t"><i class="dot"></i>最近档案</div>
+    <div class="recent"><div class="rh"><b>最近档案</b><a>全部</a></div><div class="doc-row"><span class="dic"><svg class="icon"><use href="#i-doc"/></svg></span><div class="dinfo"><b>技术架构 v2.1</b><span>架构 · 12.4k字</span></div><time>10分钟前</time></div><div class="doc-row"><span class="dic"><svg class="icon"><use href="#i-doc"/></svg></span><div class="dinfo"><b>知识库方法论</b><span>知识 · 3.2k字</span></div><time>2小时前</time></div></div>
+    <div class="land"><span class="pri r">规格</span>列表项高48，方图标。</div>
+  </article>
+  <article class="ccard bp bp-d4">
+    <span class="num">B-05</span>
+    <div class="t"><i class="dot"></i>灵感信号</div>
+    <div class="inspire"><span class="bulb"><svg class="icon"><use href="#i-spark"/></svg></span><div class="ib"><p>检测到你本周复盘可沉淀为<span class="ref">《复盘方法论》</span>档案</p><div class="acts"><button class="btn gold sm">采纳</button><button class="btn pill sm">忽略</button></div></div></div>
+    <div class="land"><span class="pri r">规格</span>旧金底+信号图标，数据苏醒入场。</div>
+  </article>
+  <article class="ccard bp bp-d5">
+    <span class="num">B-06</span>
+    <div class="t"><i class="dot"></i>今日待办</div>
+    <div class="todos"><div class="th"><b>今日待办</b><span class="cnt">4</span></div><div class="todo-item" onclick="this.classList.toggle('done');this.querySelector('.ck').classList.toggle('on')"><span class="ck on"><svg class="icon"><use href="#i-check"/></svg></span><span class="tt">完成架构渲染优化</span><span class="st butter">进行中</span></div><div class="todo-item" onclick="this.classList.toggle('done');this.querySelector('.ck').classList.toggle('on')"><span class="ck"></span><span class="tt">回复导师邮件</span><span class="st mint">待办</span></div><div class="todo-item done" onclick="this.classList.toggle('done');this.querySelector('.ck').classList.toggle('on')"><span class="ck on"><svg class="icon"><use href="#i-check"/></svg></span><span class="tt">晨间复盘</span><span class="st mint">完成</span></div></div>
+    <div class="land"><span class="pri r">规格</span>方勾选框，磷火选中辉光。点击可交互。</div>
+  </article>
+  <article class="ccard bp bp-d6">
+    <span class="num">B-07</span>
+    <div class="t"><i class="dot"></i>首页英雄区</div>
+    <div class="hero-row"><div><h2>早上好，旅人</h2><p>今天是8月28日，周五，适合专注一件大事。</p></div><div style="position:relative;width:50px;height:30px"><svg viewBox="0 0 50 30" style="width:100%;height:100%"><path d="M5 20 Q12 14 19 20 Q26 26 33 20 Q40 14 47 20" fill="none" stroke="var(--primary)" stroke-width="1.5" opacity=".4" style="animation:fog-drift 8s ease-in-out infinite"/></svg></div></div>
+    <div class="land"><span class="pri r">规格</span>Cinzel问候+日期，右侧潮线装饰。潮线缓慢漂移。</div>
+  </article>
+  <article class="ccard bp bp-d7">
+    <span class="num">B-08</span>
+    <div class="t"><i class="dot"></i>今日待办速览</div>
+    <div class="todos"><div class="th"><b>今日待办</b><span class="cnt">5</span></div>
+      <div class="todo-item" onclick="this.classList.toggle('done');this.querySelector('.ck').classList.toggle('on')"><span class="ck on"><svg class="icon"><use href="#i-check"/></svg></span><span class="tt">完成技术架构渲染优化章节</span><span class="st butter">进行中</span></div>
+      <div class="todo-item" onclick="this.classList.toggle('done');this.querySelector('.ck').classList.toggle('on')"><span class="ck"></span><span class="tt">回复导师邮件</span><span class="st mint">待办</span></div>
+      <div class="todo-item done" onclick="this.classList.toggle('done');this.querySelector('.ck').classList.toggle('on')"><span class="ck on"><svg class="icon"><use href="#i-check"/></svg></span><span class="tt">晨间复盘</span><span class="st mint">完成</span></div>
+      <div class="todo-item overdue" onclick="this.classList.toggle('done');this.querySelector('.ck').classList.toggle('on')"><span class="ck"></span><span class="tt">网站报价确认</span><span class="st straw">逾期</span></div>
+    </div>
+    <div class="land"><span class="pri r">规格</span>最多5条，方勾选框，逾期血月色。点击勾选可交互。</div>
+  </article>
+  <article class="ccard bp bp-d8">
+    <span class="num">B-09</span>
+    <div class="t"><i class="dot"></i>连续打卡徽章</div>
+    <div class="streak"><div class="badge"><svg class="icon"><use href="#i-flame"/></svg><span class="n">12</span></div><div><p>已连续复盘 <b>12</b> 天</p><p style="font-size:11px;color:var(--text-low);margin-top:2px">再坚持3天达成"半月之星"</p></div></div>
+    <div class="land"><span class="pri y">规格</span>旧金方徽章+火焰+天数角标。达成时印章盖下动画。</div>
+  </article>
+  </div>
+</section>
+
+<!-- C 区 · 任务 -->
+<section>
+  <div class="sec-head"><h2><svg class="icon sec-icon"><use href="#i-check"/></svg>任务档案</h2><span class="badge">05</span><span class="note">列表/看板，状态流转</span></div>
+  <div class="grid">
+  <article class="ccard bp">
+    <span class="num">C-01</span>
+    <div class="t"><i class="dot"></i>任务卡</div>
+    <div style="border-left:2px solid var(--primary);border-radius:0 2px 2px 0;padding:14px 16px;background:var(--bg-panel);box-shadow:var(--glow);margin-left:-2px">
+      <div style="display:flex;align-items:center;gap:10px"><span class="ck on" style="width:18px;height:18px;border-radius:2px;background:var(--primary);display:grid;place-items:center;flex:none"><svg class="icon" style="width:10px;height:10px;color:var(--on-primary)"><use href="#i-check"/></svg></span><span style="font-family:var(--font-cute);font-size:15px;flex:1;letter-spacing:1px;font-weight:600">完善启明星技术架构</span><span style="font-size:10px;padding:2px 8px;border-radius:2px;background:var(--gold-soft);color:var(--gold-ink);font-family:var(--font-cute);display:flex;align-items:center;gap:4px"><span class="dot busy" style="width:6px;height:6px"></span>进行中</span></div>
+      <div style="font-size:12px;color:var(--text-mid);margin:8px 0 0 28px;line-height:1.6">渲染性能优化方案，防卡顿专项设计</div>
+      <div style="display:flex;align-items:center;gap:10px;margin:10px 0 0 28px"><span style="display:flex;align-items:center;gap:6px;font-size:11px"><span style="width:50px;height:4px;background:var(--bg-inset);border-radius:2px;overflow:hidden"><i style="display:block;width:64%;height:100%;background:var(--primary);box-shadow:0 0 6px rgba(127,212,201,.5)"></i></span>6/9</span><span class="chip sky">架构</span><time style="font-size:11px;color:var(--straw-ink);margin-left:auto">8/30</time></div>
+    </div>
+    <div class="land"><span class="pri r">规格</span>左2px磷火条+辉光，方勾选框。</div>
+  </article>
+  <article class="ccard bp bp-d1">
+    <span class="num">C-02</span>
+    <div class="t"><i class="dot"></i>看板列</div>
+    <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:4px">
+      <div style="min-width:120px;flex:1;background:var(--bg-inset);border-radius:2px;padding:8px"><div style="font-family:var(--font-cute);font-size:12px;margin-bottom:8px;padding:0 4px"><span class="dot"></span> 待办 <span style="float:right;font-size:10px;color:var(--text-low)">3</span></div><div style="background:var(--bg-panel);border-radius:2px;padding:8px;margin-bottom:6px"><div style="font-size:11px">读书计划</div></div></div>
+      <div style="min-width:120px;flex:1;background:var(--primary-soft);border-radius:2px;padding:8px;border:1px dashed var(--primary)"><div style="font-family:var(--font-cute);font-size:12px;margin-bottom:8px;padding:0 4px;color:var(--primary)"><span class="dot busy"></span> 进行中 <span style="float:right;font-size:10px">2</span></div><div style="background:var(--bg-panel);border-radius:2px;padding:8px;box-shadow:var(--glow)"><div style="font-size:11px">架构文档</div></div></div>
+      <div style="min-width:120px;flex:1;background:var(--mint-soft);border-radius:2px;padding:8px"><div style="font-family:var(--font-cute);font-size:12px;margin-bottom:8px;padding:0 4px;color:var(--mint-ink)"><span class="dot on"></span> 完成 <span style="float:right;font-size:10px">4</span></div><div style="background:var(--bg-panel);border-radius:2px;padding:8px;opacity:.6"><div style="font-size:11px;text-decoration:line-through">晨间复盘</div></div></div>
+    </div>
+    <div class="land"><span class="pri r">规格</span>3列，拖拽目标磷火虚线。</div>
+  </article>
+  <article class="ccard bp bp-d2">
+    <span class="num">C-03</span>
+    <div class="t"><i class="dot"></i>筛选器栏</div>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <div style="display:flex;background:var(--bg-inset);border-radius:2px;padding:3px"><button style="padding:5px 14px;border-radius:2px;font-family:var(--font-cute);font-size:12px;background:var(--primary);color:var(--on-primary)">列表</button><button style="padding:5px 14px;border-radius:2px;font-family:var(--font-cute);font-size:12px;color:var(--text-mid)">看板</button></div>
+      <button class="chip primary" style="cursor:pointer">全部</button><button class="chip" style="cursor:pointer">进行中</button><button class="chip straw" style="cursor:pointer">逾期</button>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:6px;background:var(--bg-inset);border-radius:2px;padding:6px 12px"><svg class="icon" style="width:12px;height:12px;color:var(--text-low)"><use href="#i-search"/></svg><span style="font-size:11px;color:var(--text-low)">筛选…</span></div>
+    </div>
+    <div class="land"><span class="pri r">规格</span>分段控件+chips+搜索。</div>
+  </article>
+  <article class="ccard bp bp-d3">
+    <span class="num">C-04</span>
+    <div class="t"><i class="dot"></i>任务列表行</div>
+    <div style="display:flex;flex-direction:column;gap:2px">
+      <div style="display:flex;align-items:center;gap:10px;padding:9px 8px;border-radius:2px;cursor:pointer;transition:background .2s" onmouseover="this.style.background='var(--bg-inset)'" onmouseout="this.style.background=''"><span class="ck on" style="width:16px;height:16px;border-radius:2px;background:var(--primary);display:grid;place-items:center;flex:none"><svg class="icon" style="width:9px;height:9px;color:var(--on-primary)"><use href="#i-check"/></svg></span><span style="flex:1;font-size:13px;text-decoration:line-through;color:var(--text-low)">收集技术架构参考</span><span class="chip mint" style="font-size:9px">完成</span></div>
+      <div style="display:flex;align-items:center;gap:10px;padding:9px 8px;border-radius:2px;cursor:pointer;transition:background .2s" onmouseover="this.style.background='var(--bg-inset)'" onmouseout="this.style.background=''"><span class="ck on" style="width:16px;height:16px;border-radius:2px;background:var(--primary);display:grid;place-items:center;flex:none"><svg class="icon" style="width:9px;height:9px;color:var(--on-primary)"><use href="#i-check"/></svg></span><span style="flex:1;font-size:13px;text-decoration:line-through;color:var(--text-low)">绘制进程架构图</span><span class="chip mint" style="font-size:9px">完成</span></div>
+      <div style="display:flex;align-items:center;gap:10px;padding:9px 8px;border-radius:2px;cursor:pointer;transition:background .2s;background:var(--primary-soft)" onmouseover="this.style.background='var(--bg-inset)'" onmouseout="this.style.background='var(--primary-soft)'"><span class="ck" style="width:16px;height:16px;border-radius:2px;border:1.5px solid var(--line);flex:none"></span><span style="flex:1;font-size:13px">完成渲染性能优化章节</span><span class="chip butter" style="font-size:9px">进行中</span></div>
+    </div>
+    <div class="land"><span class="pri r">规格</span>行高38，方勾选框，hover磷火底。完成态删除线。</div>
+  </article>
+  <article class="ccard bp bp-d4">
+    <span class="num">C-06</span>
+    <div class="t"><i class="dot"></i>子任务嵌套</div>
+    <div style="display:flex;flex-direction:column;gap:4px">
+      <div style="display:flex;align-items:center;gap:8px;padding:6px 4px"><span class="ck on" style="width:16px;height:16px;border-radius:2px;background:var(--primary);display:grid;place-items:center;flex:none"><svg class="icon" style="width:9px;height:9px;color:var(--on-primary)"><use href="#i-check"/></svg></span><span style="font-size:13px;flex:1">收集技术架构参考</span></div>
+      <div style="display:flex;align-items:center;gap:8px;padding:6px 4px;padding-left:28px"><span class="ck on" style="width:14px;height:14px;border-radius:2px;background:var(--primary);display:grid;place-items:center;flex:none"><svg class="icon" style="width:8px;height:8px;color:var(--on-primary)"><use href="#i-check"/></svg></span><span style="font-size:12px;flex:1;color:var(--text-mid)">Electron三进程模型</span></div>
+      <div style="display:flex;align-items:center;gap:8px;padding:6px 4px;padding-left:28px"><span class="ck" style="width:14px;height:14px;border-radius:2px;border:1.5px solid var(--line);flex:none"></span><span style="font-size:12px;flex:1;color:var(--text-mid)">SQLite加密方案</span></div>
+      <div style="display:flex;align-items:center;gap:8px;padding:6px 4px;padding-left:28px;color:var(--text-low);cursor:pointer"><svg class="icon" style="width:12px;height:12px"><use href="#i-plus"/></svg><span style="font-size:11px">添加子任务</span></div>
+    </div>
+    <div class="land"><span class="pri r">规格</span>嵌套缩进16px，子任务小勾选框。Enter添加，Backspace空行删除。</div>
+  </article>
+  </div>
+</section>
+
+<!-- D 区 · 知识 -->
+<section>
+  <div class="sec-head"><h2><svg class="icon sec-icon"><use href="#i-doc"/></svg>知识档案</h2><span class="badge">04</span><span class="note">文档编辑器+文件夹</span></div>
+  <div class="grid">
+  <article class="ccard bp">
+    <span class="num">D-01</span>
+    <div class="t"><i class="dot"></i>文档卡</div>
+    <div style="background:var(--bg-panel);border:1px solid var(--line);border-radius:2px;padding:14px" onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='var(--shadow-raise)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px"><span class="chip lilac" style="font-size:10px">架构</span></div>
+      <div style="font-family:var(--font-cute);font-size:15px;margin-bottom:6px;letter-spacing:1px;font-weight:600">启明星技术架构 v2.1</div>
+      <div style="font-size:11px;color:var(--text-mid);line-height:1.6;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">Electron+SQLite本地架构，三进程模型，渲染性能防卡顿…</div>
+      <div style="display:flex;align-items:center;gap:6px;margin-top:10px"><span class="chip sky" style="font-size:9px">架构</span><span style="margin-left:auto;font-size:10px;color:var(--text-low)">12.4k字</span></div>
+    </div>
+    <div class="land"><span class="pri r">规格</span>棱角卡片+磷火内线，hover上浮。</div>
+  </article>
+  <article class="ccard bp bp-d1">
+    <span class="num">D-02</span>
+    <div class="t"><i class="dot"></i>文档编辑器</div>
+    <div style="border:1px solid var(--line);border-radius:2px;overflow:hidden">
+      <div style="display:flex;align-items:center;gap:4px;padding:8px 12px;border-bottom:1px solid var(--line);background:var(--bg-inset)">
+        <button style="width:26px;height:26px;border-radius:2px;display:grid;place-items:center;color:var(--text-mid);font-weight:600">B</button>
+        <button style="width:26px;height:26px;border-radius:2px;display:grid;place-items:center;color:var(--text-mid);font-style:italic">I</button>
+        <div style="width:1px;height:16px;background:var(--line);margin:0 4px"></div>
+        <button style="width:26px;height:26px;border-radius:2px;display:grid;place-items:center;color:var(--text-mid)"><svg class="icon" style="width:14px"><use href="#i-list"/></svg></button>
+        <div style="margin-left:auto"><button style="padding:4px 10px;border-radius:2px;background:var(--primary);color:var(--on-primary);font-family:var(--font-cute);font-size:11px;display:flex;align-items:center;gap:4px"><svg class="icon" style="width:11px"><use href="#i-spark"/></svg>AI摘要</button></div>
+      </div>
+      <div style="padding:16px 20px;max-height:120px;overflow-y:auto">
+        <div style="font-family:var(--font-cute);font-size:18px;margin-bottom:10px;letter-spacing:1px;font-weight:600">渲染性能优化专项</div>
+        <p style="font-size:13px;line-height:1.8;margin-bottom:8px">核心指标：交互响应 ≤100ms，动画稳定 <b style="color:var(--primary)">60fps</b>。</p>
+        <blockquote style="border-left:2px solid var(--primary);background:var(--bg-inset);padding:8px 12px;border-radius:0 2px 2px 0;font-size:12px;color:var(--text-mid);margin:8px 0">长任务超过50ms必须拆分。</blockquote>
+      </div>
+    </div>
+    <div class="land"><span class="pri r">规格</span>Cinzel标题，引用块磷火竖条。</div>
+  </article>
+  <article class="ccard bp bp-d2">
+    <span class="num">D-03</span>
+    <div class="t"><i class="dot"></i>文件夹树</div>
+    <div style="font-size:13px;line-height:2">
+      <div style="display:flex;align-items:center;gap:6px;padding:4px 8px;background:var(--primary-soft);border-radius:2px;color:var(--primary)"><svg class="icon" style="width:12px;height:12px;transform:rotate(90deg)"><use href="#i-chevron-right"/></svg><svg class="icon" style="width:14px;height:14px"><use href="#i-folder"/></svg>知识库</div>
+      <div style="padding-left:24px"><div style="display:flex;align-items:center;gap:6px;padding:4px 8px;color:var(--text-mid)"><svg class="icon" style="width:12px;height:12px;transform:rotate(90deg)"><use href="#i-chevron-right"/></svg><svg class="icon" style="width:14px;height:14px;color:var(--primary)"><use href="#i-folder"/></svg>架构文档</div>
+        <div style="padding-left:24px"><div style="display:flex;align-items:center;gap:6px;padding:4px 8px;color:var(--text-mid)"><svg class="icon" style="width:12px;height:12px"><use href="#i-doc"/></svg>技术架构v2.1</div></div>
+      </div>
+      <div style="padding-left:24px"><div style="display:flex;align-items:center;gap:6px;padding:4px 8px;color:var(--text-mid)"><svg class="icon" style="width:12px;height:12px"><use href="#i-chevron-right"/></svg><svg class="icon" style="width:14px;height:14px;color:var(--lilac)"><use href="#i-folder"/></svg>复盘归档</div></div>
+      <div style="display:flex;align-items:center;gap:6px;padding:4px 8px;color:var(--text-mid)"><svg class="icon" style="width:12px;height:12px"><use href="#i-chevron-right"/></svg><svg class="icon" style="width:14px;height:14px;color:var(--gold)"><use href="#i-folder"/></svg>个人资料</div>
+    </div>
+    <div class="land"><span class="pri r">规格</span>缩进16px层级，激活项磷火底。展开箭头旋转90°。</div>
+  </article>
+  <article class="ccard bp bp-d3">
+    <span class="num">D-05</span>
+    <div class="t"><i class="dot"></i>标签云</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+      <span class="chip primary" style="font-size:14px;padding:4px 14px">架构</span>
+      <span class="chip lilac" style="font-size:13px;padding:3px 12px">复盘</span>
+      <span class="chip butter" style="font-size:12px;padding:3px 10px">学习</span>
+      <span class="chip sky" style="font-size:11px;padding:2px 10px">工作流</span>
+      <span class="chip mint" style="font-size:13px;padding:3px 12px">AI</span>
+      <span class="chip gold" style="font-size:10px;padding:2px 8px">灵感</span>
+      <span class="chip straw" style="font-size:12px;padding:3px 10px">紧急</span>
+      <span class="chip" style="font-size:11px;padding:2px 8px">生活</span>
+      <span class="chip primary" style="font-size:10px;padding:2px 8px">项目</span>
+    </div>
+    <div class="land"><span class="pri r">规格</span>按使用频率定字号，hover磷火边框。点击筛选。</div>
+  </article>
+  </div>
+</section>
+
+<!-- E 区 · 第二分身 -->
+<section>
+  <div class="sec-head"><h2><svg class="icon sec-icon"><use href="#i-send"/></svg>深海精灵</h2><span class="badge">04</span><span class="note">对话即工作流，本地运行</span></div>
+  <div class="grid">
+  <article class="ccard bp">
+    <span class="num">E-01</span>
+    <div class="t"><i class="dot"></i>对话消息流</div>
+    <div style="display:flex;flex-direction:column;gap:12px;max-height:200px;overflow-y:auto;padding:4px">
+      <div style="display:flex;gap:10px;align-items:flex-end"><div style="width:32px;height:32px;border-radius:2px;background:var(--primary);display:grid;place-items:center;font-family:var(--font-cute);color:var(--on-primary);font-size:13px;flex:none;box-shadow:var(--glow)">灵</div><div style="background:var(--bg-panel);border:1px solid var(--line);border-radius:2px 2px 2px 0;padding:10px 14px;max-width:75%;font-size:13px;line-height:1.7;box-shadow:var(--shadow-card)">我已读完你最近3篇复盘，发现你在「任务拆解」常卡壳。要我帮你拆解吗？<div style="margin-top:8px;display:flex;gap:6px"><button class="btn sm" style="background:var(--primary-soft);color:var(--primary-ink);height:26px;padding:0 10px;font-size:10px">好</button><button class="btn sm pill" style="height:26px;padding:0 10px;font-size:10px">不用</button></div></div></div>
+      <div style="display:flex;gap:10px;align-items:flex-end;flex-direction:row-reverse"><div style="width:32px;height:32px;border-radius:2px;background:var(--bg-inset);display:grid;place-items:center;font-family:var(--font-cute);color:var(--text-mid);font-size:13px;flex:none">我</div><div style="background:var(--primary);color:var(--on-primary);border-radius:2px 2px 0 2px;padding:10px 14px;max-width:75%;font-size:13px;box-shadow:var(--glow)">好的，拆成5步</div></div>
+      <div style="display:flex;gap:10px;align-items:flex-end"><div style="width:32px;height:32px;border-radius:2px;background:var(--primary);display:grid;place-items:center;font-family:var(--font-cute);color:var(--on-primary);font-size:13px;flex:none;box-shadow:var(--glow)">灵</div><div style="background:var(--bg-panel);border:1px solid var(--line);border-radius:2px 2px 2px 0;padding:10px 14px;max-width:75%;font-size:13px;box-shadow:var(--shadow-card)"><div id="typingDemo" style="min-height:20px">解析中<span class="typing-dots"><i>.</i><i>.</i><i>.</i></span></div></div></div>
+    </div>
+    <div class="land"><span class="pri r">规格</span>精灵消息磷火辉光，流式打字机输出。</div>
+  </article>
+  <article class="ccard bp bp-d1">
+    <span class="num">E-02</span>
+    <div class="t"><i class="dot"></i>精灵状态指示</div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--mint-soft);border-radius:2px"><span class="dot on"></span><span style="font-family:var(--font-cute);font-size:13px;color:var(--mint-ink)">在线 · 本地模型就绪</span><span style="margin-left:auto;font-size:10px;color:var(--text-low)">LM Studio</span></div>
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--gold-soft);border-radius:2px"><span class="dot busy"></span><span style="font-family:var(--font-cute);font-size:13px;color:var(--gold-ink)">解析中… 分析知识库</span></div>
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--bg-inset);border-radius:2px"><span class="dot"></span><span style="font-family:var(--font-cute);font-size:13px;color:var(--text-mid)">离线 · 未配置</span><button class="btn sm pri" style="margin-left:auto;height:28px;padding:0 12px;font-size:11px">配置</button></div>
+    </div>
+    <div class="land"><span class="pri r">规格</span>在线磷火/解析旧金/离线灰，状态点呼吸。</div>
+  </article>
+  <article class="ccard bp bp-d2">
+    <span class="num">E-03</span>
+    <div class="t"><i class="dot"></i>引用文档卡片</div>
+    <div style="display:flex;gap:10px;align-items:center;background:var(--lilac-soft);border-radius:2px;padding:12px 14px;border:1px solid rgba(156,139,191,.25)">
+      <div style="width:36px;height:36px;border-radius:2px;background:var(--bg-panel);display:grid;place-items:center;flex:none"><svg class="icon" style="width:18px;height:18px;color:var(--lilac-ink)"><use href="#i-doc"/></svg></div>
+      <div style="flex:1;min-width:0"><div style="font-family:var(--font-cute);font-size:13px;color:var(--text-hi);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">启明星技术架构 v2.1</div><div style="font-size:10px;color:var(--text-low);margin-top:2px">第17章 · 渲染性能 · 已引用3处</div></div>
+      <button style="width:24px;height:24px;border-radius:2px;display:grid;place-items:center;color:var(--text-low);flex:none;transition:color .2s" onmouseover="this.style.color='var(--straw-ink)'" onmouseout="this.style.color='var(--text-low)'"><svg class="icon" style="width:12px;height:12px"><use href="#i-close"/></svg></button>
+    </div>
+    <div class="land"><span class="pri r">规格</span>藕荷底+文档图标+标题+引用位置+移除。</div>
+  </article>
+  <article class="ccard bp bp-d3">
+    <span class="num">E-05</span>
+    <div class="t"><i class="dot"></i>消息输入框</div>
+    <div style="border:1px solid var(--line);border-radius:2px;overflow:hidden;background:var(--bg-panel)">
+      <div style="display:flex;gap:6px;padding:8px 12px;border-bottom:1px solid var(--line)"><span class="chip primary" style="font-size:10px;cursor:pointer"><svg class="icon" style="width:10px;height:10px"><use href="#i-doc"/></svg>附件</span><span class="chip lilac" style="font-size:10px;cursor:pointer">@ 引用文档</span><span class="chip mint" style="font-size:10px;cursor:pointer"><svg class="icon" style="width:10px;height:10px"><use href="#i-setting"/></svg>工具调用</span></div>
+      <div style="display:flex;align-items:flex-end;gap:8px;padding:10px 12px"><textarea placeholder="和深海精灵聊聊…（Shift+Enter换行）" rows="2" style="flex:1;border:none;outline:none;background:transparent;color:var(--text-hi);font-family:var(--font-body);font-size:13px;resize:none;line-height:1.6"></textarea><button class="btn pri" style="height:36px;width:36px;padding:0;border-radius:2px"><svg class="icon" style="width:16px;height:16px"><use href="#i-send"/></svg></button></div>
+    </div>
+    <div class="land"><span class="pri r">规格</span>附件/引用/工具chips+自适应textarea+方发送按钮。</div>
+  </article>
+  </div>
+</section>
+
+<!-- F 区 · 复盘 -->
+<section>
+  <div class="sec-head"><h2><svg class="icon sec-icon"><use href="#i-refresh"/></svg>复盘档案</h2><span class="badge">03</span><span class="note">结构化反思</span></div>
+  <div class="grid">
+  <article class="ccard bp">
+    <span class="num">F-01</span>
+    <div class="t"><i class="dot"></i>复盘编辑器</div>
+    <div style="border:1px solid var(--line);border-radius:2px;overflow:hidden">
+      <div style="display:flex;gap:0;border-bottom:1px solid var(--line);background:var(--bg-inset)"><button style="padding:10px 16px;font-family:var(--font-cute);font-size:13px;color:var(--primary);border-bottom:2px solid var(--primary)">今日</button><button style="padding:10px 16px;font-family:var(--font-cute);font-size:13px;color:var(--text-mid)">周</button><button style="padding:10px 16px;font-family:var(--font-cute);font-size:13px;color:var(--text-mid)">月</button></div>
+      <div style="padding:16px">
+        <div style="margin-bottom:14px"><div style="font-family:var(--font-cute);font-size:13px;color:var(--text-mid);margin-bottom:6px">① 今天做了什么？</div><div style="background:var(--bg-inset);border-radius:2px;padding:10px 12px;font-size:12px;color:var(--text-mid);min-height:40px;line-height:1.7">完成架构渲染优化初稿，回复3封邮件…</div></div>
+        <div><div style="font-family:var(--font-cute);font-size:13px;color:var(--text-mid);margin-bottom:6px">② 做得好的？</div><div style="border:1px dashed var(--line);border-radius:2px;padding:10px 12px;font-size:12px;color:var(--text-low);min-height:30px;display:flex;align-items:center">点击开始记录…</div></div>
+      </div>
+    </div>
+    <div class="land"><span class="pri r">规格</span>Tab切换，编号问题①②③，数据苏醒入场。</div>
+  </article>
+  <article class="ccard bp bp-d1">
+    <span class="num">F-02</span>
+    <div class="t"><i class="dot"></i>情绪记录</div>
+    <div style="text-align:center;padding:8px">
+      <div style="font-family:var(--font-cute);font-size:13px;color:var(--text-mid);margin-bottom:12px;letter-spacing:2px">今日心绪</div>
+      <div style="display:flex;justify-content:center;gap:14px">
+        <div class="mood" style="cursor:pointer;transition:transform .25s" onmouseover="this.style.transform='scale(1.15)'" onmouseout="this.style.transform=''"><div style="font-size:28px">😄</div><div style="font-size:10px;color:var(--text-low);margin-top:2px">澄明</div></div>
+        <div class="mood" style="cursor:pointer;transition:transform .25s" onmouseover="this.style.transform='scale(1.15)'" onmouseout="this.style.transform=''"><div style="font-size:28px">🙂</div><div style="font-size:10px;color:var(--text-low);margin-top:2px">安定</div></div>
+        <div class="mood selected" style="cursor:pointer;transform:scale(1.15)"><div style="font-size:28px">😐</div><div style="font-size:10px;color:var(--primary);margin-top:2px;font-weight:600">平静</div></div>
+        <div class="mood" style="cursor:pointer;transition:transform .25s" onmouseover="this.style.transform='scale(1.15)'" onmouseout="this.style.transform=''"><div style="font-size:28px">😴</div><div style="font-size:10px;color:var(--text-low);margin-top:2px">沉滞</div></div>
+        <div class="mood" style="cursor:pointer;transition:transform .25s" onmouseover="this.style.transform='scale(1.15)'" onmouseout="this.style.transform=''"><div style="font-size:28px">😔</div><div style="font-size:10px;color:var(--text-low);margin-top:2px">郁结</div></div>
+      </div>
+      <div style="margin-top:14px;padding:8px 12px;background:var(--bg-inset);border-radius:2px;font-size:11px;color:var(--text-mid);text-align:left"><b style="color:var(--primary)">精灵察知：</b>连续3天"平静"，或许需要放松？</div>
+    </div>
+    <div class="land"><span class="pri r">规格</span>5档emoji，选中磷火色。</div>
+  </article>
+  <article class="ccard bp bp-d2">
+    <span class="num">F-03</span>
+    <div class="t"><i class="dot"></i>复盘时间线</div>
+    <div style="position:relative;padding-left:24px">
+      <div style="position:absolute;left:7px;top:6px;bottom:6px;width:1.5px;background:var(--primary);opacity:.3;border-radius:2px"></div>
+      <div style="position:relative;padding-bottom:14px"><div style="position:absolute;left:-21px;top:2px;width:11px;height:11px;border-radius:50%;background:var(--primary);box-shadow:var(--glow);border:2px solid var(--bg-panel)"></div><div style="font-size:10px;color:var(--text-low);font-family:var(--font-cute);letter-spacing:1px">08:00</div><div style="font-size:13px;color:var(--text-hi);margin-top:2px">晨间复盘 · 完成</div></div>
+      <div style="position:relative;padding-bottom:14px"><div style="position:absolute;left:-21px;top:2px;width:11px;height:11px;border-radius:50%;background:var(--gold);border:2px solid var(--bg-panel)"></div><div style="font-size:10px;color:var(--text-low);font-family:var(--font-cute);letter-spacing:1px">14:00</div><div style="font-size:13px;color:var(--text-hi);margin-top:2px">架构文档撰写 · 进行中</div></div>
+      <div style="position:relative"><div style="position:absolute;left:-21px;top:2px;width:11px;height:11px;border-radius:50%;background:var(--line);border:2px solid var(--bg-panel)"></div><div style="font-size:10px;color:var(--text-low);font-family:var(--font-cute);letter-spacing:1px">22:00</div><div style="font-size:13px;color:var(--text-low);margin-top:2px">夜间总结 · 待办</div></div>
+    </div>
+    <div class="land"><span class="pri r">规格</span>左侧磷火时间轴，节点状态色（完成磷火/进行旧金/待办灰）。</div>
+  </article>
+  </div>
+</section>
+
+<!-- G 区 · 桌宠 · 深海精灵 -->
+<section>
+  <div class="sec-head"><h2><svg class="icon sec-icon"><use href="#i-spark"/></svg>桌宠 · 深海精灵</h2><span class="badge">03</span><span class="note">水母形象，磷火辉光</span></div>
+  <div class="grid">
+  <article class="ccard bp" style="grid-column:span 2">
+    <span class="num">G-01</span>
+    <div class="t"><i class="dot"></i>深海精灵角色（多动作）</div>
+    <div style="display:flex;gap:24px;align-items:center;flex-wrap:wrap">
+      <div style="position:relative;width:160px;height:180px;flex:none">
+        <div style="position:absolute;bottom:10px;left:50%;transform:translateX(-50%);width:70px;height:12px;background:radial-gradient(ellipse,rgba(127,212,201,.2),transparent 70%);border-radius:50%"></div>
+        <svg id="petChar" class="pet idle" viewBox="0 0 160 180" width="160" height="180" style="position:relative;z-index:1;filter:drop-shadow(0 0 12px rgba(127,212,201,.4))">
+          <!-- 触须 -->
+          <g class="pet-tentacles">
+            <path d="M55 100 Q50 130 55 160" stroke="var(--primary)" stroke-width="2" fill="none" opacity=".5" stroke-linecap="round" style="animation:tentacle-wave 3s ease-in-out infinite"/>
+            <path d="M68 105 Q65 135 70 165" stroke="var(--primary)" stroke-width="2" fill="none" opacity=".4" stroke-linecap="round" style="animation:tentacle-wave 3.5s ease-in-out .3s infinite"/>
+            <path d="M80 108 Q80 140 80 170" stroke="var(--primary)" stroke-width="2" fill="none" opacity=".5" stroke-linecap="round" style="animation:tentacle-wave 2.8s ease-in-out .6s infinite"/>
+            <path d="M92 105 Q95 135 90 165" stroke="var(--primary)" stroke-width="2" fill="none" opacity=".4" stroke-linecap="round" style="animation:tentacle-wave 3.2s ease-in-out .2s infinite"/>
+            <path d="M105 100 Q110 130 105 160" stroke="var(--primary)" stroke-width="2" fill="none" opacity=".5" stroke-linecap="round" style="animation:tentacle-wave 3.8s ease-in-out .5s infinite"/>
+          </g>
+          <!-- 伞状身体 -->
+          <g class="pet-body">
+            <ellipse cx="80" cy="75" rx="45" ry="38" fill="var(--primary)" opacity=".25"/>
+            <ellipse cx="80" cy="72" rx="40" ry="34" fill="var(--primary)" opacity=".35"/>
+            <path d="M40 75 Q40 40 80 38 Q120 40 120 75 Q110 82 80 80 Q50 82 40 75 Z" fill="var(--primary)" opacity=".5"/>
+            <!-- 内部辉光 -->
+            <ellipse cx="80" cy="65" rx="25" ry="20" fill="var(--primary-ink)" opacity=".3"/>
+          </g>
+          <!-- 脸 -->
+          <g class="pet-face">
+            <g class="pet-eyes">
+              <ellipse cx="68" cy="68" rx="5" ry="6" fill="#0A0E17" opacity=".8"/>
+              <ellipse cx="92" cy="68" rx="5" ry="6" fill="#0A0E17" opacity=".8"/>
+              <circle cx="69" cy="66" r="1.5" fill="#fff"/>
+              <circle cx="93" cy="66" r="1.5" fill="#fff"/>
+            </g>
+            <path class="pet-mouth" d="M74 78 Q80 82 86 78" stroke="#0A0E17" stroke-width="1.5" fill="none" opacity=".6" stroke-linecap="round"/>
+            <!-- 腮红 -->
+            <ellipse cx="58" cy="74" rx="5" ry="3" fill="var(--lilac)" opacity=".3"/>
+            <ellipse cx="102" cy="74" rx="5" ry="3" fill="var(--lilac)" opacity=".3"/>
+          </g>
+          <!-- 头顶光点 -->
+          <circle cx="80" cy="38" r="3" fill="var(--primary-ink)" style="animation:phosphor-breathe 2s infinite"/>
+        </svg>
+        <div style="position:absolute;bottom:0;left:50%;transform:translateX(-50%);background:var(--primary);color:var(--on-primary);font-family:var(--font-cute);font-size:11px;padding:3px 14px;border-radius:2px;white-space:nowrap;letter-spacing:1px;box-shadow:var(--glow)" id="petActionLabel">漂浮 · 待机</div>
+      </div>
+      <div style="flex:1;min-width:200px">
+        <div style="font-family:var(--font-cute);font-size:16px;margin-bottom:10px;letter-spacing:2px;font-weight:600">启明星 · 深海精灵</div>
+        <div style="font-size:12px;color:var(--text-mid);line-height:1.8;margin-bottom:12px">你的第二分身形象。半透明水母身体 + 磷火触须 + 发光眼。<br>支持5种动作，桌宠/人形切换。</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn sm" onclick="setPetAction('idle')" style="background:var(--primary-soft);color:var(--primary-ink);height:28px;padding:0 10px;font-size:11px">漂浮</button>
+          <button class="btn sm" onclick="setPetAction('thinking')" style="background:var(--gold-soft);color:var(--gold-ink);height:28px;padding:0 10px;font-size:11px">凝视</button>
+          <button class="btn sm" onclick="setPetAction('celebrating')" style="background:var(--mint-soft);color:var(--mint-ink);height:28px;padding:0 10px;font-size:11px">绽放</button>
+          <button class="btn sm" onclick="setPetAction('worried')" style="background:var(--straw-soft);color:var(--straw-ink);height:28px;padding:0 10px;font-size:11px">收缩</button>
+          <button class="btn sm" onclick="setPetAction('pointing')" style="background:var(--sky-soft);color:var(--sky-ink);height:28px;padding:0 10px;font-size:11px">指引</button>
+        </div>
+      </div>
+    </div>
+    <div class="land"><span class="pri r">规格</span>SVG水母160×180，半透明磷火身体+5条波浪触须+发光眼+头顶光点。5动作。触须独立波浪动画。桌宠64px悬浮。</div>
+  </article>
+  <article class="ccard bp">
+    <span class="num">G-02</span>
+    <div class="t"><i class="dot"></i>精灵对话气泡</div>
+    <div style="position:relative;padding:10px 0 10px 50px;min-height:60px">
+      <div style="position:absolute;left:0;top:50%;transform:translateY(-50%);width:40px;height:40px;border-radius:2px;background:var(--primary);display:grid;place-items:center;font-family:var(--font-cute);color:var(--on-primary);font-size:14px;box-shadow:var(--glow)">灵</div>
+      <div style="background:var(--bg-panel);border:1px solid var(--line);border-radius:2px 2px 2px 0;padding:10px 14px;font-size:12px;line-height:1.7;box-shadow:var(--shadow-card)">该歇息啦！已连续工作2时辰，要不要放松？<div style="display:flex;gap:6px;margin-top:8px"><button class="btn sm" style="background:var(--mint-soft);color:var(--mint-ink);height:24px;padding:0 8px;font-size:10px">好的</button><button class="btn sm pill" style="height:24px;padding:0 8px;font-size:10px">再等</button></div></div>
+    </div>
+    <div class="land"><span class="pri r">规格</span>精灵头像+气泡+快捷回复。</div>
+  </article>
+  <article class="ccard bp bp-d1">
+    <span class="num">G-03</span>
+    <div class="t"><i class="dot"></i>桌宠悬浮模式</div>
+    <div style="position:relative;height:100px;background:var(--bg-inset);border-radius:2px;overflow:hidden">
+      <div style="position:absolute;bottom:8px;right:12px;width:56px;height:64px;cursor:pointer;animation:jelly-float 4s ease-in-out infinite">
+        <svg viewBox="0 0 160 180" width="56" height="64" style="filter:drop-shadow(0 0 6px rgba(127,212,201,.5))">
+          <path d="M55 100 Q50 130 55 160" stroke="var(--primary)" stroke-width="2" fill="none" opacity=".5"/>
+          <path d="M80 108 Q80 140 80 170" stroke="var(--primary)" stroke-width="2" fill="none" opacity=".4"/>
+          <path d="M105 100 Q110 130 105 160" stroke="var(--primary)" stroke-width="2" fill="none" opacity=".5"/>
+          <ellipse cx="80" cy="75" rx="45" ry="38" fill="var(--primary)" opacity=".3"/>
+          <path d="M40 75 Q40 40 80 38 Q120 40 120 75 Q110 82 80 80 Q50 82 40 75 Z" fill="var(--primary)" opacity=".5"/>
+          <ellipse cx="68" cy="68" rx="4" ry="5" fill="#0A0E17" opacity=".7"/>
+          <ellipse cx="92" cy="68" rx="4" ry="5" fill="#0A0E17" opacity=".7"/>
+        </svg>
+        <div style="position:absolute;top:-2px;right:0;width:10px;height:10px;border-radius:50%;background:var(--strawberry);border:2px solid var(--bg-inset);animation:blood-pulse 1.5s infinite"></div>
+      </div>
+      <div style="position:absolute;bottom:12px;left:12px;font-size:10px;color:var(--text-low);letter-spacing:1px">悬浮 · 56px · 右下角</div>
+    </div>
+    <div class="land"><span class="pri r">规格</span>56px缩小版，磷火辉光，always-on-top。</div>
+  </article>
+  </div>
+</section>
+
+<!-- H 区 · 设置 -->
+<section>
+  <div class="sec-head"><h2><svg class="icon sec-icon"><use href="#i-setting"/></svg>系统设置</h2><span class="badge">05</span><span class="note">AI配置+数据管理</span></div>
+  <div class="grid">
+  <article class="ccard bp">
+    <span class="num">H-01</span>
+    <div class="t"><i class="dot"></i>AI模型配置</div>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div><div style="font-size:11px;color:var(--text-mid);margin-bottom:5px;font-family:var(--font-cute);letter-spacing:1px">API提供商</div><div style="display:flex;gap:6px"><button style="padding:6px 14px;border-radius:2px;background:var(--primary);color:var(--on-primary);font-family:var(--font-cute);font-size:12px">DeepSeek</button><button style="padding:6px 14px;border-radius:2px;background:var(--bg-inset);color:var(--text-mid);font-family:var(--font-cute);font-size:12px">LM Studio</button><button style="padding:6px 14px;border-radius:2px;background:var(--bg-inset);color:var(--text-mid);font-family:var(--font-cute);font-size:12px">Ollama</button></div></div>
+      <div><div style="font-size:11px;color:var(--text-mid);margin-bottom:5px;font-family:var(--font-cute)">API Key</div><div style="display:flex;gap:6px"><div class="input-wrap has-icon" style="flex:1"><svg class="icon input-icon"><use href="#i-info"/></svg><input type="password" value="sk-••••••••" readonly></div><button class="btn sec sm" style="height:38px">显示</button></div></div>
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--mint-soft);border-radius:2px"><span class="dot on"></span><span style="font-size:12px;color:var(--mint-ink);font-family:var(--font-cute)">连接成功</span><button class="btn sm" style="margin-left:auto;height:26px;padding:0 10px;font-size:10px;background:var(--bg-panel);color:var(--mint-ink)">测试</button></div>
+    </div>
+    <div class="land"><span class="pri r">规格</span>提供商chips+Key密码框+连接状态。</div>
+  </article>
+  <article class="ccard bp bp-d1">
+    <span class="num">H-02</span>
+    <div class="t"><i class="dot"></i>开关设置</div>
+    <div style="display:flex;flex-direction:column;gap:2px">
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 4px;border-bottom:1px solid var(--line)"><div style="flex:1"><div style="font-size:13px">精灵常驻桌面</div><div style="font-size:10px;color:var(--text-low)">关闭窗口后台运行</div></div><div class="toggle on" onclick="this.classList.toggle('on')"></div></div>
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 4px;border-bottom:1px solid var(--line)"><div style="flex:1"><div style="font-size:13px">精灵主动提醒</div><div style="font-size:10px;color:var(--text-low)">基于知识库推送</div></div><div class="toggle on" onclick="this.classList.toggle('on')"></div></div>
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 4px"><div style="flex:1"><div style="font-size:13px">数据加密存储</div><div style="font-size:10px;color:var(--text-low)">AES-256加密</div></div><div class="toggle on" onclick="this.classList.toggle('on')"></div></div>
+    </div>
+    <div class="land"><span class="pri r">规格</span>方toggle，开启磷火色。</div>
+  </article>
+  <article class="ccard bp bp-d2">
+    <span class="num">H-03</span>
+    <div class="t"><i class="dot"></i>主题切换器</div>
+    <div style="display:flex;gap:8px">
+      <button style="flex:1;padding:12px;border-radius:2px;border:2px solid var(--primary);background:var(--primary-soft);display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer">
+        <div style="width:100%;height:32px;background:linear-gradient(135deg,#0B1116,#16242A);border-radius:2px;position:relative;overflow:hidden"><div style="position:absolute;top:4px;left:4px;width:20px;height:4px;background:#6CC6B8;border-radius:1px"></div><div style="position:absolute;top:12px;left:4px;width:30px;height:3px;background:#22323A;border-radius:1px"></div></div>
+        <span style="font-family:var(--font-cute);font-size:11px;color:var(--primary)">深渊</span>
+      </button>
+      <button style="flex:1;padding:12px;border-radius:2px;border:1px solid var(--line);background:var(--bg-panel);display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;transition:border-color .3s" onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='var(--line)'">
+        <div style="width:100%;height:32px;background:linear-gradient(135deg,#F3F6F5,#E2ECE9);border-radius:2px;position:relative;overflow:hidden"><div style="position:absolute;top:4px;left:4px;width:20px;height:4px;background:#2E9D8F;border-radius:1px"></div><div style="position:absolute;top:12px;left:4px;width:30px;height:3px;background:#CBD9D6;border-radius:1px"></div></div>
+        <span style="font-family:var(--font-cute);font-size:11px;color:var(--text-mid)">碧涛</span>
+      </button>
+    </div>
+    <div class="land"><span class="pri r">规格</span>双主题预览卡，选中磷火边框。点击切换全局主题。</div>
+  </article>
+  <article class="ccard bp bp-d3">
+    <span class="num">H-04</span>
+    <div class="t"><i class="dot"></i>数据存储管理</div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:var(--bg-inset);border-radius:2px"><div><div style="font-size:13px">本地存储</div><div style="font-size:10px;color:var(--text-low)">已加密 · AES-256</div></div><div style="text-align:right"><div style="font-family:var(--font-cute);font-size:16px;color:var(--primary)">2.4<span style="font-size:10px">GB</span></div><div style="font-size:10px;color:var(--text-low)">/ 无限制</div></div></div>
+      <div style="display:flex;gap:8px"><button class="btn sec sm" style="flex:1"><svg class="icon" style="width:12px;height:12px"><use href="#i-cloud"/></svg>导出备份</button><button class="btn sec sm" style="flex:1"><svg class="icon" style="width:12px;height:12px"><use href="#i-folder"/></svg>导入数据</button><button class="btn danger sm" style="flex:1"><svg class="icon" style="width:12px;height:12px"><use href="#i-trash"/></svg>清空</button></div>
+    </div>
+    <div class="land"><span class="pri r">规格</span>存储用量+加密状态+导出/导入/清空操作。</div>
+  </article>
+  <article class="ccard bp bp-d4" style="grid-column:span 2">
+    <span class="num">H-05</span>
+    <div class="t"><i class="dot"></i>内置主题切换器</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+      <a href="UI组件画廊-v2.html" style="text-decoration:none;display:block;border:1px solid var(--line);border-radius:2px;overflow:hidden;cursor:pointer;transition:transform .25s,border-color .3s" onmouseover="this.style.transform='translateY(-3px)';this.style.borderColor='var(--primary)'" onmouseout="this.style.transform='';this.style.borderColor='var(--line)'">
+        <div style="height:70px;background:linear-gradient(135deg,#E8F5E9 0%,#FFF8E1 50%,#FCE4EC 100%);position:relative;overflow:hidden">
+          <div style="position:absolute;top:8px;left:8px;width:24px;height:14px;background:#A8E6CF;border-radius:4px"></div>
+          <div style="position:absolute;top:8px;right:8px;width:20px;height:20px;background:#FFD3B6;border-radius:50%"></div>
+          <div style="position:absolute;bottom:8px;left:8px;right:8px;height:8px;background:#FFAAA5;border-radius:4px;opacity:.6"></div>
+        </div>
+        <div style="padding:10px 12px;background:var(--bg-panel)"><div style="font-family:var(--font-cute);font-size:13px;color:var(--text-hi);letter-spacing:1px">奶油糖果</div><div style="font-size:10px;color:var(--text-low);margin-top:2px">治愈软萌 · 薄荷绿</div></div>
+      </a>
+      <a href="UI组件画廊-国风雅集.html" style="text-decoration:none;display:block;border:1px solid var(--line);border-radius:2px;overflow:hidden;cursor:pointer;transition:transform .25s,border-color .3s" onmouseover="this.style.transform='translateY(-3px)';this.style.borderColor='var(--primary)'" onmouseout="this.style.transform='';this.style.borderColor='var(--line)'">
+        <div style="height:70px;background:linear-gradient(135deg,#F5F0E6 0%,#EDE4D3 100%);position:relative;overflow:hidden">
+          <div style="position:absolute;top:8px;left:8px;width:24px;height:14px;background:#C0392B;border-radius:2px"></div>
+          <div style="position:absolute;top:10px;right:10px;width:18px;height:18px;background:#C9A96E;border-radius:2px;transform:rotate(15deg)"></div>
+          <div style="position:absolute;bottom:8px;left:8px;right:8px;height:6px;background:#2C3E50;border-radius:1px;opacity:.4"></div>
+        </div>
+        <div style="padding:10px 12px;background:var(--bg-panel)"><div style="font-family:var(--font-cute);font-size:13px;color:var(--text-hi);letter-spacing:1px">国风雅集</div><div style="font-size:10px;color:var(--text-low);margin-top:2px">中国古典 · 朱砂红</div></div>
+      </a>
+      <div style="border:2px solid var(--primary);border-radius:2px;overflow:hidden;box-shadow:var(--glow);position:relative">
+        <div style="position:absolute;top:6px;right:6px;background:var(--primary);color:var(--on-primary);font-family:var(--font-cute);font-size:9px;padding:1px 8px;border-radius:2px;z-index:2;letter-spacing:1px">使用中</div>
+        <div style="height:70px;background:linear-gradient(135deg,#0B1116 0%,#16242A 100%);position:relative;overflow:hidden">
+          <div style="position:absolute;top:8px;left:8px;width:24px;height:14px;background:#6CC6B8;border-radius:2px;box-shadow:0 0 6px rgba(108,198,184,.5)"></div>
+          <div style="position:absolute;top:10px;right:10px;width:16px;height:16px;background:#6CC6B8;border-radius:50%;opacity:.6;box-shadow:0 0 8px rgba(108,198,184,.4)"></div>
+          <div style="position:absolute;bottom:8px;left:8px;right:8px;height:6px;background:#C96A5F;border-radius:1px;opacity:.5"></div>
+        </div>
+        <div style="padding:10px 12px;background:var(--bg-panel)"><div style="font-family:var(--font-cute);font-size:13px;color:var(--primary);letter-spacing:1px">深渊档案</div><div style="font-size:10px;color:var(--text-low);margin-top:2px">海洋神秘 · 磷火青</div></div>
+      </div>
+    </div>
+    <div class="land"><span class="pri r">规格</span>三栏主题预览卡，配色缩略图+名称+风格标签。当前主题磷火边框+辉光+「使用中」角标。点击跳转切换，配置写入本地localStorage。</div>
+  </article>
+  </div>
+</section>
+
+<!-- I 区 · 通用 -->
+<section>
+  <div class="sec-head"><h2><svg class="icon sec-icon"><use href="#i-grid"/></svg>通用组件</h2><span class="badge">06</span><span class="note">按钮/输入/空状态</span></div>
+  <div class="grid">
+  <article class="ccard bp">
+    <span class="num">I-01</span>
+    <div class="t"><i class="dot"></i>按钮体系</div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn pri">主要</button><button class="btn sec">次要</button><button class="btn txt">文字</button><button class="btn danger">危险</button><button class="btn gold">旧金</button></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn pri sm">小</button><button class="btn pri">默认</button><button class="btn pri lg">大</button><button class="btn pri disabled">禁用</button></div>
+    </div>
+    <div class="land"><span class="pri r">规格</span>5类型+3尺寸+棱角，hover磷火辉光。</div>
+  </article>
+  <article class="ccard bp bp-d1">
+    <span class="num">I-02</span>
+    <div class="t"><i class="dot"></i>输入框</div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div class="input-wrap"><input placeholder="默认输入框"></div>
+      <div class="input-wrap has-icon"><svg class="icon input-icon"><use href="#i-search"/></svg><input placeholder="带图标搜索"></div>
+      <div class="input-wrap"><input value="错误输入" style="border-color:var(--strawberry);box-shadow:0 0 0 2px var(--straw-soft)"><div style="font-size:10px;color:var(--straw-ink);margin-top:4px">不能为空</div></div>
+    </div>
+    <div class="land"><span class="pri r">规格</span>默认/带图标/错误。focus磷火边框。</div>
+  </article>
+  <article class="ccard bp bp-d2">
+    <span class="num">I-03</span>
+    <div class="t"><i class="dot"></i>空状态</div>
+    <div class="empty-state">
+      <svg class="eicon" viewBox="0 0 64 64"><g fill="none" stroke="var(--text-low)" stroke-width="1.5"><path d="M32 8 Q20 8 16 20 Q12 32 20 40 Q24 48 32 48 Q40 48 44 40 Q52 32 48 20 Q44 8 32 8 Z"/><line x1="20" y1="52" x2="44" y2="52"/><circle cx="26" cy="28" r="2" fill="var(--text-low)"/><circle cx="38" cy="28" r="2" fill="var(--text-low)"/></g></svg>
+      <div style="font-family:var(--font-cute);font-size:15px;color:var(--text-mid);margin-bottom:4px;letter-spacing:1px">档案未唤醒</div>
+      <div style="font-size:11px;color:var(--text-low);margin-bottom:12px">去写第一章，开启观测</div>
+      <button class="btn pri sm"><svg class="icon" style="width:12px"><use href="#i-plus"/></svg>新建档案</button>
+    </div>
+    <div class="land"><span class="pri y">规格</span>沉没石碑SVG+低语+CTA。</div>
+  </article>
+  <article class="ccard bp bp-d3">
+    <span class="num">I-04</span>
+    <div class="t"><i class="dot"></i>Toast通知</div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div class="toast success"><span class="ticon"><svg class="icon" style="width:12px;height:12px"><use href="#i-check"/></svg></span>档案已保存至本地</div>
+      <div class="toast error"><span class="ticon"><svg class="icon" style="width:12px;height:12px"><use href="#i-info"/></svg></span>同步失败，将在联网后重试</div>
+      <div class="toast info"><span class="ticon"><svg class="icon" style="width:12px;height:12px"><use href="#i-info"/></svg></span>深海精灵已解析3篇复盘</div>
+    </div>
+    <div class="land"><span class="pri r">规格</span>方角Toast，成功磷火/错误血月/信息冰蓝。顶部滑入。</div>
+  </article>
+  <article class="ccard bp bp-d4">
+    <span class="num">I-05</span>
+    <div class="t"><i class="dot"></i>骨架屏加载</div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;gap:10px;align-items:center"><div class="skeleton" style="width:40px;height:40px;border-radius:2px"></div><div style="flex:1;display:flex;flex-direction:column;gap:6px"><div class="skeleton" style="height:12px;width:60%"></div><div class="skeleton" style="height:10px;width:40%"></div></div></div>
+      <div class="skeleton" style="height:14px;width:80%"></div>
+      <div class="skeleton" style="height:14px;width:90%"></div>
+      <div class="skeleton" style="height:14px;width:50%"></div>
+    </div>
+    <div class="land"><span class="pri r">规格</span>shimmer微光扫过，方角占位。加载≤1.5s。</div>
+  </article>
+  <article class="ccard bp bp-d5">
+    <span class="num">I-06</span>
+    <div class="t"><i class="dot"></i>确认对话框</div>
+    <div style="border:1px solid var(--line);border-radius:2px;overflow:hidden;box-shadow:var(--shadow-raise)">
+      <div style="padding:16px 18px;border-bottom:1px solid var(--line)"><div style="font-family:var(--font-cute);font-size:15px;color:var(--text-hi);letter-spacing:1px;font-weight:600">确认清空所有数据？</div><div style="font-size:12px;color:var(--text-mid);margin-top:6px;line-height:1.7">此操作不可撤销。建议先导出备份。</div></div>
+      <div style="display:flex;gap:8px;padding:12px 18px;justify-content:flex-end;background:var(--bg-inset)"><button class="btn sec sm">取消</button><button class="btn danger sm">确认清空</button></div>
+    </div>
+    <div class="land"><span class="pri r">规格</span>模态对话框，方角，危险操作血月按钮。背景遮罩。</div>
+  </article>
+  </div>
+</section>
+
+<!-- J 区 · 数据可视化 -->
+<section>
+  <div class="sec-head"><h2><svg class="icon sec-icon"><use href="#i-target"/></svg>数据观测</h2><span class="badge">04</span><span class="note">统计卡+趋势图</span></div>
+  <div class="grid">
+  <article class="ccard bp">
+    <span class="num">J-01</span>
+    <div class="t"><i class="dot"></i>统计卡</div>
+    <div style="background:linear-gradient(135deg,var(--primary-soft),var(--lilac-soft));border-radius:2px;padding:18px;position:relative;overflow:hidden;border:1px solid rgba(127,212,201,.2)">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div><div style="font-size:11px;color:var(--text-mid);font-family:var(--font-cute);letter-spacing:1px">本周专注</div><div style="font-family:var(--font-cute);font-size:32px;margin-top:4px;font-variant-numeric:tabular-nums;font-weight:600" data-count="24">0</div><div style="font-size:11px;color:var(--primary-ink);margin-top:2px">↑ 4.2小时</div></div>
+        <div style="width:60px;height:40px;display:flex;align-items:flex-end;gap:3px"><div style="flex:1;background:var(--primary);border-radius:2px 2px 0 0;height:40%;box-shadow:0 0 4px rgba(127,212,201,.4)"></div><div style="flex:1;background:var(--primary);border-radius:2px 2px 0 0;height:65%"></div><div style="flex:1;background:var(--primary);border-radius:2px 2px 0 0;height:80%"></div><div style="flex:1;background:var(--lilac);border-radius:2px 2px 0 0;height:95%"></div></div>
+      </div>
+    </div>
+    <div class="land"><span class="pri r">规格</span>渐变背景+大数字+迷你柱。数字翻滚。</div>
+  </article>
+  <article class="ccard bp bp-d1">
+    <span class="num">J-02</span>
+    <div class="t"><i class="dot"></i>趋势折线图</div>
+    <div style="padding:10px 0">
+      <svg viewBox="0 0 280 100" width="100%" height="100" style="overflow:visible">
+        <defs><linearGradient id="abyssArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--primary)" stop-opacity=".2"/><stop offset="100%" stop-color="var(--primary)" stop-opacity="0"/></linearGradient></defs>
+        <g stroke="var(--line)" stroke-width="1" opacity=".4"><line x1="0" y1="25" x2="280" y2="25"/><line x1="0" y1="50" x2="280" y2="50"/><line x1="0" y1="75" x2="280" y2="75"/></g>
+        <path d="M0,70 L40,55 L80,60 L120,40 L160,45 L200,25 L240,30 L280,15 L280,100 L0,100 Z" fill="url(#abyssArea)"/>
+        <path d="M0,70 L40,55 L80,60 L120,40 L160,45 L200,25 L240,30 L280,15" fill="none" stroke="var(--primary)" stroke-width="2" style="stroke-dasharray:400;stroke-dashoffset:400;animation:draw-line 1.5s ease-out forwards;filter:drop-shadow(0 0 4px rgba(127,212,201,.5))"/>
+        <g fill="var(--primary)"><circle cx="120" cy="40" r="3.5"/><circle cx="280" cy="15" r="4.5" stroke="var(--bg-panel)" stroke-width="2"/></g>
+      </svg>
+    </div>
+    <div class="land"><span class="pri r">规格</span>SVG折线+磷火辉光+潮线绘制动画。</div>
+  </article>
+  <article class="ccard bp bp-d2">
+    <span class="num">J-03</span>
+    <div class="t"><i class="dot"></i>周历热力图</div>
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px">
+      <div style="text-align:center;font-size:9px;color:var(--text-low);padding:2px">一</div><div style="text-align:center;font-size:9px;color:var(--text-low);padding:2px">二</div><div style="text-align:center;font-size:9px;color:var(--text-low);padding:2px">三</div><div style="text-align:center;font-size:9px;color:var(--text-low);padding:2px">四</div><div style="text-align:center;font-size:9px;color:var(--text-low);padding:2px">五</div><div style="text-align:center;font-size:9px;color:var(--text-low);padding:2px">六</div><div style="text-align:center;font-size:9px;color:var(--text-low);padding:2px">日</div>
+      <div style="aspect-ratio:1;border-radius:2px;background:var(--primary);opacity:.9;box-shadow:0 0 4px rgba(108,198,184,.4)"></div><div style="aspect-ratio:1;border-radius:2px;background:var(--primary);opacity:.6"></div><div style="aspect-ratio:1;border-radius:2px;background:var(--primary);opacity:.3"></div><div style="aspect-ratio:1;border-radius:2px;background:var(--primary);opacity:.8;box-shadow:0 0 4px rgba(108,198,184,.3)"></div><div style="aspect-ratio:1;border-radius:2px;background:var(--primary);opacity:1;box-shadow:0 0 6px rgba(108,198,184,.5)"></div><div style="aspect-ratio:1;border-radius:2px;background:var(--bg-inset)"></div><div style="aspect-ratio:1;border-radius:2px;background:var(--primary);opacity:.5"></div>
+      <div style="aspect-ratio:1;border-radius:2px;background:var(--primary);opacity:.7"></div><div style="aspect-ratio:1;border-radius:2px;background:var(--primary);opacity:.4"></div><div style="aspect-ratio:1;border-radius:2px;background:var(--primary);opacity:.9;box-shadow:0 0 4px rgba(108,198,184,.4)"></div><div style="aspect-ratio:1;border-radius:2px;background:var(--bg-inset)"></div><div style="aspect-ratio:1;border-radius:2px;background:var(--primary);opacity:.6"></div><div style="aspect-ratio:1;border-radius:2px;background:var(--primary);opacity:.3"></div><div style="aspect-ratio:1;border-radius:2px;background:var(--primary);opacity:.8"></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;margin-top:10px;font-size:9px;color:var(--text-low)"><span>少</span><div style="aspect-ratio:1;width:10px;border-radius:1px;background:var(--bg-inset)"></div><div style="aspect-ratio:1;width:10px;border-radius:1px;background:var(--primary);opacity:.3"></div><div style="aspect-ratio:1;width:10px;border-radius:1px;background:var(--primary);opacity:.6"></div><div style="aspect-ratio:1;width:10px;border-radius:1px;background:var(--primary);opacity:.9"></div><span>多</span></div>
+    <div class="land"><span class="pri r">规格</span>7列方格格，磷火透明度表示强度，hover放大。</div>
+  </article>
+  <article class="ccard bp bp-d3">
+    <span class="num">J-04</span>
+    <div class="t"><i class="dot"></i>能力雷达图</div>
+    <div style="display:flex;align-items:center;gap:16px">
+      <svg viewBox="0 0 120 120" width="110" height="110">
+        <g fill="none" stroke="var(--line)" stroke-width="1"><polygon points="60,15 97,37 97,83 60,105 23,83 23,37"/><polygon points="60,30 84,44 84,76 60,90 36,76 36,44"/><polygon points="60,45 72,52 72,68 60,75 48,68 48,52"/></g>
+        <g stroke="var(--line)" stroke-width=".5"><line x1="60" y1="15" x2="60" y2="105"/><line x1="23" y1="37" x2="97" y2="83"/><line x1="97" y1="37" x2="23" y2="83"/></g>
+        <polygon points="60,25 88,42 85,78 60,92 35,75 38,40" fill="var(--primary)" opacity=".25" stroke="var(--primary)" stroke-width="1.5" style="filter:drop-shadow(0 0 4px rgba(108,198,184,.4))"/>
+        <g fill="var(--text-mid)" font-size="8" font-family="var(--font-cute)"><text x="60" y="10" text-anchor="middle">专注</text><text x="105" y="40" text-anchor="start">学习</text><text x="105" y="88" text-anchor="start">创造</text><text x="60" y="116" text-anchor="middle">复盘</text><text x="15" y="88" text-anchor="end">沟通</text><text x="15" y="40" text-anchor="end">执行</text></g>
+      </svg>
+      <div style="flex:1;font-size:11px;line-height:2"><div style="display:flex;justify-content:space-between"><span>专注</span><span style="color:var(--primary);font-family:var(--font-cute)">85%</span></div><div style="display:flex;justify-content:space-between"><span>学习</span><span style="color:var(--primary);font-family:var(--font-cute)">72%</span></div><div style="display:flex;justify-content:space-between"><span>创造</span><span style="color:var(--gold-ink);font-family:var(--font-cute)">60%</span></div><div style="display:flex;justify-content:space-between"><span>复盘</span><span style="color:var(--primary);font-family:var(--font-cute)">90%</span></div></div>
+    </div>
+    <div class="land"><span class="pri r">规格</span>6维雷达，磷火填充+辉光，右侧数值列表。</div>
+  </article>
+  </div>
+</section>
+
+</main>
+
+<script>
+// 主题切换：深渊（默认暗色）↔ 碧涛（亮色）
+const themeToggle = document.getElementById('themeToggle');
+const themeLabel = document.getElementById('themeLabel');
+themeToggle.addEventListener('click', () => {
+  const html = document.documentElement;
+  const isBitao = html.getAttribute('data-theme') === 'bitao';
+  if (isBitao) {
+    html.removeAttribute('data-theme');
+    themeLabel.textContent = '碧涛';
+    themeToggle.querySelector('use').setAttribute('href', '#i-sun');
+  } else {
+    html.setAttribute('data-theme', 'bitao');
+    themeLabel.textContent = '深渊';
+    themeToggle.querySelector('use').setAttribute('href', '#i-moon');
+  }
+});
+// 数字翻滚
+const countObserver = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      const el = entry.target; const target = parseInt(el.dataset.count);
+      let current = 0; const step = Math.max(1, Math.ceil(target / 30));
+      const timer = setInterval(() => { current += step; if (current >= target) { current = target; clearInterval(timer); } el.textContent = current; }, 30);
+      countObserver.unobserve(el);
+    }
+  });
+}, { threshold: 0.3 });
+document.querySelectorAll('[data-count]').forEach(el => countObserver.observe(el));
+// 进度环
+const ringObserver = new IntersectionObserver((entries) => {
+  entries.forEach(entry => { if (entry.isIntersecting) { entry.target.classList.add('visible'); ringObserver.unobserve(entry.target); } });
+}, { threshold: 0.3 });
+document.querySelectorAll('.ring-wrap').forEach(el => ringObserver.observe(el));
+// 桌宠动作
+const petActions = ['idle','thinking','celebrating','worried','pointing'];
+const petActionNames = {idle:'漂浮 · 待机',thinking:'凝视 · 思考',celebrating:'绽放 · 庆祝',worried:'收缩 · 担心',pointing:'指引 · 方向'};
+let petActionIdx = 0;
+function setPetAction(action) {
+  const pet = document.getElementById('petChar');
+  const label = document.getElementById('petActionLabel');
+  if (pet) { pet.setAttribute('class', 'pet ' + action); }
+  if (label) { label.textContent = petActionNames[action] || action; }
+  petActionIdx = petActions.indexOf(action);
+}
+document.getElementById('petActionBtn')?.addEventListener('click', () => {
+  petActionIdx = (petActionIdx + 1) % petActions.length;
+  setPetAction(petActions[petActionIdx]);
+});
+
+// 打字机效果
+const typingText = '已读取你最近3篇复盘，发现你在「任务拆解」常卡壳。要我帮你拆解吗？';
+let typingIdx = 0;
+const typingEl = document.getElementById('typingDemo');
+function typeWriter() {
+  if (!typingEl) return;
+  if (typingIdx < typingText.length) {
+    typingEl.innerHTML = typingText.substring(0, typingIdx + 1) + '<span class="typing-cursor" style="display:inline-block;width:2px;height:14px;background:var(--primary);margin-left:1px;vertical-align:-2px;animation:typing-cursor .8s infinite"></span>';
+    typingIdx++;
+    setTimeout(typeWriter, 40 + Math.random() * 30);
+  } else {
+    typingEl.innerHTML = typingText + '<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap"><button class="btn sm" style="background:var(--mint-soft);color:var(--mint-ink);height:26px;padding:0 10px;font-size:10px">拆解</button><button class="btn sm pill" style="height:26px;padding:0 10px;font-size:10px">不用</button></div>';
+  }
+}
+setTimeout(typeWriter, 1500);
+
+// 情绪选择
+document.querySelectorAll('.mood').forEach(m => {
+  m.addEventListener('click', () => {
+    document.querySelectorAll('.mood').forEach(x => { x.classList.remove('selected'); x.style.transform=''; x.querySelector('div:last-child').style.color='var(--text-low)'; x.querySelector('div:last-child').style.fontWeight=''; });
+    m.classList.add('selected');
+    m.style.transform='scale(1.15)';
+    m.querySelector('div:last-child').style.color='var(--primary)';
+    m.querySelector('div:last-child').style.fontWeight='600';
+  });
+});
+</script>
+</body>
+</html>

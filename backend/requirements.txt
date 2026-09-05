@@ -1,0 +1,15 @@
+# 启明星系统后端依赖（零安装：本机已验证已装同版本）
+fastapi==0.141.1
+uvicorn[standard]==0.52.4
+SQLAlchemy==2.0.52
+pydantic==2.13.4
+pydantic-settings==2.15.0
+alembic==1.19.1
+loguru==0.7.3
+httpx==0.28.1
+python-multipart==0.0.32
+
+# 开发/测试（可选，本机未装，按需安装）
+# pytest==8.3.3
+# ruff==0.6.2
+# pywin32==306            # Windows DPAPI 加密（API Key 加密用，缺省时安全降级）

@@ -1,0 +1,146 @@
+// ============================================================
+// 全局样式：reset + 奶油底纹 + 基础排版
+// 依赖: variables.scss（在 main.ts 中 @use 引入，此处只用 var()）
+// ============================================================
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+}
+
+body {
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  line-height: 1.6;
+  color: var(--text-hi);
+  background-color: var(--bg-cream);
+  /* 主题化波点底纹：--dot 由各主题包定义不同色值 */
+  background-image: radial-gradient(var(--dot) 1px, transparent 1px);
+  background-size: 24px 24px;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  transition: background-color 0.4s var(--ease-soft), color 0.4s var(--ease-soft);
+  overflow: hidden;
+}
+
+::selection {
+  background: var(--primary-soft);
+}
+
+a {
+  color: var(--sky-ink);
+  text-decoration: none;
+  &:hover {
+    color: var(--primary);
+  }
+}
+
+button {
+  font-family: inherit;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: inherit;
+}
+
+input,
+textarea,
+select {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-cute);
+  color: var(--text-hi);
+}
+
+ul, ol {
+  list-style: none;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+// ---------- 滚动条（糖果圆润） ----------
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: var(--radius-pill);
+  &:hover {
+    background: var(--text-low);
+  }
+}
+
+// ---------- 键盘焦点环（可访问性） ----------
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+// ---------- 数字对齐 ----------
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+// ---------- 动效降级（硬约束） ----------
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+// ---------- 响应式断点（PRD §19.2：最低1366×768） ----------
+@media (max-width: 1366px) {
+  :root {
+    --space-6: 20px;
+    --space-8: 28px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .shell__sidebar {
+    width: 56px !important;
+  }
+}
+
+// ---------- 高DPI适配（PRD §19.2：125%/150%缩放不模糊） ----------
+@media (min-resolution: 120dpi) {
+  /* 确保矢量图标和CSS绘制清晰，位图使用2x资源 */
+  .app-icon {
+    shape-rendering: geometricPrecision;
+  }
+}
+
+// ---------- 打印样式 ----------
+@media print {
+  .titlebar,
+  .shell__sidebar,
+  .header {
+    display: none !important;
+  }
+}

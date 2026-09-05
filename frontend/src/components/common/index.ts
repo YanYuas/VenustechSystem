@@ -1,0 +1,21 @@
+// ============================================================
+// 基础组件统一导出
+// 用法: import { BaseButton, BaseCard } from '@/components/common'
+// ============================================================
+export { default as AppIcon } from './AppIcon.vue'
+export { default as BaseButton } from './BaseButton.vue'
+export { default as BaseCard } from './BaseCard.vue'
+export { default as BaseConfirm } from './BaseConfirm.vue'
+export { default as BaseDrawer } from './BaseDrawer.vue'
+export { default as BaseEmpty } from './BaseEmpty.vue'
+export { default as BaseInput } from './BaseInput.vue'
+export { default as BaseModal } from './BaseModal.vue'
+export { default as BasePagination } from './BasePagination.vue'
+export { default as BaseSelect } from './BaseSelect.vue'
+export { default as BaseSkeleton } from './BaseSkeleton.vue'
+export { default as BaseSwitch } from './BaseSwitch.vue'
+export { default as BaseTag } from './BaseTag.vue'
+export { default as BaseToast } from './BaseToast.vue'
+export { default as BaseTooltip } from './BaseTooltip.vue'
+export { default as ModalHost } from './ModalHost.vue'
+export { default as ToastItem } from './ToastItem.vue'

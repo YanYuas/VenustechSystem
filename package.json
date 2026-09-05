@@ -1,0 +1,14 @@
+{
+  "name": "qimingxing-server",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "启明星系统统一 Web 服务",
+  "scripts": {
+    "start": "node server.js",
+    "start:dev": "node server.js"
+  },
+  "dependencies": {
+    "http-proxy": "^1.18.1"
+  }
+}
