@@ -1,4 +1,0 @@
-Usage: python -m uvicorn [OPTIONS] APP
-Try 'python -m uvicorn --help' for help.
-
-Error: Got unexpected extra argument (System\backend\.uvicorn.log)
