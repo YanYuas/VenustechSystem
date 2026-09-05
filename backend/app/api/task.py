@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user, get_db
 from app.core.response import success
 from app.schemas.task import (
+    BatchTaskRequest,
     CreateSubtaskRequest,
     CreateTaskRequest,
     UpdateSubtaskRequest,
@@ -30,6 +31,16 @@ router = APIRouter(prefix="/tasks", tags=["tasks"])
 
 def _svc(db: Session) -> TaskService:
     return TaskService(db)
+
+
+@router.post("/batch")
+def batch_tasks(
+    data: BatchTaskRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """批量操作（M02 F07）：complete / delete / move_project / set_priority。"""
+    return success(_svc(db).batch(user.id, data))
 
 
 @router.get("")
@@ -129,3 +140,34 @@ def delete_subtask(
 ):
     _svc(db).delete_subtask(user.id, task_id, sub_id)
     return success()
+
+
+# ---------- 番茄钟（M02 F08）----------
+# 注意：路径用 focus-sessions，与现有 /{id}/focus（设为今日最重要）区分
+
+
+@router.post("/{task_id}/focus-sessions/start")
+def focus_start(
+    task_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    return success(_svc(db).focus_start(user.id, task_id))
+
+
+@router.post("/focus-sessions/{session_id}/stop")
+def focus_stop(
+    session_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    return success(_svc(db).focus_stop(user.id, session_id))
+
+
+@router.get("/{task_id}/focus-sessions")
+def list_focus_sessions(
+    task_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    return success(_svc(db).focus_sessions(user.id, task_id))

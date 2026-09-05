@@ -21,8 +21,19 @@ export interface Task {
   subtasks_count: number
   subtasks_completed: number
   completed_at: string | null
+  // ---------- M02 深度开发 ----------
+  reminder_time: string | null
+  recurrence: RecurrenceRule | null
+  focus_duration: number
   created_at: string
   updated_at: string
+}
+
+/** 重复规则（M02 F05）：{type, interval, days} */
+export interface RecurrenceRule {
+  type: 'daily' | 'weekly' | 'monthly'
+  interval?: number
+  days?: number[]
 }
 
 export interface Subtask {
@@ -54,6 +65,8 @@ export interface CreateTaskRequest {
   project_tag?: string
   project_id?: string
   due_date?: string
+  reminder_time?: string
+  recurrence?: RecurrenceRule
 }
 
 export interface UpdateTaskRequest {
@@ -64,6 +77,37 @@ export interface UpdateTaskRequest {
   project_tag?: string
   project_id?: string
   due_date?: string
+  /** null 表示清除提醒（一次性提醒触发后清除） */
+  reminder_time?: string | null
+  recurrence?: RecurrenceRule | null
+}
+
+// ---------- 批量操作（M02 F07） ----------
+
+export type BatchAction = 'complete' | 'delete' | 'move_project' | 'set_priority'
+
+export interface BatchTaskRequest {
+  task_ids: string[]
+  action: BatchAction
+  project_id?: string
+  priority?: TaskPriority
+}
+
+export interface BatchTaskResult {
+  affected: number
+  failed: number
+}
+
+// ---------- 番茄钟（M02 F08） ----------
+
+export interface FocusSession {
+  id: string
+  task_id: string | null
+  start_time: string
+  end_time: string | null
+  duration: number
+  note: string | null
+  created_at: string
 }
 
 export interface TodayStats {
