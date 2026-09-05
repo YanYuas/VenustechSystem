@@ -1,8 +1,8 @@
 <script setup lang="ts">
 // ============================================================
-// 项目管理页面 —— 列表/创建/编辑/删除
+// 项目管理页面 —— 列表/筛选/创建/编辑/归档恢复/删除（M06 F04）
 // ============================================================
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { projectApi } from '@/api'
 import { useToast } from '@/composables/useToast'
 import { useModal } from '@/composables/useModal'
@@ -30,6 +30,20 @@ const statusOptions = [
   { label: '已完成', value: 'completed' },
   { label: '已归档', value: 'archived' },
 ]
+
+// 筛选 Tab（M06 F04：全部/进行中/已归档）
+type FilterKey = 'all' | 'active' | 'archived'
+const FILTER_TABS: Array<{ key: FilterKey; label: string }> = [
+  { key: 'all', label: '全部' },
+  { key: 'active', label: '进行中' },
+  { key: 'archived', label: '已归档' },
+]
+const filter = ref<FilterKey>('all')
+const filtered = computed(() => {
+  if (filter.value === 'all') return projects.value
+  if (filter.value === 'archived') return projects.value.filter((p) => p.status === 'archived')
+  return projects.value.filter((p) => p.status !== 'archived')
+})
 
 async function load() {
   loading.value = true
@@ -96,6 +110,28 @@ async function onSubmit() {
   }
 }
 
+// 归档/恢复（M06 F04）
+async function onArchiveToggle(p: Project) {
+  try {
+    if (p.status === 'archived') {
+      await projectApi.restore(p.id)
+      toast.success('项目已恢复', p.name)
+    } else {
+      const ok = await modal.confirm({
+        title: '归档项目',
+        message: `归档「${p.name}」后其任务将变为只读，可随时恢复。`,
+        confirmText: '归档',
+      })
+      if (!ok) return
+      await projectApi.archive(p.id)
+      toast.success('项目已归档', p.name)
+    }
+    await load()
+  } catch {
+    toast.error('操作失败')
+  }
+}
+
 async function onDelete(p: Project) {
   const ok = await modal.confirm({
     title: '删除项目',
@@ -110,6 +146,11 @@ async function onDelete(p: Project) {
   } catch {
     toast.error('删除失败')
   }
+}
+
+// M06 F01：点击项目进入详情页
+function goDetail(p: Project) {
+  router.push(`/projects/${p.id}`)
 }
 
 function goTasks(p: Project) {
@@ -128,15 +169,28 @@ function statusLabel(s: ProjectStatus) {
       <BaseButton variant="primary" icon="plus" @click="openCreate">新建项目</BaseButton>
     </div>
 
+    <!-- 筛选 Tab（M06 F04） -->
+    <div class="projects__tabs">
+      <button
+        v-for="t in FILTER_TABS" :key="t.key"
+        class="projects__tab" :class="{ 'is-active': filter === t.key }"
+        @click="filter = t.key"
+      >{{ t.label }}</button>
+    </div>
+
     <BaseCard>
       <template v-if="loading">
         <BaseSkeleton variant="list" :rows="4" />
       </template>
-      <template v-else-if="projects.length">
+      <template v-else-if="filtered.length">
         <ul class="projects__list">
-          <li v-for="p in projects" :key="p.id" class="projects__item">
+          <li
+            v-for="p in filtered" :key="p.id"
+            class="projects__item"
+            :class="{ 'is-archived-item': p.status === 'archived' }"
+          >
             <div class="projects__color-dot" :style="{ background: p.color }" />
-            <div class="projects__info" @click="goTasks(p)">
+            <div class="projects__info" @click="goDetail(p)">
               <span class="projects__name">{{ p.name }}</span>
               <span v-if="p.description" class="projects__desc">{{ p.description }}</span>
             </div>
@@ -151,8 +205,18 @@ function statusLabel(s: ProjectStatus) {
             </div>
             <span class="projects__status" :class="`is-${p.status}`">{{ statusLabel(p.status) }}</span>
             <div class="projects__ops">
+              <button class="projects__op" title="查看任务" @click.stop="goTasks(p)">
+                <AppIcon name="check" :size="16" />
+              </button>
               <button class="projects__op" title="编辑" @click.stop="openEdit(p)">
                 <AppIcon name="edit" :size="16" />
+              </button>
+              <button
+                class="projects__op"
+                :title="p.status === 'archived' ? '恢复项目' : '归档项目'"
+                @click.stop="onArchiveToggle(p)"
+              >
+                <AppIcon :name="p.status === 'archived' ? 'refresh' : 'folder'" :size="16" />
               </button>
               <button class="projects__op projects__op--danger" title="删除" @click.stop="onDelete(p)">
                 <AppIcon name="trash" :size="16" />
@@ -162,7 +226,7 @@ function statusLabel(s: ProjectStatus) {
         </ul>
       </template>
       <template v-else>
-        <BaseEmpty title="还没有项目" description="创建第一个项目，把任务组织起来">
+        <BaseEmpty title="没有符合条件的项目" description="换个筛选条件，或创建第一个项目">
           <template #action>
             <BaseButton variant="primary" icon="plus" @click="openCreate">新建项目</BaseButton>
           </template>
@@ -218,6 +282,18 @@ function statusLabel(s: ProjectStatus) {
     font-size: var(--text-2xl);
     font-weight: 700;
   }
+  &__tabs { display: flex; gap: var(--space-2); }
+  &__tab {
+    padding: 6px 16px;
+    border-radius: var(--radius-pill);
+    border: 1px solid var(--line);
+    background: var(--bg-panel);
+    color: var(--text-mid);
+    font-size: var(--text-sm);
+    cursor: pointer;
+    transition: all 0.15s var(--ease-soft);
+    &.is-active { background: var(--primary); border-color: var(--primary); color: #fff; }
+  }
   &__list {
     list-style: none;
     display: flex;
@@ -231,6 +307,14 @@ function statusLabel(s: ProjectStatus) {
     border-bottom: 1px solid var(--line);
     &:last-child { border-bottom: none; }
     &:hover { background: var(--bg-soft, rgba(0,0,0,0.02)); }
+    /* 归档项目整行置灰（M06 F04） */
+    &.is-archived-item {
+      .projects__name, .projects__desc, .projects__count {
+        opacity: 0.5;
+      }
+      .projects__color-dot { opacity: 0.35; }
+      .projects__bar-fill { opacity: 0.35; }
+    }
   }
   &__color-dot {
     width: 12px;

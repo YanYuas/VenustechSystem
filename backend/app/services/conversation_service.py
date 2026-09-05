@@ -45,8 +45,10 @@ class ConversationService:
     def list(self) -> list[ConversationOut]:
         return [self._conv_out(c) for c in self.conv_repo.list_user(self.user.id)]
 
-    def create(self, title: str | None = None) -> ConversationOut:
-        conv = self.conv_repo.create(user_id=self.user.id, title=title or "未命名对话")
+    def create(self, title: str | None = None, project_id: str | None = None) -> ConversationOut:
+        conv = self.conv_repo.create(
+            user_id=self.user.id, title=title or "未命名对话", project_id=project_id
+        )
         return self._conv_out(conv)
 
     def delete(self, conversation_id: str) -> None:
@@ -147,7 +149,8 @@ class ConversationService:
     @staticmethod
     def _conv_out(c: Conversation) -> ConversationOut:
         return ConversationOut(
-            id=c.id, title=c.title, scene=c.scene, created_at=c.created_at, updated_at=c.updated_at
+            id=c.id, title=c.title, scene=c.scene, project_id=c.project_id,
+            created_at=c.created_at, updated_at=c.updated_at,
         )
 
     @staticmethod

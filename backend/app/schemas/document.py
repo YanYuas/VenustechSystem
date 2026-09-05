@@ -14,6 +14,7 @@ class DocumentOut(BaseModel):
     content: str | None = None
     folder_id: str | None = None
     folder_name: str = "收集箱"
+    project_id: str | None = None
     tags: list[str] = []
     summary: str | None = None
     ai_suggested_tags: list[str] = []
@@ -26,6 +27,7 @@ class DocumentOut(BaseModel):
 class CreateDocumentRequest(BaseModel):
     title: str = Field(min_length=1, max_length=500)
     folder_id: str | None = None
+    project_id: str | None = None
     content: str | None = None
 
 
@@ -34,6 +36,7 @@ class UpdateDocumentRequest(BaseModel):
     content: str | None = None
     tags: list[str] | None = None
     folder_id: str | None = None
+    project_id: str | None = None
 
 
 class DocumentVersionOut(BaseModel):

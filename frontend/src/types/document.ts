@@ -21,6 +21,7 @@ export interface Document {
   content: string | null
   folder_id: string | null
   folder_name: string
+  project_id: string | null
   tags: string[]
   summary: string | null
   ai_suggested_tags: string[]
@@ -60,6 +61,7 @@ export interface DocumentListQuery {
 export interface CreateDocumentRequest {
   title: string
   folder_id?: string | null
+  project_id?: string | null
   /** Markdown 纯文本内容 */
   content?: string
 }

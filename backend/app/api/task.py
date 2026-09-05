@@ -37,6 +37,7 @@ def list_tasks(
     status: str | None = None,
     priority: str | None = None,
     project_tag: str | None = None,
+    project_id: str | None = None,
     due_date: date | None = None,
     page: int = 1,
     page_size: int = 20,
@@ -46,7 +47,8 @@ def list_tasks(
 ):
     data = _svc(db).list(
         user.id, status=status, priority=priority, project_tag=project_tag,
-        due_date=due_date, page=page, page_size=page_size, sort=sort,
+        project_id=project_id, due_date=due_date,
+        page=page, page_size=page_size, sort=sort,
     )
     return success(data)
 

@@ -41,6 +41,8 @@ class TaskRepository(BaseRepository[Task]):
             q = q.where(Task.priority == priority)
         if project_tag:
             q = q.where(Task.project_tag == project_tag)
+        if project_id:
+            q = q.where(Task.project_id == project_id)
         if due_date:
             q = q.where(Task.due_date == due_date)
         return list(self.db.scalars(q))
@@ -70,6 +72,8 @@ class TaskRepository(BaseRepository[Task]):
             q = q.where(Task.priority == priority)
         if project_tag:
             q = q.where(Task.project_tag == project_tag)
+        if project_id:
+            q = q.where(Task.project_id == project_id)
         if due_date:
             q = q.where(Task.due_date == due_date)
         # 排序：-前缀=降序

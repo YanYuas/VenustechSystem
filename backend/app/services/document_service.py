@@ -166,6 +166,7 @@ class DocumentService:
             title=data.title,
             content=data.content,
             folder_id=folder_id,
+            project_id=data.project_id,
             word_count=count_words(data.content),
             version=1,
         )
@@ -202,6 +203,9 @@ class DocumentService:
                 if folder is None or folder.user_id != user_id:
                     raise NotFoundException("文件夹不存在")
             doc.folder_id = new_fid
+        if "project_id" in payload:
+            # None = 解除关联；空串视同 None（前端下拉清空）
+            doc.project_id = payload["project_id"] or None
         self.db.commit()
         self.db.refresh(doc)
         self._sync_backlinks(user_id, doc)
@@ -394,6 +398,7 @@ class DocumentService:
             content=doc.content,
             folder_id=doc.folder_id,
             folder_name=folder_name,
+            project_id=doc.project_id,
             tags=list(doc.tags or []),
             summary=doc.summary,
             ai_suggested_tags=list(doc.ai_suggested_tags or []),

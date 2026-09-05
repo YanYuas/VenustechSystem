@@ -27,6 +27,12 @@ const router = createRouter({
           meta: { icon: 'folder', title: '项目', crumbs: ['项目'] },
         },
         {
+          path: 'projects/:id',
+          name: 'project-detail',
+          component: () => import('@/views/Project/ProjectDetailView.vue'),
+          meta: { icon: 'folder', title: '项目详情', crumbs: ['项目', '详情'], hidden: true },
+        },
+        {
           path: 'tasks',
           name: 'tasks',
           component: () => import('@/views/Task/TaskListView.vue'),

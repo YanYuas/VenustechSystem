@@ -27,6 +27,7 @@ class ReviewOut(BaseModel):
     id: str
     type: str
     review_date: date
+    project_id: str | None = None
     data: ReviewData
     created_at: datetime
     updated_at: datetime
@@ -35,6 +36,7 @@ class ReviewOut(BaseModel):
 class UpsertReviewRequest(BaseModel):
     type: str = "daily"
     date: date
+    project_id: str | None = None
     data: ReviewData
 
 

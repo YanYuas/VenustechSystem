@@ -9,6 +9,7 @@ export interface Conversation {
   id: string
   title: string | null
   scene: string
+  project_id: string | null
   created_at: string
   updated_at: string
 }

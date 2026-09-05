@@ -104,6 +104,15 @@ class TaskService:
         return task
 
     @staticmethod
+    def _ensure_project_active(task: Task) -> None:
+        """归档项目的任务只读（M06 F04）：修改/完成前校验所属项目状态。"""
+        if task.project_id is None:
+            return
+        project = task.project  # relationship（expire_on_commit=False 下可用）
+        if project is not None and project.status == "archived":
+            raise TaskStateException("所属项目已归档，任务为只读。请先恢复项目")
+
+    @staticmethod
     def _apply_status(task: Task, new_status: str) -> bool:
         """应用状态流转。返回是否刚变为 completed（供提交后发布事件）。"""
         if new_status not in STATUS_TRANSITIONS.get(task.status, set()):
@@ -179,6 +188,7 @@ class TaskService:
 
     def update(self, user_id: str, task_id: str, data: UpdateTaskRequest) -> TaskOut:
         task = self._owned(task_id, user_id)
+        self._ensure_project_active(task)
         payload = data.model_dump(exclude_unset=True)
         became_completed = False
         if "status" in payload:
