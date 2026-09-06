@@ -729,6 +729,8 @@ function fmtDateTime(v: string | null): string {
   .pd__stats { grid-template-columns: repeat(2, 1fr); }
   .pd__stat-ring { grid-column: span 2; }
 }
+
+.pd {
   // 时间线（M06 F05）
   &__timeline {
     display: flex;
@@ -769,4 +771,5 @@ function fmtDateTime(v: string | null): string {
     font-size: var(--text-xs);
     color: var(--text-low);
   }
+}
 </style>

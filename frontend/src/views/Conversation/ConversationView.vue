@@ -719,6 +719,8 @@ loadTraits()
   0%, 100% { opacity: 1; }
   50% { opacity: 0; }
 }
+
+.conv-view {
   // 人设状态栏（M04 P0 F04）
   &__persona-bar {
     margin-bottom: var(--space-2);
@@ -740,8 +742,9 @@ loadTraits()
   &__persona-name { font-weight: 600; font-size: var(--text-sm); color: var(--text-hi); }
   &__persona-desc { font-size: var(--text-xs); color: var(--text-low); flex: 1; text-align: left; }
 
-  // 提示词模板（M04 P0 F02）
 }
+
+  // 提示词模板（M04 P0 F02）
 .conv-tpl {
   display: flex;
   flex-direction: column;
@@ -865,4 +868,5 @@ loadTraits()
   &__input { flex: 1; padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; outline: none; &:focus { border-color: var(--primary); } }
   &__select { padding: 8px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; background: var(--bg-panel); }
   &__hint { font-size: 11px; color: var(--text-low); text-align: center; margin: 0; }
+}
 </style>

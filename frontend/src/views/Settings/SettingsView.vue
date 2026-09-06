@@ -561,14 +561,14 @@ onMounted(() => {
             </div>
           </div>
         </div>
-        <div class="<div class="settings__group">
+        <div class="settings__group">
           <label class="settings__label">数据目录</label>
           <div class="settings__row">
             <span class="settings__dir">{{ dataDir }}</span>
             <BaseButton variant="secondary" size="sm" @click="openDataDir">打开</BaseButton>
           </div>
         </div>
-        settings__group">
+        <div class="settings__group">
           <label class="settings__label">备份与恢复</label>
           <div class="settings__row">
             <BaseButton variant="secondary" @click="exportBackup">
@@ -864,6 +864,7 @@ onMounted(() => {
   }
 }
 
+.settings {
   /* 快捷键 */
   &__shortcuts { display: flex; flex-direction: column; gap: var(--space-2); }
   &__shortcut { display: flex; align-items: center; justify-content: space-between; padding: var(--space-1) 0; }
@@ -897,5 +898,6 @@ onMounted(() => {
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
+}
 }
 </style>

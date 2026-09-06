@@ -441,7 +441,7 @@ const petClass = computed(() => ({
               <span>{{ m.label }}</span>
             </button>
           </div>
-          <div class="<div class="pet__menu-divider" />
+          <div class="pet__menu-divider" />
           <div class="pet__menu-actions">
             <button class="pet__menu-item" @click="feed"><span class="pet__menu-icon">🍖</span><span>喂食</span><span class="pet__menu-val">{{ Math.round(stats.hunger) }}%</span></button>
             <button class="pet__menu-item" @click="play"><span class="pet__menu-icon">🎾</span><span>玩耍</span><span class="pet__menu-val">{{ Math.round(stats.energy) }}%</span></button>
@@ -550,6 +550,8 @@ const petClass = computed(() => ({
 
 .bubble-enter-active, .bubble-leave-active { transition: all 0.3s var(--ease-spring); }
 .bubble-enter-from, .bubble-leave-to { opacity: 0; transform: translateX(-50%) translateY(8px); }
+
+.pet {
   // 右键菜单
   &__menu {
     position: fixed; z-index: 10000; min-width: 160px;
@@ -589,9 +591,12 @@ const petClass = computed(() => ({
 
 .menu-enter-active, .menu-leave-active { transition: all 0.15s ease; }
 .menu-enter-from, .menu-leave-to { opacity: 0; transform: scale(0.95); }
+
+.pet {
   &__menu-val { margin-left: auto; font-size: 11px; color: var(--text-low); }
   &__menu-stats { padding: 8px 14px; display: flex; flex-direction: column; gap: 6px; }
   &__stat-row { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-mid); }
   &__stat-bar { flex: 1; height: 6px; background: var(--bg-inset); border-radius: 3px; overflow: hidden; }
   &__stat-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+}
 </style>

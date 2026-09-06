@@ -778,6 +778,8 @@ defineExpose({ generateAnnualReport, exportAnnualReport, showAnnualReport, annua
     margin-bottom: var(--space-1);
   }
 }
+
+.review {
   // 热力日历（M05 P0）
   &__cal-head { display: flex; align-items: center; justify-content: space-between; width: 100%; }
   &__cal-nav { display: flex; align-items: center; gap: 8px; }
@@ -816,4 +818,5 @@ defineExpose({ generateAnnualReport, exportAnnualReport, showAnnualReport, annua
     font-size: 11px; color: var(--text-mid); cursor: pointer; display: inline-flex; align-items: center; gap: 4px;
     &:hover { border-color: var(--primary); color: var(--primary); }
   }
+}
 </style>
