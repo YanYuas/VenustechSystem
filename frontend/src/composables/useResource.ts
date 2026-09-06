@@ -17,7 +17,7 @@ export function useResource() {
   async function fetchInbox(status?: string) {
     loading.value = true
     try {
-      inboxItems.value = await resourceApi.listInbox(status)
+      inboxItems.value = (await resourceApi.listInbox(status ? { status } : undefined)).list
     } catch (e: unknown) {
       error.value = e instanceof Error ? e.message : String(e)
     } finally {
@@ -28,7 +28,7 @@ export function useResource() {
   async function fetchTemplates(category?: string) {
     loading.value = true
     try {
-      templates.value = await resourceApi.listTemplates(category)
+      templates.value = (await resourceApi.listTemplates(category ? { category } : undefined)).list
     } catch (e: unknown) {
       error.value = e instanceof Error ? e.message : String(e)
     } finally {
