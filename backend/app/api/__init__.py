@@ -11,6 +11,7 @@ from app.api import (
     conversation,
     dashboard,
     document,
+    events,
     folder,
     health,
     notification,
@@ -40,3 +41,4 @@ api_router.include_router(panel.todo_router)
 api_router.include_router(panel.reminder_router)
 api_router.include_router(notification.router)
 api_router.include_router(project.router)
+api_router.include_router(events.router)
