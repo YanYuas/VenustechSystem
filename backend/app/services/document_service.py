@@ -330,6 +330,49 @@ class DocumentService:
         suffix = "…" if end < len(content) else ""
         return prefix + content[start:end] + suffix
 
+    def graph(self, user_id: str) -> dict:
+        """文档关系图谱：返回所有文档节点及双向链接边（M03 P2）。"""
+        from sqlalchemy import select as sa_select
+
+        docs = list(self.db.scalars(
+            sa_select(Document).where(Document.user_id == user_id)
+        ))
+        doc_map = {d.id: d for d in docs}
+        nodes = [
+            {
+                "id": d.id,
+                "title": d.title,
+                "folder_name": self._folder_name(d.folder_id),
+                "word_count": count_words(d.content),
+                "updated_at": d.updated_at,
+            }
+            for d in docs
+        ]
+        # 所有已解析的链接（target_doc_id 非空）
+        backlinks = list(self.db.scalars(
+            sa_select(Backlink).where(Backlink.source_doc_id.in_(doc_map.keys()))
+        ))
+        edges = []
+        for bl in backlinks:
+            if bl.target_doc_id and bl.target_doc_id in doc_map:
+                edges.append({
+                    "source": bl.source_doc_id,
+                    "target": bl.target_doc_id,
+                })
+        # 未解析的链接（指向不存在的文档）
+        dangling = [
+            {"source": bl.source_doc_id, "target_title": bl.target_title}
+            for bl in backlinks
+            if bl.target_doc_id is None
+        ]
+        return {"nodes": nodes, "edges": edges, "dangling": dangling}
+
+    def _folder_name(self, folder_id: str | None) -> str:
+        if not folder_id:
+            return "收集箱"
+        folder = self.folder_repo.get(folder_id)
+        return folder.name if folder else "收集箱"
+
     def _sync_backlinks(self, user_id: str, doc: Document) -> None:
         """扫描文档内容中的 [[标题]] 链接，重建该文档的出链记录。
 

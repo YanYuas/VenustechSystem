@@ -8,6 +8,20 @@ import type {
   CreateDocumentRequest, UpdateDocumentRequest, SearchResult, PaginatedData,
 } from '@/types'
 
+export interface GraphNode {
+  id: string
+  title: string
+  folder_name: string
+  word_count: number
+  updated_at: string
+}
+export interface GraphEdge { source: string; target: string }
+export interface GraphData {
+  nodes: GraphNode[]
+  edges: GraphEdge[]
+  dangling: Array<{ source: string; target_title: string }>
+}
+
 export const documentApi = {
   // 文件夹
   folders() {
@@ -49,6 +63,9 @@ export const documentApi = {
   },
   backlinks(id: string) {
     return http.get<Array<{ source_doc_id: string; source_title: string }>>(`/documents/${id}/backlinks`)
+  },
+  graph() {
+    return http.get<GraphData>('/documents/graph/data')
   },
   tags() {
     return http.get<string[]>('/tags')

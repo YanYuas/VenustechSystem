@@ -20,6 +20,7 @@ import BaseEmpty from '@/components/common/BaseEmpty.vue'
 import BaseSkeleton from '@/components/common/BaseSkeleton.vue'
 import AppIcon from '@/components/common/AppIcon.vue'
 import DocumentEditor from './DocumentEditor.vue'
+import DocumentGraph from '@/components/document/DocumentGraph.vue'
 import type { Document, Folder } from '@/types'
 
 const {
@@ -29,6 +30,9 @@ const {
 } = useDocument()
 const toast = useToast()
 const modal = useModal()
+
+// 视图切换（M03 P2：列表/图谱）
+const viewMode = ref<'list' | 'graph'>('list')
 
 onMounted(() => {
   fetchFolders().catch(() => { /* http 层已提示 */ })
@@ -144,6 +148,14 @@ async function onCreateDocFromWiki(title: string) {
       editingDoc.value = doc
       toast.success('文档已创建', title)
     }
+  } catch { /* http层已提示 */ }
+}
+
+/** 图谱视图：点击节点打开文档 */
+async function onGraphOpenDoc(id: string) {
+  try {
+    const doc = await documentApi.detail(id)
+    editingDoc.value = doc
   } catch { /* http层已提示 */ }
 }
 
@@ -375,6 +387,14 @@ async function exportFolderZip() {
     <div class="docs__head">
       <h1 class="docs__title">知识资源</h1>
       <div class="docs__head-actions">
+        <div class="docs__view-toggle">
+          <button class="docs__view-btn" :class="{ 'is-active': viewMode === 'list' }" @click="viewMode = 'list'">
+            <AppIcon name="list" :size="14" />
+          </button>
+          <button class="docs__view-btn" :class="{ 'is-active': viewMode === 'graph' }" @click="viewMode = 'graph'">
+            <AppIcon name="graph" :size="14" />
+          </button>
+        </div>
         <BaseButton variant="secondary" icon="download" :loading="exporting" @click="exportFolderZip">导出ZIP</BaseButton>
         <BaseButton variant="secondary" icon="folder-plus" @click="openCreateFolder">新建文件夹</BaseButton>
         <BaseButton variant="primary" icon="plus" @click="createOpen = true">新建文档</BaseButton>
@@ -432,45 +452,55 @@ async function exportFolderZip() {
       </template>
     </nav>
 
-    <BaseCard>
-      <template v-if="loading">
-        <BaseSkeleton variant="list" :rows="5" />
-      </template>
-      <template v-else-if="documents.length">
-        <ul class="docs__list">
-          <li v-for="d in documents" :key="d.id" class="docs__item" @click="openEditor(d)">
-            <div class="docs__row">
-              <AppIcon name="doc" :size="18" class="docs__doc-icon" />
-              <span class="docs__name">{{ d.title }}</span>
-              <div class="docs__tags">
-                <BaseTag v-for="t in d.tags" :key="t" semantic="lilac">{{ t }}</BaseTag>
+    <!-- 列表视图 -->
+    <template v-if="viewMode === 'list'">
+      <BaseCard>
+        <template v-if="loading">
+          <BaseSkeleton variant="list" :rows="5" />
+        </template>
+        <template v-else-if="documents.length">
+          <ul class="docs__list">
+            <li v-for="d in documents" :key="d.id" class="docs__item" @click="openEditor(d)">
+              <div class="docs__row">
+                <AppIcon name="doc" :size="18" class="docs__doc-icon" />
+                <span class="docs__name">{{ d.title }}</span>
+                <div class="docs__tags">
+                  <BaseTag v-for="t in d.tags" :key="t" semantic="lilac">{{ t }}</BaseTag>
+                </div>
+                <span class="docs__meta">{{ fmtTime(d.updated_at) }} · {{ d.word_count }} 字 · v{{ d.version }}</span>
+                <button class="docs__del" title="删除" @click.stop="onDelete(d)">
+                  <AppIcon name="trash" :size="15" />
+                </button>
               </div>
-              <span class="docs__meta">{{ fmtTime(d.updated_at) }} · {{ d.word_count }} 字 · v{{ d.version }}</span>
-              <button class="docs__del" title="删除" @click.stop="onDelete(d)">
-                <AppIcon name="trash" :size="15" />
-              </button>
-            </div>
-            <p v-if="d.summary" class="docs__summary">✨ {{ d.summary }}</p>
-          </li>
-        </ul>
-      </template>
-      <template v-else>
-        <BaseEmpty title="没有文档" description="换一个文件夹，或创建第一篇笔记吧">
-          <template #action>
-            <BaseButton variant="primary" icon="plus" @click="createOpen = true">新建文档</BaseButton>
-          </template>
-        </BaseEmpty>
-      </template>
-    </BaseCard>
+              <p v-if="d.summary" class="docs__summary">✨ {{ d.summary }}</p>
+            </li>
+          </ul>
+        </template>
+        <template v-else>
+          <BaseEmpty title="没有文档" description="换一个文件夹，或创建第一篇笔记吧">
+            <template #action>
+              <BaseButton variant="primary" icon="plus" @click="createOpen = true">新建文档</BaseButton>
+            </template>
+          </BaseEmpty>
+        </template>
+      </BaseCard>
 
-    <!-- 分页 -->
-    <BasePagination
-      v-if="!loading"
-      :total="total"
-      :page="query.page ?? 1"
-      :page-size="query.page_size ?? 20"
-      @change="onPageChange"
-    />
+      <!-- 分页 -->
+      <BasePagination
+        v-if="!loading"
+        :total="total"
+        :page="query.page ?? 1"
+        :page-size="query.page_size ?? 20"
+        @change="onPageChange"
+      />
+    </template>
+
+    <!-- 图谱视图（M03 P2） -->
+    <template v-else>
+      <div class="docs__graph-wrap">
+        <DocumentGraph @open-doc="onGraphOpenDoc" />
+      </div>
+    </template>
 
     <!-- 新建文档弹窗 -->
     <BaseModal v-model="createOpen" title="新建文档" @confirm="onCreate">
@@ -521,7 +551,33 @@ async function exportFolderZip() {
   }
   &__head-actions {
     display: flex;
+    align-items: center;
     gap: var(--space-2);
+  }
+  &__view-toggle {
+    display: flex;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+  }
+  &__view-btn {
+    padding: 6px 10px;
+    background: var(--bg-panel);
+    border: none;
+    cursor: pointer;
+    color: var(--text-mid);
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    &:hover { background: var(--bg-inset); }
+    &.is-active {
+      background: var(--primary-soft);
+      color: var(--primary-ink, var(--primary));
+    }
+  }
+  &__graph-wrap {
+    height: calc(100vh - 280px);
+    min-height: 400px;
   }
   &__title {
     font-size: var(--text-2xl);
