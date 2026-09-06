@@ -18,14 +18,14 @@ export function useLearning() {
   async function fetchPlans() {
     loading.value = true
     try { plans.value = await cachedFetch('learning:plans', () => learningApi.listPlans()) }
-    catch (e: any) { error.value = e.message }
+    catch (e: unknown) { error.value = e instanceof Error ? e.message : String(e) }
     finally { loading.value = false }
   }
 
   async function fetchTodayReview() {
     loading.value = true
     try { todayReviewCards.value = await learningApi.todayReview() }
-    catch (e: any) { error.value = e.message }
+    catch (e: unknown) { error.value = e instanceof Error ? e.message : String(e) }
     finally { loading.value = false }
   }
 
@@ -35,7 +35,7 @@ export function useLearning() {
 
   async function fetchTimeStats(days = 30) {
     try { timeStats.value = await learningApi.timeStats(days) }
-    catch (e: any) { error.value = e.message }
+    catch (e: unknown) { error.value = e instanceof Error ? e.message : String(e) }
   }
   return { loading, error, plans, cards, todayReviewCards, timeStats, fetchPlans, fetchTodayReview, submitReview, fetchTimeStats }
 }

@@ -18,6 +18,7 @@ class LearningService:
 
     def __init__(self, db: Session):
         self.db = db
+        self.logger = logger
         self.plan_repo = StudyPlanRepository(db)
         self.card_repo = FlashcardRepository(db)
         self.time_repo = StudyTimeRepository(db)

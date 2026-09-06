@@ -18,7 +18,7 @@ export function useLife() {
   async function fetchHabits() {
     loading.value = true
     try { habits.value = await cachedFetch('life:habits', () => lifeApi.listHabits()) }
-    catch (e: any) { error.value = e.message }
+    catch (e: unknown) { error.value = e instanceof Error ? e.message : String(e) }
     finally { loading.value = false }
   }
 
@@ -28,13 +28,13 @@ export function useLife() {
 
   async function fetchMoodTrend(days = 30) {
     try { moodTrend.value = await lifeApi.moodTrend(days) }
-    catch (e: any) { error.value = e.message }
+    catch (e: unknown) { error.value = e instanceof Error ? e.message : String(e) }
   }
 
   async function fetchDiaries(dimension?: string) {
     loading.value = true
     try { diaries.value = await lifeApi.listDiaries(dimension) }
-    catch (e: any) { error.value = e.message }
+    catch (e: unknown) { error.value = e instanceof Error ? e.message : String(e) }
     finally { loading.value = false }
   }
   return { loading, error, habits, moods, diaries, moodTrend, fetchHabits, checkinHabit, fetchMoodTrend, fetchDiaries }

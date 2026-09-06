@@ -18,6 +18,7 @@ class ResourceService:
 
     def __init__(self, db: Session):
         self.db = db
+        self.logger = logger
         self.inbox_repo = InboxItemRepository(db)
         self.template_repo = TemplateRepository(db)
         self.domain_repo = DomainRepository(db)

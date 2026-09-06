@@ -18,6 +18,7 @@ class LifeService:
 
     def __init__(self, db: Session):
         self.db = db
+        self.logger = logger
         self.habit_repo = HabitRepository(db)
         self.checkin_repo = HabitCheckinRepository(db)
         self.mood_repo = MoodRepository(db)

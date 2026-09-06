@@ -18,8 +18,8 @@ export function useResource() {
     loading.value = true
     try {
       inboxItems.value = await resourceApi.listInbox(status)
-    } catch (e: any) {
-      error.value = e.message
+    } catch (e: unknown) {
+      error.value = e instanceof Error ? e.message : String(e)
     } finally {
       loading.value = false
     }
@@ -29,8 +29,8 @@ export function useResource() {
     loading.value = true
     try {
       templates.value = await resourceApi.listTemplates(category)
-    } catch (e: any) {
-      error.value = e.message
+    } catch (e: unknown) {
+      error.value = e instanceof Error ? e.message : String(e)
     } finally {
       loading.value = false
     }
@@ -40,8 +40,8 @@ export function useResource() {
     loading.value = true
     try {
       domains.value = await cachedFetch('resource:domains', () => resourceApi.listDomains())
-    } catch (e: any) {
-      error.value = e.message
+    } catch (e: unknown) {
+      error.value = e instanceof Error ? e.message : String(e)
     } finally {
       loading.value = false
     }

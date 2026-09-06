@@ -18,6 +18,7 @@ class AssetService:
 
     def __init__(self, db: Session):
         self.db = db
+        self.logger = logger
         self.sop_repo = SOPRepository(db)
         self.prompt_repo = PromptRepository(db)
         self.skill_repo = SkillRepository(db)
