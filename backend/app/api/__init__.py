@@ -18,6 +18,7 @@ from app.api import (
     panel,
     plugins,
     security,
+    logs,
     project,
     review,
     task,
@@ -46,3 +47,4 @@ api_router.include_router(project.router)
 api_router.include_router(events.router)
 api_router.include_router(plugins.router)
 api_router.include_router(security.router)
+api_router.include_router(logs.router)
