@@ -25,6 +25,43 @@ const toast = useToast()
 /** 动态取「今天」：应用跨午夜挂机后仍写入正确日期 */
 const today = () => dayjs().format('YYYY-MM-DD')
 
+// ---------- 复盘模板系统（M05 P1） ----------
+interface ReviewTemplate {
+  type: string; name: string; icon: string; description: string
+  fields: Array<{ key: string; label: string; placeholder: string; required?: boolean }>
+}
+const reviewTemplates: ReviewTemplate[] = [
+  { type: 'daily', name: '日复盘', icon: '☀️', description: '每日总结', fields: [
+    { key: 'completed_tasks', label: '今日完成', placeholder: '列出今天完成的任务' },
+    { key: 'gains', label: '今日收获', placeholder: '今天学到了什么', required: true },
+    { key: 'tomorrow_plan', label: '明日计划', placeholder: '明天最重要的事' },
+  ]},
+  { type: 'weekly', name: '周复盘', icon: '📅', description: '每周回顾', fields: [
+    { key: 'key_gains', label: '关键收获', placeholder: '本周最大的收获', required: true },
+    { key: 'problems', label: '遇到的问题', placeholder: '本周遇到了哪些困难' },
+    { key: 'next_week_plan', label: '下周计划', placeholder: '下周的重点方向' },
+  ]},
+  { type: 'monthly', name: '月复盘', icon: '🌙', description: '月度反思', fields: [
+    { key: 'monthly_summary', label: '本月总结', placeholder: '总结这个月', required: true },
+    { key: 'achievements', label: '主要成就', placeholder: '本月取得了哪些成就' },
+    { key: 'growth', label: '成长变化', placeholder: '哪些方面有成长' },
+    { key: 'next_month_goal', label: '下月目标', placeholder: '下个月核心目标' },
+  ]},
+  { type: 'project', name: '项目复盘', icon: '📊', description: '项目复盘', fields: [
+    { key: 'project_name', label: '项目名称', placeholder: '复盘的项目名称', required: true },
+    { key: 'what_went_well', label: '做得好的', placeholder: '哪些方面做得好' },
+    { key: 'what_went_wrong', label: '待改进的', placeholder: '哪些可以更好' },
+    { key: 'lessons', label: '经验教训', placeholder: '学到了什么' },
+  ]},
+]
+const activeTemplate = ref<ReviewTemplate>(reviewTemplates[0])
+function selectTemplate(t: ReviewTemplate) {
+  activeTemplate.value = t
+  form.value = { completed_tasks: '', gains: '', tomorrow_plan: '', mood: '4', energy: '3' }
+  reflections.value = []
+  toast.success('已切换为' + t.name)
+}
+
 // ---------- 热力日历（M05 P0） ----------
 const calendarMonth = ref(dayjs())
 const calendarDays = ref<Array<{ date: string; hasReview: boolean; mood: number }>>([])
@@ -175,6 +212,13 @@ function toggleDetail(id: string) {
       <BaseButton variant="primary" icon="plus" @click="openWrite">写今日复盘</BaseButton>
     </div>
 
+    <!-- 复盘类型切换（M05 P1） -->
+    <div class="review__types">
+      <button v-for="t in reviewTemplates" :key="t.type" class="review__type-btn" :class="{ 'is-active': t.type === activeTemplate.type }" @click="selectTemplate(t)">
+        <span class="review__type-icon">{{ t.icon }}</span>
+        <span class="review__type-name">{{ t.name }}</span>
+      </button>
+    </div>
     <!-- 今日自动数据填充 -->
     <BaseCard>
       <template #title><h3 class="review__card-title">今日数据</h3></template>
@@ -625,4 +669,9 @@ function toggleDetail(id: string) {
   &__trend-legend { display: flex; gap: 16px; justify-content: center; }
   &__trend-legend-item { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text-mid); }
   &__trend-legend-dot { width: 12px; height: 3px; border-radius: 2px; &.mood-line { background: #f59e0b; } &.energy-line { background: #8b5cf6; } }
+  // 复盘类型切换（M05 P1）
+  &__types { display: flex; gap: 8px; margin-bottom: var(--space-3); flex-wrap: wrap; }
+  &__type-btn { display: flex; align-items: center; gap: 6px; padding: 8px 16px; background: var(--bg-panel); border: 1px solid var(--line); border-radius: var(--radius-md); cursor: pointer; transition: all 0.15s; &:hover { border-color: var(--primary); } &.is-active { border-color: var(--primary); background: var(--primary-soft); } }
+  &__type-icon { font-size: 16px; }
+  &__type-name { font-size: var(--text-sm); font-weight: 500; color: var(--text-hi); }
 </style>
