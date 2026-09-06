@@ -22,6 +22,10 @@ from app.api import (
     project,
     review,
     task,
+    resource,
+    learning,
+    life,
+    asset,
 )
 
 api_router = APIRouter(prefix="/api/v1")
@@ -48,3 +52,7 @@ api_router.include_router(events.router)
 api_router.include_router(plugins.router)
 api_router.include_router(security.router)
 api_router.include_router(logs.router)
+api_router.include_router(resource.router)
+api_router.include_router(learning.router)
+api_router.include_router(life.router)
+api_router.include_router(asset.router)

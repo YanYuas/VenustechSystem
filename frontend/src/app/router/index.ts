@@ -57,6 +57,30 @@ const router = createRouter({
           meta: { icon: 'refresh', title: '复盘', crumbs: ['复盘'] },
         },
         {
+          path: 'resource-center',
+          name: 'resource-center',
+          component: () => import('@/views/Resource/ResourceCenterView.vue'),
+          meta: { icon: 'folder', title: '资源中心', crumbs: ['资源中心'] },
+        },
+        {
+          path: 'learning',
+          name: 'learning',
+          component: () => import('@/views/Learning/LearningView.vue'),
+          meta: { icon: 'book', title: '学习成长', crumbs: ['学习成长'] },
+        },
+        {
+          path: 'life',
+          name: 'life',
+          component: () => import('@/views/Life/LifeView.vue'),
+          meta: { icon: 'heart', title: '生活记录', crumbs: ['生活记录'] },
+        },
+        {
+          path: 'assets',
+          name: 'assets',
+          component: () => import('@/views/Asset/AssetLibraryView.vue'),
+          meta: { icon: 'award', title: '长期资产库', crumbs: ['长期资产库'] },
+        },
+        {
           path: 'settings',
           name: 'settings',
           component: () => import('@/views/Settings/SettingsView.vue'),

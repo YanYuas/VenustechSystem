@@ -238,7 +238,7 @@ const quickActions = computed(() => data.value?.quick_actions.items ?? [])
         </template>
         <div class="dash__resources">
           <div v-for="c in resourceCategories" :key="c.id" class="dash__resource"
-            @click="toast.info('资源中心', '该功能开发中')">
+            @click="router.push('/resource-center')">
             <AppIcon :name="c.icon" :size="16" class="dash__resource-icon" />
             <span class="dash__resource-name">{{ c.name }}</span>
             <span class="dash__resource-count">{{ c.count }}</span>
@@ -274,7 +274,7 @@ const quickActions = computed(() => data.value?.quick_actions.items ?? [])
             <span class="dash__learning-label">知识卡片</span>
             <span class="dash__learning-value">今日复习 0 张</span>
           </div>
-          <p class="dash__learning-enter" @click="toast.info('学习与成长', '该功能开发中')">进入学习中心 →</p>
+          <p class="dash__learning-enter" @click="router.push('/learning')">进入学习中心 →</p>
         </div>
       </BaseCard>
 
@@ -312,14 +312,14 @@ const quickActions = computed(() => data.value?.quick_actions.items ?? [])
         </template>
         <div class="dash__life">
           <div v-for="c in lifeCategories" :key="c.id" class="dash__life-item"
-            @click="toast.info('生活与自我', '该功能开发中')">
+            @click="router.push('/life')">
             <AppIcon :name="c.icon" :size="16" class="dash__life-icon" />
             <div class="dash__life-text">
               <span class="dash__life-name">{{ c.name }}</span>
               <span class="dash__life-value">{{ c.value }}</span>
             </div>
           </div>
-          <p class="dash__life-enter" @click="toast.info('生活与自我', '该功能开发中')">记录生活，自我觉察 →</p>
+          <p class="dash__life-enter" @click="router.push('/life')">记录生活，自我觉察 →</p>
         </div>
       </BaseCard>
     </div>
@@ -377,12 +377,12 @@ const quickActions = computed(() => data.value?.quick_actions.items ?? [])
         </template>
         <div class="dash__assets">
           <div v-for="c in assetCategories" :key="c.id" class="dash__asset"
-            @click="toast.info('长期资产库', '该功能开发中')">
+            @click="router.push('/assets')">
             <AppIcon :name="c.icon" :size="18" class="dash__asset-icon" />
             <span class="dash__asset-name">{{ c.name }}</span>
             <span class="dash__asset-count">{{ c.count }}</span>
           </div>
-          <p class="dash__assets-enter" @click="toast.info('资产库', '该功能开发中')">查看全部资产 →</p>
+          <p class="dash__assets-enter" @click="router.push('/assets')">查看全部资产 →</p>
         </div>
       </BaseCard>
     </div>
