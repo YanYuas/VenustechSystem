@@ -3,7 +3,7 @@
 // 复盘 —— 真实数据版（useReview → /api/v1/reviews + auto-fill）
 // M5：今日复盘（自动数据填充 + 撰写）+ 复盘历史列表
 // ============================================================
-import { onMounted, ref, watch } from 'vue'
+import { onMounted, ref, watch, computed } from 'vue'
 import dayjs from 'dayjs'
 import { aiApi } from '@/api'
 import { useReview } from '@/composables/useReview'
@@ -24,6 +24,43 @@ const toast = useToast()
 
 /** 动态取「今天」：应用跨午夜挂机后仍写入正确日期 */
 const today = () => dayjs().format('YYYY-MM-DD')
+
+// ---------- 热力日历（M05 P0） ----------
+const calendarMonth = ref(dayjs())
+const calendarDays = ref<Array<{ date: string; hasReview: boolean; mood: number }>>([])
+
+function buildCalendar() {
+  const start = calendarMonth.value.startOf('month')
+  const end = calendarMonth.value.endOf('month')
+  const startWeekday = start.day()
+  const daysInMonth = end.date()
+  const days: Array<{ date: string; hasReview: boolean; mood: number }> = []
+  for (let i = 0; i < startWeekday; i++) days.push({ date: '', hasReview: false, mood: 0 })
+  for (let d = 1; d <= daysInMonth; d++) {
+    const date = calendarMonth.value.date(d).format('YYYY-MM-DD')
+    const review = reviews.value.find(r => r.review_date === date)
+    days.push({ date, hasReview: !!review, mood: review?.data?.mood ? Number(review.data.mood) : 0 })
+  }
+  calendarDays.value = days
+}
+function prevMonth() { calendarMonth.value = calendarMonth.value.subtract(1, 'month'); buildCalendar() }
+function nextMonth() { calendarMonth.value = calendarMonth.value.add(1, 'month'); buildCalendar() }
+watch(() => reviews.value, () => buildCalendar(), { deep: true })
+
+// ---------- 情绪趋势（M05 P0） ----------
+const moodTrend = computed(() => {
+  const recent = reviews.value.slice(0, 14).reverse()
+  return recent.map(r => ({
+    date: r.review_date,
+    mood: r.data?.mood ? Number(r.data.mood) : 3,
+    energy: r.data?.energy ? Number(r.data.energy) : 3,
+  }))
+})
+const moodAvg = computed(() => {
+  if (!moodTrend.value.length) return '0'
+  const sum = moodTrend.value.reduce((a, b) => a + b.mood, 0)
+  return (sum / moodTrend.value.length).toFixed(1)
+})
 
 onMounted(() => {
   fetchReviews('daily' as ReviewType).catch(() => { /* http 层已提示 */ })
@@ -171,6 +208,82 @@ function toggleDetail(id: string) {
       </template>
     </BaseCard>
 
+
+    <!-- 热力日历（M05 P0） -->
+    <BaseCard>
+      <template #title>
+        <div class="review__cal-head">
+          <h3 class="review__card-title">复盘日历</h3>
+          <div class="review__cal-nav">
+            <button class="review__cal-btn" @click="prevMonth"><AppIcon name="chevron-left" :size="14" /></button>
+            <span class="review__cal-month">{{ calendarMonth.format('YYYY年MM月') }}</span>
+            <button class="review__cal-btn" @click="nextMonth"><AppIcon name="chevron-right" :size="14" /></button>
+          </div>
+        </div>
+      </template>
+      <div class="review__cal">
+        <div class="review__cal-weekdays">
+          <span v-for="w in ['日','一','二','三','四','五','六']" :key="w" class="review__cal-wd">{{ w }}</span>
+        </div>
+        <div class="review__cal-grid">
+          <div v-for="(d, i) in calendarDays" :key="i" class="review__cal-cell" :class="{
+            'is-empty': !d.date,
+            'is-today': d.date === today(),
+            'has-review': d.hasReview,
+            [`mood-${d.mood}`]: d.hasReview && d.mood,
+          }">
+            <span v-if="d.date" class="review__cal-day">{{ d.date.slice(-2) }}</span>
+          </div>
+        </div>
+        <div class="review__cal-legend">
+          <span>少</span>
+          <span class="review__cal-legend-dot mood-1" />
+          <span class="review__cal-legend-dot mood-2" />
+          <span class="review__cal-legend-dot mood-3" />
+          <span class="review__cal-legend-dot mood-4" />
+          <span class="review__cal-legend-dot mood-5" />
+          <span>多</span>
+        </div>
+      </div>
+    </BaseCard>
+
+    <!-- 情绪趋势（M05 P0） -->
+    <BaseCard v-if="moodTrend.length">
+      <template #title>
+        <div class="review__trend-head">
+          <h3 class="review__card-title">情绪趋势</h3>
+          <span class="review__trend-avg">近{{ moodTrend.length }}天平均 {{ moodAvg }}★</span>
+        </div>
+      </template>
+      <div class="review__trend">
+        <svg class="review__trend-svg" :viewBox="`0 0 ${moodTrend.length * 40 + 40} 120`" preserveAspectRatio="none">
+          <!-- 网格线 -->
+          <line v-for="i in 5" :key="i" :x1="20" :x2="moodTrend.length * 40 + 20" :y1="10 + (i-1) * 25" :y2="10 + (i-1) * 25" class="review__trend-grid" />
+          <!-- 情绪折线 -->
+          <polyline
+            :points="moodTrend.map((d, i) => `${i * 40 + 30},${110 - (d.mood - 1) * 25}`).join(' ')"
+            class="review__trend-line mood-line"
+            fill="none"
+          />
+          <!-- 精力折线 -->
+          <polyline
+            :points="moodTrend.map((d, i) => `${i * 40 + 30},${110 - (d.energy - 1) * 25}`).join(' ')"
+            class="review__trend-line energy-line"
+            fill="none"
+          />
+          <!-- 数据点 -->
+          <circle v-for="(d, i) in moodTrend" :key="'m'+i" :cx="i * 40 + 30" :cy="110 - (d.mood - 1) * 25" r="3" class="review__trend-dot mood-dot" />
+          <circle v-for="(d, i) in moodTrend" :key="'e'+i" :cx="i * 40 + 30" :cy="110 - (d.energy - 1) * 25" r="3" class="review__trend-dot energy-dot" />
+        </svg>
+        <div class="review__trend-labels">
+          <span v-for="d in moodTrend" :key="d.date" class="review__trend-label">{{ d.date.slice(5) }}</span>
+        </div>
+        <div class="review__trend-legend">
+          <span class="review__trend-legend-item"><span class="review__trend-legend-dot mood-line" /> 心情</span>
+          <span class="review__trend-legend-item"><span class="review__trend-legend-dot energy-line" /> 精力</span>
+        </div>
+      </div>
+    </BaseCard>
     <!-- 复盘历史 -->
     <BaseCard>
       <template #title><h3 class="review__card-title">历史复盘</h3></template>
@@ -485,4 +598,31 @@ function toggleDetail(id: string) {
     margin-bottom: var(--space-1);
   }
 }
+  // 热力日历（M05 P0）
+  &__cal-head { display: flex; align-items: center; justify-content: space-between; width: 100%; }
+  &__cal-nav { display: flex; align-items: center; gap: 8px; }
+  &__cal-btn { background: none; border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; cursor: pointer; color: var(--text-mid); &:hover { border-color: var(--primary); color: var(--primary); } }
+  &__cal-month { font-size: var(--text-sm); font-weight: 500; color: var(--text-hi); min-width: 80px; text-align: center; }
+  &__cal { display: flex; flex-direction: column; gap: 8px; }
+  &__cal-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+  &__cal-wd { text-align: center; font-size: 11px; color: var(--text-low); padding: 4px 0; }
+  &__cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+  &__cal-cell { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; border-radius: 6px; font-size: 12px; color: var(--text-mid); background: var(--bg-inset); &.is-empty { background: transparent; } &.is-today { border: 2px solid var(--primary); } &.has-review { color: #fff; font-weight: 600; } &.mood-1 { background: #fecaca; } &.mood-2 { background: #fed7aa; } &.mood-3 { background: #fef08a; } &.mood-4 { background: #bbf7d0; } &.mood-5 { background: #86efac; } }
+  &__cal-day { }
+  &__cal-legend { display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 10px; color: var(--text-low); margin-top: 4px; }
+  &__cal-legend-dot { width: 12px; height: 12px; border-radius: 3px; &.mood-1 { background: #fecaca; } &.mood-2 { background: #fed7aa; } &.mood-3 { background: #fef08a; } &.mood-4 { background: #bbf7d0; } &.mood-5 { background: #86efac; } }
+
+  // 情绪趋势（M05 P0）
+  &__trend-head { display: flex; align-items: center; justify-content: space-between; width: 100%; }
+  &__trend-avg { font-size: var(--text-xs); color: var(--text-mid); background: var(--primary-soft); padding: 2px 8px; border-radius: 10px; }
+  &__trend { display: flex; flex-direction: column; gap: 8px; }
+  &__trend-svg { width: 100%; height: 120px; }
+  &__trend-grid { stroke: var(--line); stroke-width: 0.5; stroke-dasharray: 2,2; }
+  &__trend-line { stroke-width: 2; &.mood-line { stroke: #f59e0b; } &.energy-line { stroke: #8b5cf6; } }
+  &__trend-dot { &.mood-dot { fill: #f59e0b; } &.energy-dot { fill: #8b5cf6; } }
+  &__trend-labels { display: flex; justify-content: space-around; }
+  &__trend-label { font-size: 10px; color: var(--text-low); }
+  &__trend-legend { display: flex; gap: 16px; justify-content: center; }
+  &__trend-legend-item { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text-mid); }
+  &__trend-legend-dot { width: 12px; height: 3px; border-radius: 2px; &.mood-line { background: #f59e0b; } &.energy-line { background: #8b5cf6; } }
 </style>
