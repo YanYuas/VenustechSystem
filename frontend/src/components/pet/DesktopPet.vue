@@ -276,7 +276,52 @@ function getMoodLabel() {
 
 loadStats()
 
-defineExpose({ setAction, celebrate: () => setAction('celebrate', 3000), toggleForm, form, stats, pet, feed, play, rest })
+
+// ---------- 自定义形象配置（M07 P2） ----------
+interface PetAppearance {
+  primaryColor: string
+  secondaryColor: string
+  eyeColor: string
+  preset: string
+}
+const APPEARANCE_KEY = 'venustech_pet_appearance'
+const appearancePresets = [
+  { id: 'default', name: '默认', primary: '#FFB6C1', secondary: '#87CEEB', eye: '#4A4A4A' },
+  { id: 'ocean', name: '海洋', primary: '#6BB5D6', secondary: '#2E9D8F', eye: '#1A3A4A' },
+  { id: 'sunset', name: '落日', primary: '#FFA07A', secondary: '#FF6B6B', eye: '#5A2A2A' },
+  { id: 'forest', name: '森林', primary: '#90EE90', secondary: '#228B22', eye: '#1A3A1A' },
+  { id: 'cosmic', name: '星辰', primary: '#9B7ED8', secondary: '#E8C547', eye: '#2A1A4A' },
+]
+const appearance = ref<PetAppearance>({
+  primaryColor: '#FFB6C1',
+  secondaryColor: '#87CEEB',
+  eyeColor: '#4A4A4A',
+  preset: 'default',
+})
+function loadAppearance() {
+  try {
+    const saved = localStorage.getItem(APPEARANCE_KEY)
+    if (saved) appearance.value = JSON.parse(saved)
+  } catch { }
+}
+function saveAppearance() {
+  localStorage.setItem(APPEARANCE_KEY, JSON.stringify(appearance.value))
+}
+function applyPreset(presetId: string) {
+  const preset = appearancePresets.find(p => p.id === presetId)
+  if (preset) {
+    appearance.value = {
+      primaryColor: preset.primary,
+      secondaryColor: preset.secondary,
+      eyeColor: preset.eye,
+      preset: presetId,
+    }
+    saveAppearance()
+  }
+}
+loadAppearance()
+
+defineExpose({ appearance, appearancePresets, applyPreset, setAction, celebrate: () => setAction('celebrate', 3000), toggleForm, form, stats, pet, feed, play, rest })
 
 const petClass = computed(() => ({
   'pet--idle': action.value === 'idle',
