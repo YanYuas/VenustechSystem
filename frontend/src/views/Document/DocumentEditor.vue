@@ -340,7 +340,7 @@ async function searchWikiDocs(q: string) {
       wikiResults.value = res.documents
         .filter(d => d.id !== props.document.id)
         .map(d => ({
-          id: d.id, title: d.title, content: null, folder_id: null,
+          id: d.id, title: d.title, content: null, folder_id: null, project_id: null,
           folder_name: '', tags: [], summary: null, ai_suggested_tags: [],
           version: 0, word_count: 0, created_at: '', updated_at: d.updated_at,
         }))
