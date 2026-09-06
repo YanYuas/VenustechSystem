@@ -16,6 +16,8 @@ from app.api import (
     health,
     notification,
     panel,
+    plugins,
+    security,
     project,
     review,
     task,
@@ -42,3 +44,5 @@ api_router.include_router(panel.reminder_router)
 api_router.include_router(notification.router)
 api_router.include_router(project.router)
 api_router.include_router(events.router)
+api_router.include_router(plugins.router)
+api_router.include_router(security.router)
