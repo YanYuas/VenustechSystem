@@ -203,6 +203,62 @@ const expandedId = ref<string | null>(null)
 function toggleDetail(id: string) {
   expandedId.value = expandedId.value === id ? null : id
 }
+// ---------- 复盘导出（M05 P1） ----------
+function exportReview(r: any) {
+  const typeLabel = r.type === 'weekly' ? '周复盘' : r.type === 'monthly' ? '月复盘' : r.type === 'project' ? '项目复盘' : '日复盘'
+  let md = `# ${typeLabel} - ${r.review_date}\n\n`
+  md += `> 导出时间：${new Date().toLocaleString('zh-CN')}\n\n`
+  if (r.data.mood) md += `**心情**：${'★'.repeat(r.data.mood)}${'☆'.repeat(5 - r.data.mood)}\n\n`
+  if (r.data.energy) md += `**精力**：${r.data.energy}/5\n\n`
+  md += `---\n\n`
+  if (r.data.completed_tasks) md += `## 今日完成\n\n${r.data.completed_tasks}\n\n`
+  if (r.data.gains) md += `## 收获与感悟\n\n${r.data.gains}\n\n`
+  if (r.data.tomorrow_plan) md += `## 明日计划\n\n${r.data.tomorrow_plan}\n\n`
+  if (r.data.reflections?.length) {
+    md += `## 深度反思\n\n`
+    r.data.reflections.forEach((ref: any, i: number) => {
+      const q = typeof ref === 'string' ? ref : ref.question
+      const a = typeof ref === 'string' ? '' : ref.answer
+      md += `**${i + 1}. ${q}**\n\n${a || '（未回答）'}\n\n`
+    })
+  }
+  md += `---\n\n*由启明星系统 Venustech System 生成*`
+  
+  const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `复盘-${r.review_date}.md`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+  toast.success('复盘已导出为Markdown')
+}
+
+function exportAllReviews() {
+  if (!reviews.value.length) return toast.warning('暂无复盘可导出')
+  let md = `# 复盘合集\n\n`
+  md += `> 共 ${reviews.value.length} 篇复盘 · 导出时间：${new Date().toLocaleString('zh-CN')}\n\n`
+  md += `---\n\n`
+  reviews.value.forEach((r: any) => {
+    const typeLabel = r.type === 'weekly' ? '周复盘' : r.type === 'monthly' ? '月复盘' : '日复盘'
+    md += `## ${typeLabel} - ${r.review_date}\n\n`
+    if (r.data.gains) md += `**收获**：${r.data.gains}\n\n`
+    if (r.data.tomorrow_plan) md += `**计划**：${r.data.tomorrow_plan}\n\n`
+    md += `---\n\n`
+  })
+  const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `复盘合集-${dayjs().format('YYYY-MM-DD')}.md`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+  toast.success(`已导出 ${reviews.value.length} 篇复盘`)
+}
 </script>
 
 <template>
@@ -330,7 +386,7 @@ function toggleDetail(id: string) {
     </BaseCard>
     <!-- 复盘历史 -->
     <BaseCard>
-      <template #title><h3 class="review__card-title">历史复盘</h3></template>
+      <template #title><div style="display:flex;align-items:center;justify-content:space-between;width:100%"><h3 class="review__card-title">历史复盘</h3><BaseButton variant="text" size="sm" @click="exportAllReviews"><AppIcon name="download" :size="14" /> 全部导出</BaseButton></div></template>
       <template v-if="loading">
         <BaseSkeleton variant="list" :rows="3" />
       </template>
@@ -364,7 +420,7 @@ function toggleDetail(id: string) {
                   </li>
                 </ul>
               </div>
-              <div class="review__detail-meta">
+              <div class="review__detail-meta"><button class="review__export-btn" @click.stop="exportReview(r)"><AppIcon name="download" :size="12" /> 导出</button>
                 <span v-if="r.data.energy">精力: {{ r.data.energy }}/5</span>
                 <span>创建于 {{ dayjs(r.created_at).format('MM-DD HH:mm') }}</span>
               </div>
@@ -674,4 +730,10 @@ function toggleDetail(id: string) {
   &__type-btn { display: flex; align-items: center; gap: 6px; padding: 8px 16px; background: var(--bg-panel); border: 1px solid var(--line); border-radius: var(--radius-md); cursor: pointer; transition: all 0.15s; &:hover { border-color: var(--primary); } &.is-active { border-color: var(--primary); background: var(--primary-soft); } }
   &__type-icon { font-size: 16px; }
   &__type-name { font-size: var(--text-sm); font-weight: 500; color: var(--text-hi); }
+  // 复盘导出（M05 P1）
+  &__export-btn {
+    background: none; border: 1px solid var(--line); border-radius: 6px; padding: 4px 10px;
+    font-size: 11px; color: var(--text-mid); cursor: pointer; display: inline-flex; align-items: center; gap: 4px;
+    &:hover { border-color: var(--primary); color: var(--primary); }
+  }
 </style>
