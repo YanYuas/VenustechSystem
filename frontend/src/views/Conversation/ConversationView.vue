@@ -4,7 +4,7 @@
 // 对应 PRD §6 第二分身模块
 // 功能: 对话列表 / 消息流 / SSE流式输出 / 引用文档
 // ============================================================
-import { onMounted, ref, computed } from 'vue'
+import { onMounted, ref, computed, watch } from 'vue'
 import { documentApi } from '@/api'
 import { useConversation } from '@/composables/useConversation'
 import { useModal } from '@/composables/useModal'
@@ -14,6 +14,40 @@ import BaseButton from '@/components/common/BaseButton.vue'
 import BaseModal from '@/components/common/BaseModal.vue'
 import AppIcon from '@/components/common/AppIcon.vue'
 import type { Document } from '@/types'
+// ---------- 主动提醒（M04 P1） ----------
+const reminderEnabled = ref(true)
+const reminderInterval = ref(30)
+let reminderTimer: ReturnType<typeof setInterval> | null = null
+const REMINDER_KEY = 'venustech_reminder_settings'
+function loadReminderSettings() {
+  try {
+    const s = JSON.parse(localStorage.getItem(REMINDER_KEY) || '{}')
+    reminderEnabled.value = s.enabled ?? true
+    reminderInterval.value = s.interval ?? 30
+  } catch { }
+}
+function saveReminderSettings() {
+  localStorage.setItem(REMINDER_KEY, JSON.stringify({ enabled: reminderEnabled.value, interval: reminderInterval.value }))
+}
+async function checkReminders() {
+  if (!reminderEnabled.value) return
+  try {
+    const res = await fetch('http://127.0.0.1:8765/api/v1/tasks?due_soon=true')
+    if (res.ok) {
+      const data = await res.json()
+      const tasks = data.data?.items || data.data || []
+      if (tasks.length > 0) {
+        window.dispatchEvent(new CustomEvent('venustech-pet-action', { detail: { action: 'thinking', message: `有 ${tasks.length} 个任务即将到期~` } }))
+      }
+    }
+  } catch { }
+}
+function startReminderTimer() {
+  if (reminderTimer) clearInterval(reminderTimer)
+  if (reminderEnabled.value) reminderTimer = setInterval(checkReminders, reminderInterval.value * 60000)
+}
+loadReminderSettings()
+watch([reminderEnabled, reminderInterval], saveReminderSettings)
 
 const { conversations, messages, currentId, streaming, streamContent, sendMessage, createConversation, fetchConversations, fetchMessages, stopStreaming, deleteConversation } = useConversation()
 
@@ -125,6 +159,7 @@ function removeRefDoc(id: string) {
 }
 
 onMounted(() => {
+  startReminderTimer()
   fetchConversations().catch(() => { /* http 层已提示 */ })
 })
 
