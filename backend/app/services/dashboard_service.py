@@ -13,6 +13,8 @@ from app.core.utils import greeting_by_hour, local_day_bounds_utc
 from app.models.user import User
 from app.repositories import DocumentRepository, TaskRepository
 from app.schemas.dashboard import (
+    StreakData,
+    WeekProgress,
     AIAssistantStatus,
     AssetsSection,
     AssetCategory,
@@ -138,6 +140,11 @@ class DashboardService:
         assets = AssetsSection(categories=ASSET_CATEGORIES, status="beta")
         quick_actions = QuickActions(items=QUICK_ACTIONS)
 
+        # 本周进度环（M01 F04）
+        week_progress = self._build_week_progress(all_tasks)
+
+        # 连续打卡徽章（M01 F05）
+        streak = self._build_streak()
         # AI 助手状态
         settings = get_settings()
         ai_assistant = AIAssistantStatus(
@@ -159,6 +166,8 @@ class DashboardService:
             life=life,
             assets=assets,
             quick_actions=quick_actions,
+            week_progress=week_progress,
+            streak=streak,
             ai_assistant=ai_assistant,
             modules_status=MODULES_STATUS,
         )
@@ -233,3 +242,44 @@ class DashboardService:
 
         return ProjectsSection(items=items, status="beta")
 
+
+    def _build_week_progress(self, all_tasks: list) -> WeekProgress:
+        """本周任务完成进度（周一至周日）"""
+        from datetime import timedelta
+        today = datetime.now().date()
+        monday = today - timedelta(days=today.weekday())
+        sunday = monday + timedelta(days=6)
+        week_tasks = [t for t in all_tasks if t.due_date and monday <= t.due_date <= sunday]
+        total = len(week_tasks)
+        completed = sum(1 for t in week_tasks if t.status == "completed")
+        percentage = round(completed / total * 100) if total else 0
+        return WeekProgress(completed=completed, total=total, percentage=percentage)
+
+    def _build_streak(self) -> StreakData:
+        """连续打卡：基于复盘记录统计连续天数 + 本周7天打卡情况"""
+        from datetime import timedelta
+        from sqlalchemy import select
+        from app.models.review import Review
+
+        today = datetime.now().date()
+        # 查最近30天的复盘日期
+        rows = self.db.scalars(
+            select(Review.review_date).where(
+                Review.user_id == self.user.id,
+                Review.review_date >= today - timedelta(days=30),
+            ).order_by(Review.review_date.desc())
+        )
+        review_dates = {r for r in rows if r}
+
+        # 计算连续打卡天数（从今天往前数）
+        streak_days = 0
+        check_date = today
+        while check_date in review_dates:
+            streak_days += 1
+            check_date -= timedelta(days=1)
+
+        # 本周7天打卡情况（周一至周日）
+        monday = today - timedelta(days=today.weekday())
+        week_checkins = [(monday + timedelta(days=i)) in review_dates for i in range(7)]
+
+        return StreakData(days=streak_days, week_checkins=week_checkins)

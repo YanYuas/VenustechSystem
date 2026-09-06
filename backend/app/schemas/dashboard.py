@@ -134,6 +134,17 @@ class AssetsSection(BaseModel):
     status: ModuleStatus = "planned"
 
 
+
+# ---------- 本周进度环（M01 F04） ----------
+class WeekProgress(BaseModel):
+    completed: int = 0
+    total: int = 0
+    percentage: int = 0
+
+# ---------- 连续打卡徽章（M01 F05） ----------
+class StreakData(BaseModel):
+    days: int = 0
+    week_checkins: list[bool] = Field(default_factory=lambda: [False]*7)
 # ---------- 用户信息 ----------
 class DashboardUser(BaseModel):
     nickname: str
