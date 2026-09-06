@@ -125,6 +125,7 @@ onMounted(() => {
   }, 8000)
   setTimeout(() => randomMessage(), 1000)
   window.addEventListener(PET_ACTION_EVENT, onPetAction)
+  startDecay()
 })
 
 onUnmounted(() => {
@@ -132,6 +133,7 @@ onUnmounted(() => {
   if (messageTimer) clearTimeout(messageTimer)
   if (actionTimer) clearTimeout(actionTimer)
   window.removeEventListener(PET_ACTION_EVENT, onPetAction)
+  if (decayTimer) clearInterval(decayTimer)
 })
 
 
@@ -183,7 +185,98 @@ function doMenuAction(a: PetAction) {
 }
 function closeMenu() { showMenu.value = false }
 
-defineExpose({ setAction, celebrate: () => setAction('celebrate', 3000), toggleForm, form })
+
+// ---------- 状态系统（M07 P1） ----------
+interface PetStats {
+  intimacy: number    // 亲密度 0-100
+  hunger: number      // 饱食度 0-100
+  mood: number        // 心情 0-100
+  energy: number      // 精力 0-100
+}
+const STATS_KEY = 'venustech_pet_stats'
+const stats = ref<PetStats>({ intimacy: 30, hunger: 70, mood: 60, energy: 80 })
+
+function loadStats() {
+  try {
+    const saved = localStorage.getItem(STATS_KEY)
+    if (saved) stats.value = JSON.parse(saved)
+  } catch { }
+}
+function saveStats() {
+  try { localStorage.setItem(STATS_KEY, JSON.stringify(stats.value)) } catch { }
+}
+function clamp(v: number) { return Math.max(0, Math.min(100, v)) }
+
+// 状态随时间衰减
+let decayTimer: ReturnType<typeof setInterval> | null = null
+function startDecay() {
+  decayTimer = setInterval(() => {
+    stats.value.hunger = clamp(stats.value.hunger - 1)
+    stats.value.energy = clamp(stats.value.energy - 0.5)
+    if (stats.value.hunger < 30) stats.value.mood = clamp(stats.value.mood - 1)
+    saveStats()
+  }, 60000) // 每分钟衰减
+}
+
+// ---------- 互动系统（M07 P1） ----------
+function pet() {
+  // 抚摸：增加亲密度和心情
+  stats.value.intimacy = clamp(stats.value.intimacy + 2)
+  stats.value.mood = clamp(stats.value.mood + 3)
+  setAction('happy', 1500)
+  saveStats()
+}
+function feed() {
+  if (stats.value.hunger >= 95) {
+    message.value = '人家吃饱啦~'
+    showMessage.value = true
+    setTimeout(() => { showMessage.value = false }, 2000)
+    return
+  }
+  stats.value.hunger = clamp(stats.value.hunger + 25)
+  stats.value.mood = clamp(stats.value.mood + 5)
+  setAction('happy', 2000)
+  message.value = '好好吃~ 谢谢你！'
+  showMessage.value = true
+  setTimeout(() => { showMessage.value = false }, 2500)
+  saveStats()
+}
+function play() {
+  if (stats.value.energy < 20) {
+    message.value = '好累哦...想休息一下...'
+    showMessage.value = true
+    setTimeout(() => { showMessage.value = false }, 2000)
+    setAction('sleep', 2000)
+    return
+  }
+  stats.value.mood = clamp(stats.value.mood + 10)
+  stats.value.energy = clamp(stats.value.energy - 10)
+  stats.value.intimacy = clamp(stats.value.intimacy + 3)
+  setAction('dance', 2500)
+  saveStats()
+}
+function rest() {
+  stats.value.energy = clamp(stats.value.energy + 30)
+  stats.value.mood = clamp(stats.value.mood + 5)
+  setAction('sleep', 3000)
+  message.value = 'Zzz... 休息一下~'
+  showMessage.value = true
+  setTimeout(() => { showMessage.value = false }, 3000)
+  saveStats()
+}
+
+// 状态影响消息
+function getMoodLabel() {
+  if (stats.value.mood >= 80) return '超开心'
+  if (stats.value.mood >= 60) return '心情不错'
+  if (stats.value.mood >= 40) return '一般般'
+  if (stats.value.mood >= 20) return '有点低落'
+  return '需要陪伴'
+}
+
+loadStats()
+
+defineExpose({ setAction, celebrate: () => setAction('celebrate', 3000), toggleForm, form, stats, pet, feed, play, rest })
 
 const petClass = computed(() => ({
   'pet--idle': action.value === 'idle',
@@ -303,9 +396,20 @@ const petClass = computed(() => ({
               <span>{{ m.label }}</span>
             </button>
           </div>
+          <div class="<div class="pet__menu-divider" />
+          <div class="pet__menu-actions">
+            <button class="pet__menu-item" @click="feed"><span class="pet__menu-icon">🍖</span><span>喂食</span><span class="pet__menu-val">{{ Math.round(stats.hunger) }}%</span></button>
+            <button class="pet__menu-item" @click="play"><span class="pet__menu-icon">🎾</span><span>玩耍</span><span class="pet__menu-val">{{ Math.round(stats.energy) }}%</span></button>
+            <button class="pet__menu-item" @click="rest"><span class="pet__menu-icon">💤</span><span>休息</span><span class="pet__menu-val">{{ Math.round(stats.mood) }}%</span></button>
+          </div>
           <div class="pet__menu-divider" />
+          <div class="pet__menu-stats">
+            <div class="pet__stat-row"><span>亲密度</span><div class="pet__stat-bar"><div class="pet__stat-fill" style="background:#FF6B9D" :style="{width: stats.intimacy + '%'}"></div></div><span>{{ Math.round(stats.intimacy) }}</span></div>
+            <div class="pet__stat-row"><span>心情</span><div class="pet__stat-bar"><div class="pet__stat-fill" style="background:#FFD93D" :style="{width: stats.mood + '%'}"></div></div><span>{{ getMoodLabel() }}</span></div>
+          </div>
+          pet__menu-divider" />
           <div class="pet__menu-footer">
-            <span class="pet__menu-hint">双击切换形态 · 拖拽移动</span>
+            <span class="pet__menu-hint">双击切换形态 · 拖拽移动 · 单击抚摸</span>
           </div>
         </div>
       </Transition>
@@ -440,4 +544,9 @@ const petClass = computed(() => ({
 
 .menu-enter-active, .menu-leave-active { transition: all 0.15s ease; }
 .menu-enter-from, .menu-leave-to { opacity: 0; transform: scale(0.95); }
+  &__menu-val { margin-left: auto; font-size: 11px; color: var(--text-low); }
+  &__menu-stats { padding: 8px 14px; display: flex; flex-direction: column; gap: 6px; }
+  &__stat-row { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-mid); }
+  &__stat-bar { flex: 1; height: 6px; background: var(--bg-inset); border-radius: 3px; overflow: hidden; }
+  &__stat-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
 </style>
