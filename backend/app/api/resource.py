@@ -22,6 +22,8 @@ def _svc(db: Session) -> ResourceService:
 @router.get("/inbox", summary="收集箱列表")
 async def list_inbox(
     status: str | None = None,
+    page: int = 1,
+    page_size: int = 20,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
@@ -40,6 +42,8 @@ async def create_inbox_item(
 @router.get("/templates", summary="模板列表")
 async def list_templates(
     category: str | None = None,
+    page: int = 1,
+    page_size: int = 20,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):

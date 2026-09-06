@@ -21,6 +21,8 @@ def _svc(db: Session) -> LifeService:
 
 @router.get("/habits", summary="习惯列表")
 async def list_habits(
+    page: int = 1,
+    page_size: int = 20,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
@@ -63,6 +65,8 @@ async def create_mood(
 @router.get("/diaries", summary="日记列表")
 async def list_diaries(
     dimension: str | None = None,
+    page: int = 1,
+    page_size: int = 20,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):

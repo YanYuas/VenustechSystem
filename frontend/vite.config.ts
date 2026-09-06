@@ -59,7 +59,9 @@ export default defineConfig(({ mode }) => ({
         // 第三方依赖单独打包
         manualChunks: {
           'vue-vendor': ['vue', 'vue-router', 'pinia'],
-          // element-plus 已按需引入（unplugin）、dayjs 未直接引用，均无需预分组
+          'element-vendor': ['element-plus', '@element-plus/icons-vue'],
+          'editor-vendor': ['jszip'],
+          // dayjs 已被 element-plus 间接引用，无需单独分组
         },
         // 资源文件命名
         chunkFileNames: 'assets/js/[name]-[hash].js',
@@ -78,5 +80,7 @@ export default defineConfig(({ mode }) => ({
   // 依赖预构建优化
   optimizeDeps: {
     include: ['vue', 'vue-router', 'pinia', 'element-plus', '@element-plus/icons-vue', 'dayjs'],
+    // 开发环境预构建，减少冷启动时间
+    force: false,
   },
 }))

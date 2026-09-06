@@ -22,6 +22,8 @@ def _svc(db: Session) -> AssetService:
 @router.get("/sops", summary="SOP列表")
 async def list_sops(
     category: str | None = None,
+    page: int = 1,
+    page_size: int = 20,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
@@ -39,6 +41,8 @@ async def create_sop(
 @router.get("/prompts", summary="Prompt模板列表")
 async def list_prompts(
     category: str | None = None,
+    page: int = 1,
+    page_size: int = 20,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
@@ -55,6 +59,8 @@ async def create_prompt(
 
 @router.get("/skills", summary="Skill列表")
 async def list_skills(
+    page: int = 1,
+    page_size: int = 20,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
@@ -64,6 +70,8 @@ async def list_skills(
 @router.get("/memories", summary="项目记忆列表")
 async def list_memories(
     project_id: str | None = None,
+    page: int = 1,
+    page_size: int = 20,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):

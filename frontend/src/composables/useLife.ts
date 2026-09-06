@@ -2,12 +2,14 @@
 // 生活记录 composable（二期 M9）
 // ============================================================
 import { ref } from 'vue'
+import { useDataCache } from './useDataCache'
 import { lifeApi } from '@/api'
 import type { Habit, MoodLog, Diary } from '@/types'
 
 export function useLife() {
   const loading = ref(false)
   const error = ref<string | null>(null)
+  const { cachedFetch } = useDataCache()
   const habits = ref<Habit[]>([])
   const moods = ref<MoodLog[]>([])
   const diaries = ref<Diary[]>([])
@@ -15,7 +17,7 @@ export function useLife() {
 
   async function fetchHabits() {
     loading.value = true
-    try { habits.value = await lifeApi.listHabits() }
+    try { habits.value = await cachedFetch('life:habits', () => lifeApi.listHabits()) }
     catch (e: any) { error.value = e.message }
     finally { loading.value = false }
   }

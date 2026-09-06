@@ -2,12 +2,14 @@
 // 学习成长 composable（二期 M8）
 // ============================================================
 import { ref } from 'vue'
+import { useDataCache } from './useDataCache'
 import { learningApi } from '@/api'
 import type { StudyPlan, Flashcard } from '@/types'
 
 export function useLearning() {
   const loading = ref(false)
   const error = ref<string | null>(null)
+  const { cachedFetch } = useDataCache()
   const plans = ref<StudyPlan[]>([])
   const cards = ref<Flashcard[]>([])
   const todayReviewCards = ref<Flashcard[]>([])
@@ -15,7 +17,7 @@ export function useLearning() {
 
   async function fetchPlans() {
     loading.value = true
-    try { plans.value = await learningApi.listPlans() }
+    try { plans.value = await cachedFetch('learning:plans', () => learningApi.listPlans()) }
     catch (e: any) { error.value = e.message }
     finally { loading.value = false }
   }

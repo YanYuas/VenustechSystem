@@ -2,12 +2,14 @@
 // 长期资产库 composable（二期 M10）
 // ============================================================
 import { ref } from 'vue'
+import { useDataCache } from './useDataCache'
 import { assetApi } from '@/api'
 import type { SOP, PromptTemplate, Skill, ProjectMemory } from '@/types'
 
 export function useAsset() {
   const loading = ref(false)
   const error = ref<string | null>(null)
+  const { cachedFetch } = useDataCache()
   const sops = ref<SOP[]>([])
   const prompts = ref<PromptTemplate[]>([])
   const skills = ref<Skill[]>([])
@@ -29,7 +31,7 @@ export function useAsset() {
 
   async function fetchSkills() {
     loading.value = true
-    try { skills.value = await assetApi.listSkills() }
+    try { skills.value = await cachedFetch('asset:skills', () => assetApi.listSkills()) }
     catch (e: any) { error.value = e.message }
     finally { loading.value = false }
   }

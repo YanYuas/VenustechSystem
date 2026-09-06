@@ -8,6 +8,12 @@ import { STORAGE_KEYS } from '@/constants'
 
 const router = createRouter({
   history: createWebHashHistory(),
+  // 路由切换滚动行为：保存滚动位置，新路由回到顶部
+  scrollBehavior(to, _from, savedPosition) {
+    if (savedPosition) return savedPosition
+    if (to.hash) return { el: to.hash, behavior: 'smooth' }
+    return { top: 0 }
+  },
   routes: [
     {
       path: '/',

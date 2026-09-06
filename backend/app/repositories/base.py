@@ -58,6 +58,14 @@ class BaseRepository(Generic[ModelT]):
         self.db.refresh(obj)
         return obj
 
+
+    def paginate(self, page: int = 1, page_size: int = 20, **filters) -> tuple[list[ModelT], int]:
+        """分页查询，返回 (数据列表, 总数)"""
+        skip = (page - 1) * page_size
+        items = self.list(skip=skip, limit=page_size, **filters)
+        total = self.count(**filters)
+        return items, total
+
     def delete(self, obj: ModelT) -> None:
         self.db.delete(obj)
         self.db.commit()

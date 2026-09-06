@@ -21,6 +21,8 @@ def _svc(db: Session) -> LearningService:
 
 @router.get("/plans", summary="学习计划列表")
 async def list_plans(
+    page: int = 1,
+    page_size: int = 20,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
@@ -38,6 +40,8 @@ async def create_plan(
 @router.get("/cards", summary="知识卡片列表")
 async def list_cards(
     plan_id: str | None = None,
+    page: int = 1,
+    page_size: int = 20,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
