@@ -29,6 +29,37 @@ const toast = useToast()
 const modal = useModal()
 const route = useRoute()
 
+// ---------- 任务依赖关系（M02 P2） ----------
+const taskDependencies = ref<Record<string, string[]>>({})
+const DEP_KEY = 'venustech_task_dependencies'
+function loadDependencies() {
+  try {
+    const saved = localStorage.getItem(DEP_KEY)
+    if (saved) taskDependencies.value = JSON.parse(saved)
+  } catch { }
+}
+function saveDependencies() {
+  localStorage.setItem(DEP_KEY, JSON.stringify(taskDependencies.value))
+}
+function isBlocked(taskId: string): boolean {
+  const deps = taskDependencies.value[taskId] || []
+  return deps.some(depId => {
+    const depTask = tasks.value.find(t => t.id === depId)
+    return depTask && depTask.status !== 'completed'
+  })
+}
+function getBlockingTasks(taskId: string): string[] {
+  return taskDependencies.value[taskId] || []
+}
+function toggleDependency(taskId: string, depId: string) {
+  if (!taskDependencies.value[taskId]) taskDependencies.value[taskId] = []
+  const idx = taskDependencies.value[taskId].indexOf(depId)
+  if (idx >= 0) taskDependencies.value[taskId].splice(idx, 1)
+  else taskDependencies.value[taskId].push(depId)
+  saveDependencies()
+}
+loadDependencies()
+
 const projects = ref<Array<{ id: string; name: string; color: string }>>([])
 const projectOptions = computed(() => [
   { label: '不归属项目', value: '' },
@@ -463,6 +494,7 @@ function formatDate(iso: string | null): string {
   if (!iso) return ''
   return iso.split('T')[0]
 }
+defineExpose({ isBlocked, getBlockingTasks, toggleDependency })
 </script>
 
 <template>
