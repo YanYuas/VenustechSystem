@@ -199,6 +199,67 @@ try {
   const saved = localStorage.getItem('venustech_ai_model')
   if (saved) { const found = availableModels.find(function(m) { return m.id === saved }); if (found) currentModel.value = found }
 } catch { }
+// ---------- 用户画像沉淀（M04 P1 F07） ----------
+interface UserTrait {
+  id: string
+  label: string
+  category: 'interest' | 'skill' | 'style' | 'value'
+  confidence: number
+  source: string
+}
+const PROFILE_KEY = 'venustech_user_profile'
+const defaultTraits: UserTrait[] = [
+  { id: 't1', label: '终身学习者', category: 'value', confidence: 0.8, source: '系统预设' },
+  { id: 't2', label: '注重效率', category: 'style', confidence: 0.7, source: '系统预设' },
+  { id: 't3', label: '技术爱好者', category: 'interest', confidence: 0.6, source: '系统预设' },
+]
+const userTraits = ref<UserTrait[]>([...defaultTraits])
+const showProfilePanel = ref(false)
+const newTraitLabel = ref('')
+const newTraitCategory = ref<'interest' | 'skill' | 'style' | 'value'>('interest')
+const analyzing = ref(false)
+
+function loadTraits() {
+  try {
+    const saved = localStorage.getItem(PROFILE_KEY)
+    if (saved) userTraits.value = JSON.parse(saved)
+  } catch { }
+}
+function saveTraits() {
+  try { localStorage.setItem(PROFILE_KEY, JSON.stringify(userTraits.value)) } catch { }
+}
+function addTrait() {
+  if (!newTraitLabel.value.trim()) return
+  userTraits.value.push({
+    id: 't' + Date.now(),
+    label: newTraitLabel.value.trim(),
+    category: newTraitCategory.value,
+    confidence: 0.5,
+    source: '用户添加',
+  })
+  newTraitLabel.value = ''
+  saveTraits()
+}
+function removeTrait(id: string) {
+  userTraits.value = userTraits.value.filter(t => t.id !== id)
+  saveTraits()
+}
+async function analyzeProfile() {
+  if (analyzing.value) return
+  analyzing.value = true
+  // 模拟分析过程（实际应由后端NLP分析用户文档）
+  await new Promise(r => setTimeout(r, 2000))
+  const newTraits: UserTrait[] = [
+    { id: 'a' + Date.now(), label: '逻辑思维强', category: 'skill', confidence: 0.75, source: '文档分析' },
+    { id: 'b' + Date.now(), label: '追求完美', category: 'style', confidence: 0.65, source: '文档分析' },
+  ]
+  userTraits.value.push(...newTraits)
+  saveTraits()
+  analyzing.value = false
+  toast.success('画像分析完成，新增2个特质标签')
+}
+const categoryLabel = (c: string) => ({ interest: '兴趣', skill: '能力', style: '风格', value: '价值观' } as Record<string, string>)[c] || c
+loadTraits()
 </script>
 
 <template>
@@ -230,7 +291,7 @@ try {
     </aside>
 
     <!-- 对话主区 -->
-    <section class="conv-view__main">`n      <!-- 人设状态栏 -->`n      <div class="conv-view__persona-bar">`n        <button class="conv-view__persona-btn" @click="showPersonaPicker = true">`n          <span class="conv-view__persona-avatar">{{ activePersona.avatar }}</span>`n          <span class="conv-view__persona-name">{{ activePersona.name }}</span>`n          <span class="conv-view__persona-desc">{{ activePersona.description }}</span>`n          <AppIcon name="chevron-down" :size="12" />`n        </button>`n        <button class="conv-view__model-btn" @click="showModelPicker = true">`n          <span class="conv-view__model-icon">{{ currentModel.icon }}</span>`n          <span class="conv-view__model-name">{{ currentModel.name }}</span>`n          <AppIcon name="chevron-down" :size="12" />`n        </button>`n      </div>
+    <section class="conv-view__main">`n      <!-- 人设状态栏 -->`n      <div class="conv-view__persona-bar">`n        <button class="conv-view__persona-btn" @click="showPersonaPicker = true">`n          <span class="conv-view__persona-avatar">{{ activePersona.avatar }}</span>`n          <span class="conv-view__persona-name">{{ activePersona.name }}</span>`n          <span class="conv-view__persona-desc">{{ activePersona.description }}</span>`n          <AppIcon name="chevron-down" :size="12" />`n        </button>`n        <button class="conv-view__model-btn" @click="showModelPicker = true">`n          <span class="conv-view__model-icon">{{ currentModel.icon }}</span>`n          <span class="conv-view__model-name">{{ currentModel.name }}</span>`n          <AppIcon name="chevron-down" :size="12" />`n        </button>`n        <button class="conv-view__model-btn" @click="showProfilePanel = true">`n          <AppIcon name="user" :size="14" />`n          <span class="conv-view__model-name">画像</span>`n        </button>`n      </div>
       <BaseCard class="conv-view__chat" padding="0">
         <div class="conv-view__messages">
           <div
@@ -376,6 +437,37 @@ try {
               </button>
             </div>
           </div>
+        </div>
+      </BaseModal>
+
+      <!-- 用户画像面板（M04 P1 F07） -->
+      <BaseModal v-model="showProfilePanel" title="第二分身 · 用户画像" :width="520">
+        <div class="conv-profile">
+          <div class="conv-profile__head">
+            <p class="conv-profile__desc">第二分身通过分析你的文档和对话，沉淀你的个人特质，用于个性化回复。</p>
+            <BaseButton variant="primary" size="sm" :loading="analyzing" @click="analyzeProfile">
+              <AppIcon name="spark" :size="14" /> {{ analyzing ? '分析中…' : '分析我的文档' }}
+            </BaseButton>
+          </div>
+          <div class="conv-profile__tags">
+            <span v-for="t in userTraits" :key="t.id" class="conv-profile__tag" :class="t.category">
+              <span class="conv-profile__tag-label">{{ t.label }}</span>
+              <span class="conv-profile__tag-cat">{{ categoryLabel(t.category) }}</span>
+              <span class="conv-profile__tag-conf">{{ Math.round(t.confidence * 100) }}%</span>
+              <button class="conv-profile__tag-del" @click="removeTrait(t.id)"><AppIcon name="close" :size="10" /></button>
+            </span>
+          </div>
+          <div class="conv-profile__add">
+            <input v-model="newTraitLabel" class="conv-profile__input" placeholder="添加自定义特质标签…" @keyup.enter="addTrait" />
+            <select v-model="newTraitCategory" class="conv-profile__select">
+              <option value="interest">兴趣</option>
+              <option value="skill">能力</option>
+              <option value="style">风格</option>
+              <option value="value">价值观</option>
+            </select>
+            <BaseButton variant="secondary" size="sm" @click="addTrait">添加</BaseButton>
+          </div>
+          <p class="conv-profile__hint">共 {{ userTraits.length }} 个特质标签 · 数据全程本地存储</p>
         </div>
       </BaseModal>
     </section>
@@ -722,4 +814,20 @@ try {
   &__tags { display: flex; gap: 8px; margin-top: 4px; }
   &__tag { font-size: 10px; color: var(--text-mid); background: var(--bg-panel); padding: 2px 6px; border-radius: 4px; }
   &__check { color: var(--primary); flex-shrink: 0; }
+  // 用户画像（M04 P1 F07）
+}
+.conv-profile {
+  display: flex; flex-direction: column; gap: 16px;
+  &__head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+  &__desc { font-size: 12px; color: var(--text-mid); margin: 0; flex: 1; line-height: 1.5; }
+  &__tags { display: flex; flex-wrap: wrap; gap: 8px; min-height: 60px; }
+  &__tag { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 16px; font-size: 12px; background: var(--bg-inset); border: 1px solid var(--line); &.interest { background: rgba(59,130,246,0.1); border-color: rgba(59,130,246,0.3); } &.skill { background: rgba(16,185,129,0.1); border-color: rgba(16,185,129,0.3); } &.style { background: rgba(168,85,247,0.1); border-color: rgba(168,85,247,0.3); } &.value { background: rgba(245,158,11,0.1); border-color: rgba(245,158,11,0.3); } }
+  &__tag-label { font-weight: 500; color: var(--text-hi); }
+  &__tag-cat { font-size: 10px; color: var(--text-low); background: var(--bg-panel); padding: 1px 5px; border-radius: 4px; }
+  &__tag-conf { font-size: 10px; color: var(--text-low); }
+  &__tag-del { background: none; border: none; color: var(--text-low); cursor: pointer; padding: 2px; &:hover { color: var(--danger); } }
+  &__add { display: flex; gap: 8px; }
+  &__input { flex: 1; padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; outline: none; &:focus { border-color: var(--primary); } }
+  &__select { padding: 8px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; background: var(--bg-panel); }
+  &__hint { font-size: 11px; color: var(--text-low); text-align: center; margin: 0; }
 </style>
