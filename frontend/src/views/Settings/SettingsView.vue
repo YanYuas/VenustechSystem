@@ -284,7 +284,7 @@ const showChangelog = ref(false)
 const changelog = [
   { version: 'v0.1.70', date: '2026-08-28', changes: ['一期工程基础版发布', '6大核心模块上线', '四套UI主题'] },
   { version: 'v0.1.71', date: '2026-09-04', changes: ['模块深度开发启动', '9个模块分支创建', 'UI组件V3.0对齐'] },
-  { version: 'v0.2.0', date: '开发中', changes: ['桌宠互动系统', '史诗典藏主题', '事件总线增强'] },
+  { version: 'v0.2.0', date: '2026-09-06', changes: ['9模块深度开发完成', '四套UI主题V3.0对齐', '插件系统+加密存储', '首页跳转修复'] },
 ]
 
 onMounted(() => {
@@ -596,7 +596,7 @@ onMounted(() => {
           <div class="settings__about-info">
             <h3>Venustech System · 启明星</h3>
             <p>方向启明，人生推演</p>
-            <p class="settings__about-version">版本 v0.2.0 · 一期打磨中</p>
+            <p class="settings__about-version">版本 v0.2.0</p>
           </div>
         </div>
         <div class="settings__group">

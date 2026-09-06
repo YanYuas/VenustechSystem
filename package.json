@@ -1,7 +1,7 @@
 {
   "name": "qimingxing-server",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "description": "启明星系统统一 Web 服务",
   "scripts": {
