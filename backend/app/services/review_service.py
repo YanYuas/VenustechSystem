@@ -57,10 +57,12 @@ class ReviewService:
         if review is None:
             review = self.repo.create(
                 user_id=self.user_id, type=data.type, review_date=data.date,
-                data=data.data.model_dump(),
+                project_id=data.project_id, data=data.data.model_dump(),
             )
         else:
             review.data = data.data.model_dump()
+            if "project_id" in data.model_dump(exclude_unset=True):
+                review.project_id = data.project_id
             self.db.commit()
             self.db.refresh(review)
         return self._out(review)
@@ -152,7 +154,7 @@ class ReviewService:
     @staticmethod
     def _out(r: Review) -> ReviewOut:
         return ReviewOut(
-            id=r.id, type=r.type, review_date=r.review_date,
+            id=r.id, type=r.type, review_date=r.review_date, project_id=r.project_id,
             data=ReviewData(**(r.data or {})),
             created_at=r.created_at, updated_at=r.updated_at,
         )

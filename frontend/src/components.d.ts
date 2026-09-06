@@ -33,6 +33,7 @@ declare module 'vue' {
     CommandPalette: typeof import('./components/layout/CommandPalette.vue')['default']
     DefaultLayout: typeof import('./components/layout/DefaultLayout.vue')['default']
     DesktopPet: typeof import('./components/pet/DesktopPet.vue')['default']
+    FocusTimer: typeof import('./components/task/FocusTimer.vue')['default']
     GlobalSearch: typeof import('./components/layout/GlobalSearch.vue')['default']
     LeftInfoPanel: typeof import('./components/layout/LeftInfoPanel.vue')['default']
     ModalHost: typeof import('./components/common/ModalHost.vue')['default']

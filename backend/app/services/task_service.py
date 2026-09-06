@@ -4,19 +4,23 @@
 # ============================================================
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.event_bus import EVENT_TASK_COMPLETED, EVENT_TASK_CREATED, event_bus
 from app.core.exceptions import NotFoundException, TaskStateException
 from app.models.base import utcnow
-from app.models.task import Task
+from app.models.task import FocusSession, Task
 from app.repositories import SubtaskRepository, TaskRepository
 from app.schemas.common import PaginatedData
 from app.schemas.task import (
+    BatchTaskRequest,
+    BatchTaskResult,
     CreateSubtaskRequest,
     CreateTaskRequest,
+    FocusSessionOut,
     FocusTaskOut,
     SubtaskOut,
     TaskDetailOut,
@@ -80,6 +84,9 @@ class TaskService:
             subtasks_count=total,
             subtasks_completed=done,
             completed_at=task.completed_at,
+            reminder_time=task.reminder_time,
+            recurrence=task.recurrence,
+            focus_duration=task.focus_duration or 0,
             created_at=task.created_at,
             updated_at=task.updated_at,
         )
@@ -102,6 +109,15 @@ class TaskService:
         if task is None or task.user_id != user_id:
             raise NotFoundException("任务不存在")
         return task
+
+    @staticmethod
+    def _ensure_project_active(task: Task) -> None:
+        """归档项目的任务只读（M06 F04）：修改/完成前校验所属项目状态。"""
+        if task.project_id is None:
+            return
+        project = task.project  # relationship（expire_on_commit=False 下可用）
+        if project is not None and project.status == "archived":
+            raise TaskStateException("所属项目已归档，任务为只读。请先恢复项目")
 
     @staticmethod
     def _apply_status(task: Task, new_status: str) -> bool:
@@ -158,6 +174,8 @@ class TaskService:
             project_tag=data.project_tag,
             project_id=data.project_id,
             due_date=data.due_date,
+            reminder_time=data.reminder_time,
+            recurrence=data.recurrence,
         )
         event_bus.publish(EVENT_TASK_CREATED, task_id=task.id)
         return self._to_out(task)
@@ -175,10 +193,14 @@ class TaskService:
         return TaskDetailOut(**out.model_dump(), subtasks=subtasks)
 
     # 允许更新的字段白名单（防越权修改 user_id / is_focus 等）
-    _UPDATABLE_FIELDS = {"title", "description", "priority", "project_tag", "project_id", "due_date", "sort_order"}
+    _UPDATABLE_FIELDS = {
+        "title", "description", "priority", "project_tag", "project_id",
+        "due_date", "sort_order", "reminder_time", "recurrence",
+    }
 
     def update(self, user_id: str, task_id: str, data: UpdateTaskRequest) -> TaskOut:
         task = self._owned(task_id, user_id)
+        self._ensure_project_active(task)
         payload = data.model_dump(exclude_unset=True)
         became_completed = False
         if "status" in payload:
@@ -263,3 +285,167 @@ class TaskService:
             id=sub.id, task_id=sub.task_id, title=sub.title, completed=sub.completed,
             sort_order=sub.sort_order, created_at=sub.created_at, updated_at=sub.updated_at,
         )
+
+    # ---------- 批量操作（M02 F07） ----------
+
+    def batch(self, user_id: str, data: BatchTaskRequest) -> BatchTaskResult:
+        affected = 0
+        failed = 0
+        for task_id in data.task_ids:
+            try:
+                task = self.repo.get(task_id)
+                if task is None or task.user_id != user_id:
+                    failed += 1
+                    continue
+                if data.action == "complete":
+                    self._ensure_project_active(task)
+                    if task.status != "completed":
+                        self._apply_status(task, "completed")
+                elif data.action == "delete":
+                    self.db.delete(task)
+                elif data.action == "move_project":
+                    self._ensure_project_active(task)
+                    task.project_id = data.project_id
+                elif data.action == "set_priority":
+                    if data.priority not in VALID_PRIORITIES:
+                        raise TaskStateException(f"无效优先级: {data.priority}")
+                    task.priority = data.priority
+                affected += 1
+            except Exception:
+                failed += 1
+        self.db.commit()
+        return BatchTaskResult(affected=affected, failed=failed)
+
+    # ---------- 番茄钟（M02 F08） ----------
+
+    def focus_start(self, user_id: str, task_id: str) -> FocusSessionOut:
+        task = self._owned(task_id, user_id)
+        session = FocusSession(
+            task_id=task.id, user_id=user_id, start_time=utcnow()
+        )
+        self.db.add(session)
+        self.db.commit()
+        self.db.refresh(session)
+        return self._focus_session_out(session)
+
+    def focus_stop(self, user_id: str, session_id: str) -> FocusSessionOut:
+        session = self.db.get(FocusSession, session_id)
+        if session is None or session.user_id != user_id:
+            raise NotFoundException("专注会话不存在")
+        if session.end_time is not None:
+            raise TaskStateException("该专注会话已结束")
+        session.end_time = utcnow()
+        session.duration = max(
+            0, int((session.end_time - session.start_time).total_seconds())
+        )
+        # 累计到任务总专注时长
+        if session.task_id:
+            task = self.repo.get(session.task_id)
+            if task is not None:
+                task.focus_duration = (task.focus_duration or 0) + session.duration
+        self.db.commit()
+        self.db.refresh(session)
+        return self._focus_session_out(session)
+
+    def focus_sessions(self, user_id: str, task_id: str) -> list[FocusSessionOut]:
+        task = self._owned(task_id, user_id)
+        from sqlalchemy import select as sa_select
+        rows = self.db.scalars(
+            sa_select(FocusSession)
+            .where(FocusSession.task_id == task.id)
+            .order_by(FocusSession.start_time.desc())
+            .limit(50)
+        )
+        return [self._focus_session_out(s) for s in rows]
+
+    @staticmethod
+    def _focus_session_out(s: FocusSession) -> FocusSessionOut:
+        return FocusSessionOut(
+            id=s.id, task_id=s.task_id, start_time=s.start_time,
+            end_time=s.end_time, duration=s.duration, note=s.note,
+            created_at=s.created_at,
+        )
+
+    # ---------- 重复任务（M02 F05）：惰性生成到期实例 ----------
+
+    def generate_recurring_instances(self, user_id: str) -> int:
+        """为重复任务生成到期实例（启动/每日触发，幂等：已有当日实例不重复生成）。"""
+        from sqlalchemy import select as sa_select
+        today = date.today()
+        templates = list(
+            self.db.scalars(
+                sa_select(Task).where(
+                    Task.user_id == user_id,
+                    Task.recurrence.is_not(None),
+                )
+            )
+        )
+        created = 0
+        for t in templates:
+            rule = t.recurrence or {}
+            rtype = rule.get("type")
+            if not rtype:
+                continue
+            # 目标日期：模板 due_date 或今天
+            base_date = t.due_date or today
+            target = self._next_occurrence(base_date, today, rtype, rule)
+            if target is None:
+                continue
+            # 幂等：同模板同目标日已存在实例则跳过（按 title+due_date 粗粒度判重）
+            exists = self.db.scalar(
+                sa_select(func.count()).select_from(Task).where(
+                    Task.user_id == user_id,
+                    Task.title == t.title,
+                    Task.due_date == target,
+                )
+            )
+            if exists:
+                continue
+            self.db.add(Task(
+                user_id=user_id,
+                title=t.title,
+                description=t.description,
+                status="pending",
+                priority=t.priority,
+                project_tag=t.project_tag,
+                project_id=t.project_id,
+                due_date=target,
+                recurrence=t.recurrence,
+            ))
+            created += 1
+        if created:
+            self.db.commit()
+        return created
+
+    @staticmethod
+    def _next_occurrence(base_date: date, today: date, rtype: str, rule: dict) -> date | None:
+        """从 base_date 推进到 ≥today 的下一次出现日；已过期的周期跳到当前周期。"""
+        interval = max(1, int(rule.get("interval", 1)))
+        if rtype == "daily":
+            delta = (today - base_date).days
+            if delta < 0:
+                return base_date
+            step = ((delta + interval - 1) // interval) * interval
+            return base_date + timedelta(days=step)
+        if rtype == "weekly":
+            days = rule.get("days") or []
+            # 未指定星期几则按 base_date 的星期
+            weekdays = sorted({int(d) for d in days}) if days else [base_date.weekday()]
+            for offset in range(0, 60):
+                d = today + timedelta(days=offset)
+                if d.weekday() in weekdays and d >= base_date and d >= today:
+                    return d
+            return None
+        if rtype == "monthly":
+            # 月份推进
+            d = base_date
+            while d < today:
+                month = d.month + interval
+                year = d.year + (month - 1) // 12
+                month = (month - 1) % 12 + 1
+                try:
+                    d = date(year, month, min(base_date.day, 28))
+                except ValueError:
+                    d = date(year, month, 28)
+            return d if d >= today else None
+        return None

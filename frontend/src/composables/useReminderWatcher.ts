@@ -51,6 +51,11 @@ export function useReminderWatcher() {
 
   // 检查到期提醒
   async function checkReminders() {
+    await Promise.allSettled([checkQuickReminders(), checkTaskReminders()])
+  }
+
+  // 快速提醒（左侧面板 reminders）
+  async function checkQuickReminders() {
     try {
       const reminders = await panelApi.listReminders()
       const now = Date.now()
@@ -84,6 +89,40 @@ export function useReminderWatcher() {
           // 4. 标记提醒为已触发（dismissed）
           try {
             await panelApi.updateReminder(r.id, { dismissed: true })
+          } catch { /* ignore */ }
+        }
+      }
+    } catch {
+      // 静默失败，不影响用户
+    }
+  }
+
+  // 任务提醒（M02 F06）：reminder_time 到期的未完成任务
+  async function checkTaskReminders() {
+    try {
+      const { taskApi } = await import('@/api')
+      const res = await taskApi.list({ page_size: 200 })
+      const now = Date.now()
+
+      for (const t of res.list) {
+        if (!t.reminder_time || t.status === 'completed') continue
+        const remindTime = new Date(t.reminder_time).getTime()
+        // 到期（且在过去1小时内）；提醒后清除 reminder_time 防重复
+        if (remindTime <= now && now - remindTime < 3600000) {
+          showDesktopNotification(`任务提醒：${t.title}`, t.description ?? '该任务提醒时间到了')
+          toast.warning(`任务提醒：${t.title}`, t.due_date ? `截止 ${t.due_date}` : '时间到了')
+          try {
+            await notificationApi.create({
+              title: `任务提醒：${t.title}`,
+              content: t.description ?? '任务提醒时间到',
+              type: 'warning',
+              source_type: 'task',
+              source_id: t.id,
+            })
+          } catch { /* ignore */ }
+          // 清除该任务的提醒时间（一次性提醒语义，null 落库清除）
+          try {
+            await taskApi.update(t.id, { reminder_time: null })
           } catch { /* ignore */ }
         }
       }

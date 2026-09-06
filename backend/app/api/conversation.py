@@ -49,7 +49,8 @@ def create_conversation(
     user: User = Depends(get_current_user),
 ):
     title = data.title if data else None
-    return success(_svc(db, user).create(title))
+    project_id = data.project_id if data else None
+    return success(_svc(db, user).create(title, project_id))
 
 
 @router.get("/{conversation_id}/messages")

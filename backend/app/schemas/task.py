@@ -33,6 +33,10 @@ class TaskOut(BaseModel):
     subtasks_count: int = 0
     subtasks_completed: int = 0
     completed_at: datetime | None = None
+    # ---------- M02 深度开发 ----------
+    reminder_time: datetime | None = None
+    recurrence: dict | None = None
+    focus_duration: int = 0
     created_at: datetime
     updated_at: datetime
 
@@ -49,6 +53,8 @@ class CreateTaskRequest(BaseModel):
     project_tag: str | None = None
     project_id: str | None = None
     due_date: date | None = None
+    reminder_time: datetime | None = None
+    recurrence: dict | None = None
 
 
 class UpdateTaskRequest(BaseModel):
@@ -59,6 +65,8 @@ class UpdateTaskRequest(BaseModel):
     project_tag: str | None = None
     project_id: str | None = None
     due_date: date | None = None
+    reminder_time: datetime | None = None
+    recurrence: dict | None = None
 
 
 class CreateSubtaskRequest(BaseModel):
@@ -68,6 +76,35 @@ class CreateSubtaskRequest(BaseModel):
 class UpdateSubtaskRequest(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=500)
     completed: bool | None = None
+    sort_order: int | None = None
+
+
+# ---------- 批量操作（M02 F07） ----------
+
+class BatchTaskRequest(BaseModel):
+    """批量操作：action 决定语义，其余字段按 action 可选。"""
+
+    task_ids: list[str] = Field(min_length=1)
+    action: str = Field(pattern="^(complete|delete|move_project|set_priority)$")
+    project_id: str | None = None      # move_project
+    priority: str | None = None        # set_priority
+
+
+class BatchTaskResult(BaseModel):
+    affected: int = 0
+    failed: int = 0
+
+
+# ---------- 番茄钟（M02 F08） ----------
+
+class FocusSessionOut(BaseModel):
+    id: str
+    task_id: str | None = None
+    start_time: datetime
+    end_time: datetime | None = None
+    duration: int = 0
+    note: str | None = None
+    created_at: datetime
 
 
 class TodayStatsOut(BaseModel):

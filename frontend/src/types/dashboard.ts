@@ -130,6 +130,18 @@ export interface AssetsSection {
   status: ModuleStatus
 }
 
+/** 本周进度环（M01 F04） */
+export interface WeekProgress {
+  completed: number
+  total: number
+  percentage: number
+}
+
+/** 连续打卡徽章（M01 F05） */
+export interface StreakData {
+  days: number
+  week_checkins: boolean[]
+}
 /** 用户信息 */
 export interface DashboardUser {
   nickname: string

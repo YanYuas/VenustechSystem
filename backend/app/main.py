@@ -45,6 +45,20 @@ async def lifespan(_app: FastAPI):
     with SessionLocal() as db:
         if settings.demo_seed:
             seed_if_empty(db)
+        # 重复任务（M02 F05）：启动时惰性生成到期实例（幂等）
+        try:
+            from sqlalchemy import select
+            from app.models.user import User
+            from app.services.task_service import TaskService
+            svc = TaskService(db)
+            total = sum(
+                svc.generate_recurring_instances(uid)
+                for (uid,) in db.execute(select(User.id)).all()
+            )
+            if total:
+                logger.info(f"重复任务生成 {total} 个实例")
+        except Exception:
+            logger.exception("重复任务生成失败（不影响启动）")
     # 注册事件总线订阅者（文档保存→AI摘要/标签，任务完成→通知）
     import asyncio
     set_event_loop(asyncio.get_running_loop())

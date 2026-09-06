@@ -12,12 +12,14 @@ class ConversationOut(BaseModel):
     id: str
     title: str | None = None
     scene: str = "general"
+    project_id: str | None = None
     created_at: datetime
     updated_at: datetime
 
 
 class CreateConversationRequest(BaseModel):
     title: str | None = None
+    project_id: str | None = None
 
 
 class MessageOut(BaseModel):

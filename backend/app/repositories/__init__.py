@@ -11,6 +11,7 @@ from app.repositories.conversation_repo import ConversationRepository, MessageRe
 from app.repositories.review_repo import ReviewRepository
 from app.repositories.panel_repo import QuickTodoRepository, ReminderRepository
 from app.repositories.notification_repo import NotificationRepository
+from app.repositories.project_repo import MilestoneRepository, ProjectRepository
 
 __all__ = [
     "BaseRepository",
@@ -27,4 +28,6 @@ __all__ = [
     "QuickTodoRepository",
     "ReminderRepository",
     "NotificationRepository",
+    "ProjectRepository",
+    "MilestoneRepository",
 ]

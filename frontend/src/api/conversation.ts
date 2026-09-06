@@ -12,8 +12,8 @@ export const conversationApi = {
   list() {
     return http.get<Conversation[]>('/conversations')
   },
-  create(title?: string) {
-    return http.post<Conversation>('/conversations', { title })
+  create(title?: string, project_id?: string) {
+    return http.post<Conversation>('/conversations', { title, project_id })
   },
   messages(id: string) {
     return http.get<Message[]>(`/conversations/${id}/messages`)

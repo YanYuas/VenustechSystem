@@ -1,5 +1,5 @@
 # ============================================================
-# tasks + subtasks（PRD §15.2 / §15.3）
+# tasks + subtasks + focus_sessions（PRD §15.2 / §15.3 + M02 深度开发）
 # ============================================================
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Index, Integer, Stri
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, SoftDeleteMixin, TimestampMixin, UUIDMixin
+from app.models.types import JSONType
 
 
 class Task(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
@@ -48,6 +49,15 @@ class Task(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
     completed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # ---------- M02 深度开发新增 ----------
+    # 任务提醒时间（本地 naive，到期触发通知）
+    reminder_time: Mapped[datetime | None] = mapped_column(
+        DateTime, nullable=True, index=True
+    )
+    # 重复规则 JSON：{type: daily|weekly|monthly|custom, interval: int, days: [0-6]}
+    recurrence: Mapped[dict | None] = mapped_column(JSONType, nullable=True)
+    # 累计专注秒数（番茄钟）
+    focus_duration: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     subtasks: Mapped[list["Subtask"]] = relationship(
         back_populates="task",
@@ -71,3 +81,20 @@ class Subtask(UUIDMixin, TimestampMixin, Base):
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     task: Mapped[Task] = relationship(back_populates="subtasks")
+
+
+class FocusSession(UUIDMixin, TimestampMixin, Base):
+    """番茄钟专注会话（M02 F08）：start 后 stop 结算，duration 秒。"""
+
+    __tablename__ = "focus_sessions"
+
+    task_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("tasks.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    user_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    start_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    end_time: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    duration: Mapped[int] = mapped_column(Integer, nullable=False, default=0)  # 秒
+    note: Mapped[str | None] = mapped_column(String(500), nullable=True)
