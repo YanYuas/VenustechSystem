@@ -20,7 +20,7 @@ const emit = defineEmits<{
   (e: 'move', pos: { x: number; y: number }): void
 }>()
 
-export type PetAction = 'idle' | 'happy' | 'thinking' | 'working' | 'celebrate' | 'sleep'
+export type PetAction = 'idle' | 'happy' | 'thinking' | 'working' | 'celebrate' | 'sleep' | 'wave' | 'dance' | 'read' | 'run' | 'shy' | 'surprised'
 const action = ref<PetAction>('idle')
 const message = ref('')
 const showMessage = ref(false)
@@ -29,12 +29,18 @@ const pos = ref({ ...props.position })
 const dragOffset = { x: 0, y: 0 }
 
 const MESSAGES: Record<PetAction, string[]> = {
-  idle: ['今天也要加油哦~', '有什么我可以帮你的吗？', '记得休息一下眼睛~', '专注当下，你可以的！'],
-  happy: ['太棒了！', '做得好！', '继续保持！'],
-  thinking: ['让我想想...', '嗯...这个问题...', '我在认真思考哦'],
-  working: ['努力工作中...', '正在帮你处理~', '加油加油！'],
-  celebrate: ['任务完成！', '太厉害了！', '你是最棒的！'],
-  sleep: ['Zzz...', '好困哦...', '休息一下吧~'],
+  idle: ['今天也要加油哦~', '有什么我可以帮你的吗？', '记得休息一下眼睛~', '专注当下，你可以的！', '我在你身边呢~'],
+  happy: ['太棒了！', '做得好！', '继续保持！', '好开心呀~'],
+  thinking: ['让我想想...', '嗯...这个问题...', '我在认真思考哦', '有思路了！'],
+  working: ['努力工作中...', '正在帮你处理~', '加油加油！', '专注模式启动！'],
+  celebrate: ['任务完成！', '太厉害了！', '你是最棒的！', '恭喜恭喜~'],
+  sleep: ['Zzz...', '好困哦...', '休息一下吧~', '晚安...'],
+  wave: ['你好呀~', '嗨！', '欢迎回来！', '见到你真高兴~'],
+  dance: ['一起跳舞吧~', '动起来！', '心情超好~', '啦啦啦~'],
+  read: ['正在阅读...', '这本书真有趣', '知识就是力量！', '让我看看...'],
+  run: ['冲鸭！', '快速前进~', '等等我！', '活力满满！'],
+  shy: ['哎呀...', '人家害羞了~', '不要这样看着我嘛', '脸红了...'],
+  surprised: ['诶？！', '真的吗？', '太意外了！', '哇哦~'],
 }
 
 let messageTimer: ReturnType<typeof setTimeout> | null = null
@@ -119,6 +125,7 @@ onMounted(() => {
   }, 8000)
   setTimeout(() => randomMessage(), 1000)
   window.addEventListener(PET_ACTION_EVENT, onPetAction)
+  startDecay()
 })
 
 onUnmounted(() => {
@@ -126,9 +133,195 @@ onUnmounted(() => {
   if (messageTimer) clearTimeout(messageTimer)
   if (actionTimer) clearTimeout(actionTimer)
   window.removeEventListener(PET_ACTION_EVENT, onPetAction)
+  if (decayTimer) clearInterval(decayTimer)
 })
 
-defineExpose({ setAction, celebrate: () => setAction('celebrate', 3000) })
+
+// ---------- 形态切换（桌宠/人形） ----------
+type PetForm = 'pet' | 'human'
+const form = ref<PetForm>('pet')
+const switching = ref(false)
+const FORM_KEY = 'venustech_pet_form'
+
+function loadForm() {
+  try {
+    const saved = localStorage.getItem(FORM_KEY)
+    if (saved === 'human' || saved === 'pet') form.value = saved
+  } catch { }
+}
+function toggleForm() {
+  switching.value = true
+  setTimeout(() => {
+    form.value = form.value === 'pet' ? 'human' : 'pet'
+    try { localStorage.setItem(FORM_KEY, form.value) } catch { }
+    setAction('wave', 1500)
+    setTimeout(() => { switching.value = false }, 300)
+  }, 300)
+}
+loadForm()
+
+// ---------- 右键菜单 ----------
+const showMenu = ref(false)
+const menuPos = ref({ x: 0, y: 0 })
+const menuActions: Array<{ action: PetAction; label: string; icon: string }> = [
+  { action: 'wave', label: '打招呼', icon: '👋' },
+  { action: 'dance', label: '跳舞', icon: '💃' },
+  { action: 'read', label: '阅读', icon: '📖' },
+  { action: 'run', label: '奔跑', icon: '🏃' },
+  { action: 'shy', label: '害羞', icon: '😊' },
+  { action: 'surprised', label: '惊讶', icon: '😮' },
+  { action: 'sleep', label: '睡觉', icon: '😴' },
+  { action: 'celebrate', label: '庆祝', icon: '🎉' },
+]
+
+function onContextMenu(e: MouseEvent) {
+  e.preventDefault()
+  menuPos.value = { x: e.clientX, y: e.clientY }
+  showMenu.value = true
+}
+function doMenuAction(a: PetAction) {
+  setAction(a, 2000)
+  showMenu.value = false
+}
+function closeMenu() { showMenu.value = false }
+
+
+// ---------- 状态系统（M07 P1） ----------
+interface PetStats {
+  intimacy: number    // 亲密度 0-100
+  hunger: number      // 饱食度 0-100
+  mood: number        // 心情 0-100
+  energy: number      // 精力 0-100
+}
+const STATS_KEY = 'venustech_pet_stats'
+const stats = ref<PetStats>({ intimacy: 30, hunger: 70, mood: 60, energy: 80 })
+
+function loadStats() {
+  try {
+    const saved = localStorage.getItem(STATS_KEY)
+    if (saved) stats.value = JSON.parse(saved)
+  } catch { }
+}
+function saveStats() {
+  try { localStorage.setItem(STATS_KEY, JSON.stringify(stats.value)) } catch { }
+}
+function clamp(v: number) { return Math.max(0, Math.min(100, v)) }
+
+// 状态随时间衰减
+let decayTimer: ReturnType<typeof setInterval> | null = null
+function startDecay() {
+  decayTimer = setInterval(() => {
+    stats.value.hunger = clamp(stats.value.hunger - 1)
+    stats.value.energy = clamp(stats.value.energy - 0.5)
+    if (stats.value.hunger < 30) stats.value.mood = clamp(stats.value.mood - 1)
+    saveStats()
+  }, 60000) // 每分钟衰减
+}
+
+// ---------- 互动系统（M07 P1） ----------
+function pet() {
+  // 抚摸：增加亲密度和心情
+  stats.value.intimacy = clamp(stats.value.intimacy + 2)
+  stats.value.mood = clamp(stats.value.mood + 3)
+  setAction('happy', 1500)
+  saveStats()
+}
+function feed() {
+  if (stats.value.hunger >= 95) {
+    message.value = '人家吃饱啦~'
+    showMessage.value = true
+    setTimeout(() => { showMessage.value = false }, 2000)
+    return
+  }
+  stats.value.hunger = clamp(stats.value.hunger + 25)
+  stats.value.mood = clamp(stats.value.mood + 5)
+  setAction('happy', 2000)
+  message.value = '好好吃~ 谢谢你！'
+  showMessage.value = true
+  setTimeout(() => { showMessage.value = false }, 2500)
+  saveStats()
+}
+function play() {
+  if (stats.value.energy < 20) {
+    message.value = '好累哦...想休息一下...'
+    showMessage.value = true
+    setTimeout(() => { showMessage.value = false }, 2000)
+    setAction('sleep', 2000)
+    return
+  }
+  stats.value.mood = clamp(stats.value.mood + 10)
+  stats.value.energy = clamp(stats.value.energy - 10)
+  stats.value.intimacy = clamp(stats.value.intimacy + 3)
+  setAction('dance', 2500)
+  saveStats()
+}
+function rest() {
+  stats.value.energy = clamp(stats.value.energy + 30)
+  stats.value.mood = clamp(stats.value.mood + 5)
+  setAction('sleep', 3000)
+  message.value = 'Zzz... 休息一下~'
+  showMessage.value = true
+  setTimeout(() => { showMessage.value = false }, 3000)
+  saveStats()
+}
+
+// 状态影响消息
+function getMoodLabel() {
+  if (stats.value.mood >= 80) return '超开心'
+  if (stats.value.mood >= 60) return '心情不错'
+  if (stats.value.mood >= 40) return '一般般'
+  if (stats.value.mood >= 20) return '有点低落'
+  return '需要陪伴'
+}
+
+loadStats()
+
+
+// ---------- 自定义形象配置（M07 P2） ----------
+interface PetAppearance {
+  primaryColor: string
+  secondaryColor: string
+  eyeColor: string
+  preset: string
+}
+const APPEARANCE_KEY = 'venustech_pet_appearance'
+const appearancePresets = [
+  { id: 'default', name: '默认', primary: '#FFB6C1', secondary: '#87CEEB', eye: '#4A4A4A' },
+  { id: 'ocean', name: '海洋', primary: '#6BB5D6', secondary: '#2E9D8F', eye: '#1A3A4A' },
+  { id: 'sunset', name: '落日', primary: '#FFA07A', secondary: '#FF6B6B', eye: '#5A2A2A' },
+  { id: 'forest', name: '森林', primary: '#90EE90', secondary: '#228B22', eye: '#1A3A1A' },
+  { id: 'cosmic', name: '星辰', primary: '#9B7ED8', secondary: '#E8C547', eye: '#2A1A4A' },
+]
+const appearance = ref<PetAppearance>({
+  primaryColor: '#FFB6C1',
+  secondaryColor: '#87CEEB',
+  eyeColor: '#4A4A4A',
+  preset: 'default',
+})
+function loadAppearance() {
+  try {
+    const saved = localStorage.getItem(APPEARANCE_KEY)
+    if (saved) appearance.value = JSON.parse(saved)
+  } catch { }
+}
+function saveAppearance() {
+  localStorage.setItem(APPEARANCE_KEY, JSON.stringify(appearance.value))
+}
+function applyPreset(presetId: string) {
+  const preset = appearancePresets.find(p => p.id === presetId)
+  if (preset) {
+    appearance.value = {
+      primaryColor: preset.primary,
+      secondaryColor: preset.secondary,
+      eyeColor: preset.eye,
+      preset: presetId,
+    }
+    saveAppearance()
+  }
+}
+loadAppearance()
+
+defineExpose({ appearance, appearancePresets, applyPreset, setAction, celebrate: () => setAction('celebrate', 3000), toggleForm, form, stats, pet, feed, play, rest })
 
 const petClass = computed(() => ({
   'pet--idle': action.value === 'idle',
@@ -146,14 +339,14 @@ const petClass = computed(() => ({
     :class="petClass"
     :style="{ transform: `translate3d(${pos.x}px, ${pos.y}px, 0)`, zIndex: topmost ? 9999 : 100 }"
     @mousedown="onDragStart"
-    @click.stop="onClick"
+    @click.stop="onClick" @contextmenu.prevent="onContextMenu" @dblclick.stop="toggleForm"
   >
     <Transition name="bubble">
       <div v-if="showMessage" class="pet__bubble">{{ message }}</div>
     </Transition>
 
     <div class="pet__body">
-      <svg viewBox="0 0 120 140" class="pet__svg">
+      <svg v-if="form === 'pet'" viewBox="0 0 120 140" class="pet__svg">
         <ellipse cx="60" cy="95" rx="35" ry="38" fill="url(#bodyGrad)" />
         <circle cx="60" cy="50" r="32" fill="url(#headGrad)" />
         <path d="M28 45 Q30 20 60 18 Q90 20 92 45 Q85 30 60 28 Q35 30 28 45" fill="#8B7355" />
@@ -181,6 +374,49 @@ const petClass = computed(() => ({
         </defs>
       </svg>
 
+
+      <!-- 人形形象 -->
+      <svg v-if="form === 'human'" viewBox="0 0 120 160" class="pet__svg pet__svg--human">
+        <!-- 头发 -->
+        <path d="M30 45 Q28 15 60 12 Q92 15 90 45 Q85 25 60 23 Q35 25 30 45" fill="#4A3728" />
+        <!-- 脸 -->
+        <ellipse cx="60" cy="50" rx="26" ry="28" fill="url(#skinGrad)" />
+        <!-- 眼睛 -->
+        <g class="pet__eyes">
+          <ellipse cx="50" cy="52" rx="4" ry="6" fill="#333" />
+          <ellipse cx="70" cy="52" rx="4" ry="6" fill="#333" />
+          <circle cx="51" cy="50" r="1.5" fill="#fff" />
+          <circle cx="71" cy="50" r="1.5" fill="#fff" />
+        </g>
+        <!-- 腮红 -->
+        <ellipse cx="42" cy="60" rx="5" ry="3" fill="#FFB6C1" opacity="0.5" />
+        <ellipse cx="78" cy="60" rx="5" ry="3" fill="#FFB6C1" opacity="0.5" />
+        <!-- 嘴巴 -->
+        <path class="pet__mouth" d="M54 64 Q60 69 66 64" stroke="#333" stroke-width="1.5" fill="none" stroke-linecap="round" />
+        <!-- 脖子 -->
+        <rect x="55" y="75" width="10" height="10" fill="url(#skinGrad)" />
+        <!-- 身体（衣服） -->
+        <path d="M35 85 Q30 82 35 130 L85 130 Q90 82 85 85 Q75 80 60 80 Q45 80 35 85" fill="url(#clothGrad)" />
+        <!-- 手臂 -->
+        <ellipse cx="28" cy="100" rx="8" ry="20" fill="url(#clothGrad)" class="pet__arm pet__arm--left" />
+        <ellipse cx="92" cy="100" rx="8" ry="20" fill="url(#clothGrad)" class="pet__arm pet__arm--right" />
+        <!-- 手 -->
+        <circle cx="28" cy="120" r="6" fill="url(#skinGrad)" />
+        <circle cx="92" cy="120" r="6" fill="url(#skinGrad)" />
+        <!-- 星星装饰 -->
+        <path d="M85 30 L86.5 34 L91 34 L87.5 37 L89 42 L85 39 L81 42 L82.5 37 L79 34 L83.5 34 Z" fill="#FFD700" />
+        <defs>
+          <linearGradient id="skinGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#FFE4C4" />
+            <stop offset="100%" stop-color="#FFDAB9" />
+          </linearGradient>
+          <linearGradient id="clothGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#C9A8E8" />
+            <stop offset="100%" stop-color="#9B7FD4" />
+          </linearGradient>
+        </defs>
+      </svg>
+
       <div v-if="action === 'celebrate'" class="pet__confetti">
         <span v-for="i in 8" :key="i" class="pet__confetti-piece" :style="{ '--i': i }" />
       </div>
@@ -189,7 +425,41 @@ const petClass = computed(() => ({
     <div class="pet__status">
       <AppIcon :name="action === 'working' ? 'loading' : 'spark'" :size="12" />
     </div>
-  </div>
+
+    <!-- 右键菜单 -->
+    <Teleport to="body">
+      <Transition name="menu">
+        <div v-if="showMenu" class="pet__menu" :style="{ left: menuPos.x + 'px', top: menuPos.y + 'px' }" @click.stop>
+          <div class="pet__menu-header">
+            <span>{{ form === 'pet' ? '桌宠模式' : '人形模式' }}</span>
+            <button class="pet__menu-switch" @click="toggleForm">切换形态</button>
+          </div>
+          <div class="pet__menu-divider" />
+          <div class="pet__menu-actions">
+            <button v-for="m in menuActions" :key="m.action" class="pet__menu-item" @click="doMenuAction(m.action)">
+              <span class="pet__menu-icon">{{ m.icon }}</span>
+              <span>{{ m.label }}</span>
+            </button>
+          </div>
+          <div class="<div class="pet__menu-divider" />
+          <div class="pet__menu-actions">
+            <button class="pet__menu-item" @click="feed"><span class="pet__menu-icon">🍖</span><span>喂食</span><span class="pet__menu-val">{{ Math.round(stats.hunger) }}%</span></button>
+            <button class="pet__menu-item" @click="play"><span class="pet__menu-icon">🎾</span><span>玩耍</span><span class="pet__menu-val">{{ Math.round(stats.energy) }}%</span></button>
+            <button class="pet__menu-item" @click="rest"><span class="pet__menu-icon">💤</span><span>休息</span><span class="pet__menu-val">{{ Math.round(stats.mood) }}%</span></button>
+          </div>
+          <div class="pet__menu-divider" />
+          <div class="pet__menu-stats">
+            <div class="pet__stat-row"><span>亲密度</span><div class="pet__stat-bar"><div class="pet__stat-fill" style="background:#FF6B9D" :style="{width: stats.intimacy + '%'}"></div></div><span>{{ Math.round(stats.intimacy) }}</span></div>
+            <div class="pet__stat-row"><span>心情</span><div class="pet__stat-bar"><div class="pet__stat-fill" style="background:#FFD93D" :style="{width: stats.mood + '%'}"></div></div><span>{{ getMoodLabel() }}</span></div>
+          </div>
+          pet__menu-divider" />
+          <div class="pet__menu-footer">
+            <span class="pet__menu-hint">双击切换形态 · 拖拽移动 · 单击抚摸</span>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+    <div v-if="showMenu" class="pet__menu-overlay" @click="closeMenu" />  </div>
 </template>
 
 <style scoped lang="scss">
@@ -243,6 +513,14 @@ const petClass = computed(() => ({
   &--working .pet__body { animation: working-shake 0.3s ease-in-out infinite; }
   &--celebrate .pet__svg { animation: celebrate-spin 0.6s ease-in-out; }
   &--sleep .pet__eyes { opacity: 0.3; }
+  &--wave .pet__arm--right { animation: wave-arm 0.5s ease-in-out infinite; }
+  &--dance .pet__body { animation: dance-move 0.4s ease-in-out infinite; }
+  &--read .pet__svg { animation: read-sway 2s ease-in-out infinite; }
+  &--run .pet__body { animation: run-bounce 0.2s ease-in-out infinite; }
+  &--shy .pet__svg { animation: shy-shift 1.5s ease-in-out infinite; }
+  &--surprised .pet__svg { animation: surprised-pop 0.3s ease-out; }
+  &--switching { opacity: 0; transform: scale(0.5) rotate(180deg); transition: all 0.3s ease; }
+  &.is-human { width: 90px; .pet__body { height: 140px; } }
 
   &__confetti { position: absolute; inset: 0; pointer-events: none; }
   &__confetti-piece {
@@ -272,4 +550,48 @@ const petClass = computed(() => ({
 
 .bubble-enter-active, .bubble-leave-active { transition: all 0.3s var(--ease-spring); }
 .bubble-enter-from, .bubble-leave-to { opacity: 0; transform: translateX(-50%) translateY(8px); }
+  // 右键菜单
+  &__menu {
+    position: fixed; z-index: 10000; min-width: 160px;
+    background: var(--bg-raised); border: 1px solid var(--line);
+    border-radius: var(--radius-md); box-shadow: var(--shadow-raise);
+    padding: 8px 0; font-size: 13px;
+  }
+  &__menu-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 14px; font-weight: 600; color: var(--text-hi);
+  }
+  &__menu-switch {
+    background: var(--primary-soft); color: var(--primary); border: none;
+    padding: 4px 10px; border-radius: 6px; font-size: 11px; cursor: pointer;
+    &:hover { opacity: 0.8; }
+  }
+  &__menu-divider { height: 1px; background: var(--line); margin: 4px 0; }
+  &__menu-actions { display: flex; flex-direction: column; }
+  &__menu-item {
+    display: flex; align-items: center; gap: 10px; padding: 8px 14px;
+    background: none; border: none; cursor: pointer; color: var(--text-mid);
+    font-size: 13px; text-align: left; width: 100%;
+    &:hover { background: var(--primary-soft); color: var(--primary); }
+  }
+  &__menu-icon { font-size: 16px; }
+  &__menu-footer { padding: 6px 14px; }
+  &__menu-hint { font-size: 10px; color: var(--text-low); }
+  &__menu-overlay { position: fixed; inset: 0; z-index: 9999; }
+}
+
+@keyframes wave-arm { 0%,100%{transform:rotate(0)} 50%{transform:rotate(-30deg)} }
+@keyframes dance-move { 0%,100%{transform:translateY(0) rotate(0)} 25%{transform:translateY(-8px) rotate(-5deg)} 75%{transform:translateY(-8px) rotate(5deg)} }
+@keyframes read-sway { 0%,100%{transform:rotate(-2deg)} 50%{transform:rotate(2deg)} }
+@keyframes run-bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)} }
+@keyframes shy-shift { 0%,100%{transform:translateX(0)} 50%{transform:translateX(3px)} }
+@keyframes surprised-pop { 0%{transform:scale(1)} 50%{transform:scale(1.15)} 100%{transform:scale(1)} }
+
+.menu-enter-active, .menu-leave-active { transition: all 0.15s ease; }
+.menu-enter-from, .menu-leave-to { opacity: 0; transform: scale(0.95); }
+  &__menu-val { margin-left: auto; font-size: 11px; color: var(--text-low); }
+  &__menu-stats { padding: 8px 14px; display: flex; flex-direction: column; gap: 6px; }
+  &__stat-row { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-mid); }
+  &__stat-bar { flex: 1; height: 6px; background: var(--bg-inset); border-radius: 3px; overflow: hidden; }
+  &__stat-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
 </style>
