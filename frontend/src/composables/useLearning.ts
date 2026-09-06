@@ -17,14 +17,14 @@ export function useLearning() {
 
   async function fetchPlans() {
     loading.value = true
-    try { plans.value = await cachedFetch('learning:plans', () => learningApi.listPlans()) }
+    try { plans.value = (await cachedFetch('learning:plans', () => learningApi.listPlans())).list }
     catch (e: unknown) { error.value = e instanceof Error ? e.message : String(e) }
     finally { loading.value = false }
   }
 
   async function fetchTodayReview() {
     loading.value = true
-    try { todayReviewCards.value = await learningApi.todayReview() }
+    try { todayReviewCards.value = (await learningApi.todayReview()).list }
     catch (e: unknown) { error.value = e instanceof Error ? e.message : String(e) }
     finally { loading.value = false }
   }
