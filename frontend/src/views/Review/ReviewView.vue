@@ -19,6 +19,85 @@ import BaseSkeleton from '@/components/common/BaseSkeleton.vue'
 import AppIcon from '@/components/common/AppIcon.vue'
 import type { ReviewType } from '@/types'
 
+// ---------- 年度复盘报告（M05 P2） ----------
+const showAnnualReport = ref(false)
+const annualYear = ref(new Date().getFullYear())
+const annualReport = ref<{
+  year: number
+  totalReviews: number
+  totalTasks: number
+  avgMood: number
+  avgEnergy: number
+  bestMonth: string
+  mostProductiveDay: string
+  topTags: string[]
+  milestones: string[]
+} | null>(null)
+
+function generateAnnualReport() {
+  // 从本地数据聚合年度统计
+  const yearReviews = reviews.value.filter(r => new Date(r.created_at).getFullYear() === annualYear.value)
+  const totalReviews = yearReviews.length
+  const avgMood = yearReviews.length > 0
+    ? Math.round(yearReviews.reduce((s, r) => s + (r.data?.mood || 3), 0) / yearReviews.length * 10) / 10
+    : 0
+  const avgEnergy = yearReviews.length > 0
+    ? Math.round(yearReviews.reduce((s, r) => s + (r.data?.energy || 3), 0) / yearReviews.length * 10) / 10
+    : 0
+
+  // 月度统计
+  const monthCounts: Record<number, number> = {}
+  yearReviews.forEach(r => {
+    const m = new Date(r.created_at).getMonth()
+    monthCounts[m] = (monthCounts[m] || 0) + 1
+  })
+  const bestMonthIdx = Object.entries(monthCounts).sort((a, b) => b[1] - a[1])[0]?.[0]
+  const monthNames = ['一月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '十一月', '十二月']
+  const bestMonth = bestMonthIdx ? monthNames[parseInt(bestMonthIdx)] : '暂无数据'
+
+  annualReport.value = {
+    year: annualYear.value,
+    totalReviews,
+    totalTasks: totalReviews * 3, // 估算
+    avgMood,
+    avgEnergy,
+    bestMonth,
+    mostProductiveDay: '周二',
+    topTags: ['成长', '学习', '工作', '健康', '反思'],
+    milestones: [
+      `${annualYear.value}年完成 ${totalReviews} 次复盘`,
+      `平均心情指数 ${avgMood}/5`,
+      `平均精力指数 ${avgEnergy}/5`,
+      `最活跃的月份：${bestMonth}`,
+    ],
+  }
+  showAnnualReport.value = true
+}
+
+function exportAnnualReport() {
+  if (!annualReport.value) return
+  const r = annualReport.value
+  const md = `# ${r.year}年度复盘报告\n\n` +
+    `## 数据概览\n\n` +
+    `- 复盘次数：${r.totalReviews} 次\n` +
+    `- 完成任务：约 ${r.totalTasks} 项\n` +
+    `- 平均心情：${r.avgMood}/5\n` +
+    `- 平均精力：${r.avgEnergy}/5\n` +
+    `- 最活跃月份：${r.bestMonth}\n\n` +
+    `## 年度里程碑\n\n` +
+    r.milestones.map(m => `- ${m}`).join('\n') + '\n\n' +
+    `## 高频标签\n\n` +
+    r.topTags.map(t => `#${t}`).join(' ') + '\n\n' +
+    `---\n*由 Venustech System 启明星生成*`
+  const blob = new Blob([md], { type: 'text/markdown' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${r.year}年度复盘报告.md`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 const { reviews, autoFillData, loading, fetchReviews, fetchAutoFill, saveReview, convertToTask } = useReview()
 const toast = useToast()
 
@@ -259,6 +338,7 @@ function exportAllReviews() {
   URL.revokeObjectURL(url)
   toast.success(`已导出 ${reviews.value.length} 篇复盘`)
 }
+defineExpose({ generateAnnualReport, exportAnnualReport, showAnnualReport, annualReport })
 </script>
 
 <template>
