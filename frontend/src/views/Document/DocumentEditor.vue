@@ -30,6 +30,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'close'): void
   (e: 'saved', doc: Document): void
+  (e: 'open-doc-by-title', title: string): void
+  (e: 'create-doc', title: string): void
 }>()
 
 const toast = useToast()
@@ -77,10 +79,11 @@ watch([title, content], () => {
 type EditorMode = 'edit' | 'preview' | 'read'
 const mode = ref<EditorMode>('edit')
 
-/** marked 渲染（同步） */
+/** marked 渲染（同步），含 [[wiki链接]] 转换 */
 const renderedHtml = computed(() => {
   try {
-    return marked.parse(content.value || '（空文档）', { async: false }) as string
+    const raw = marked.parse(content.value || '（空文档）', { async: false }) as string
+    return renderWithWikiLinks(raw)
   } catch {
     return '<p>渲染失败</p>'
   }
@@ -219,19 +222,50 @@ function openHistory() {
   loadVersions()
 }
 
-/** 简易行级 diff：旧版本行标记删除、新版本行标记新增 */
+/** 逐行 diff：保持原始顺序，相同行显示 same，修改行显示 del+add */
 const versionDiff = computed(() => {
   if (!compareId.value) return null
   const oldLines = compareContent.value.split('\n')
   const newLines = (content.value || '').split('\n')
-  const oldSet = new Set(oldLines)
-  const newSet = new Set(newLines)
   const rows: Array<{ type: 'same' | 'add' | 'del'; text: string }> = []
-  for (const line of oldLines) {
-    if (!newSet.has(line)) rows.push({ type: 'del', text: line })
-  }
-  for (const line of newLines) {
-    if (!oldSet.has(line)) rows.push({ type: 'add', text: line })
+  let i = 0, j = 0
+  while (i < oldLines.length || j < newLines.length) {
+    if (i < oldLines.length && j < newLines.length && oldLines[i] === newLines[j]) {
+      rows.push({ type: 'same', text: oldLines[i] })
+      i++; j++
+    } else {
+      // 查找下一个匹配点
+      let found = -1
+      for (let k = j + 1; k < Math.min(j + 20, newLines.length); k++) {
+        if (newLines[k] === oldLines[i]) { found = k; break }
+      }
+      if (found >= 0) {
+        // 旧行被删除，新增行插入
+        for (let m = j; m < found; m++) rows.push({ type: 'add', text: newLines[m] })
+        j = found
+      } else {
+        // 检查旧行是否在后续新行中出现
+        let oldFound = -1
+        for (let k = i + 1; k < Math.min(i + 20, oldLines.length); k++) {
+          if (oldLines[k] === newLines[j]) { oldFound = k; break }
+        }
+        if (oldFound >= 0) {
+          for (let m = i; m < oldFound; m++) rows.push({ type: 'del', text: oldLines[m] })
+          i = oldFound
+        } else if (i < oldLines.length && j < newLines.length) {
+          // 两边都有，视为修改
+          rows.push({ type: 'del', text: oldLines[i] })
+          rows.push({ type: 'add', text: newLines[j] })
+          i++; j++
+        } else if (i < oldLines.length) {
+          rows.push({ type: 'del', text: oldLines[i] })
+          i++
+        } else {
+          rows.push({ type: 'add', text: newLines[j] })
+          j++
+        }
+      }
+    }
   }
   return rows
 })
@@ -260,7 +294,107 @@ async function restoreVersion(v: DocumentVersion) {
   }
 }
 
-// ---------- 导出 MD（M03 F06 第一阶段） ----------
+// ---------- 双向链接编辑器侧（M03 F05） ----------
+const wikiOpen = ref(false)
+const wikiQuery = ref('')
+const wikiResults = ref<Document[]>([])
+const wikiLoading = ref(false)
+const wikiStartPos = ref(0) // [[ 的起始位置
+let wikiSearchTimer: ReturnType<typeof setTimeout> | undefined
+
+function onEditorInput() {
+  const ta = textareaRef.value
+  if (!ta) return
+  const pos = ta.selectionStart
+  // 检测光标前是否有 [[ 且未闭合
+  const before = content.value.slice(0, pos)
+  const lastOpen = before.lastIndexOf('[[')
+  const lastClose = before.lastIndexOf(']]')
+  if (lastOpen > lastClose) {
+    wikiStartPos.value = lastOpen
+    wikiQuery.value = before.slice(lastOpen + 2)
+    wikiOpen.value = true
+    searchWikiDocs(wikiQuery.value)
+  } else {
+    wikiOpen.value = false
+  }
+}
+
+async function searchWikiDocs(q: string) {
+  clearTimeout(wikiSearchTimer)
+  wikiSearchTimer = setTimeout(async () => {
+    if (!q.trim()) {
+      // 空查询时显示最近文档
+      wikiLoading.value = true
+      try {
+        const res = await documentApi.list({ page: 1, page_size: 8 })
+        wikiResults.value = res.list.filter(d => d.id !== props.document.id)
+      } catch { /* ignore */ } finally {
+        wikiLoading.value = false
+      }
+      return
+    }
+    wikiLoading.value = true
+    try {
+      const res = await documentApi.search(q)
+      wikiResults.value = res.documents
+        .filter(d => d.id !== props.document.id)
+        .map(d => ({
+          id: d.id, title: d.title, content: null, folder_id: null,
+          folder_name: '', tags: [], summary: null, ai_suggested_tags: [],
+          version: 0, word_count: 0, created_at: '', updated_at: d.updated_at,
+        }))
+    } catch { /* ignore */ } finally {
+      wikiLoading.value = false
+    }
+  }, 200)
+}
+
+function insertWikiLink(doc: Document) {
+  const ta = textareaRef.value
+  if (!ta) return
+  const endPos = ta.selectionStart
+  // 替换 [[query 为 [[文档标题]]
+  const newText = `[[${doc.title}]]`
+  content.value = content.value.slice(0, wikiStartPos.value) + newText + content.value.slice(endPos)
+  wikiOpen.value = false
+  wikiQuery.value = ''
+  scheduleSave()
+  requestAnimationFrame(() => {
+    ta.focus()
+    const newPos = wikiStartPos.value + newText.length
+    ta.setSelectionRange(newPos, newPos)
+  })
+}
+
+function createWikiDoc() {
+  const docTitle = wikiQuery.value.trim()
+  if (!docTitle) return
+  emit('create-doc', docTitle)
+  wikiOpen.value = false
+}
+
+/** 预览模式：将 [[标题]] 渲染为可点击链接 */
+function renderWithWikiLinks(html: string): string {
+  return html.replace(
+    /\[\[([^\]|]+)(?:\|([^\]]*))?\]\]/g,
+    (_, title: string, alias?: string) => {
+      const display = alias || title
+      const escaped = title.replace(/"/g, '&quot;')
+      return `<a class="wiki-link" href="javascript:void(0)" data-title="${escaped}">${display}</a>`
+    },
+  )
+}
+
+function onPreviewClick(e: MouseEvent) {
+  const target = e.target as HTMLElement
+  if (target.classList.contains('wiki-link')) {
+    const docTitle = target.dataset.title || ''
+    emit('open-doc-by-title', docTitle)
+  }
+}
+
+// ---------- 导出（M03 F06） ----------
 function exportMarkdown() {
   const md = `# ${title.value}\n\n${content.value}\n`
   const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' })
@@ -271,6 +405,81 @@ function exportMarkdown() {
   a.click()
   URL.revokeObjectURL(url)
   toast.success('已导出', `${title.value}.md`)
+}
+
+function exportHtml() {
+  const body = renderWithWikiLinks(renderedHtml.value)
+  const html = `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${title.value}</title>
+<style>
+  body { max-width: 720px; margin: 40px auto; padding: 0 20px; font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; line-height: 1.8; color: #333; }
+  h1 { font-size: 1.8em; border-bottom: 2px solid #eee; padding-bottom: 0.3em; }
+  h2 { font-size: 1.4em; margin-top: 1.5em; }
+  h3 { font-size: 1.2em; }
+  code { background: #f5f5f5; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
+  pre { background: #f5f5f5; padding: 16px; border-radius: 8px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  blockquote { border-left: 4px solid #ddd; margin: 1em 0; padding: 0.5em 1em; color: #666; background: #fafafa; }
+  table { border-collapse: collapse; width: 100%; margin: 1em 0; }
+  th, td { border: 1px solid #ddd; padding: 8px 12px; }
+  th { background: #f5f5f5; }
+  img { max-width: 100%; }
+  .wiki-link { color: #7c5cff; text-decoration: none; border-bottom: 1px dashed #7c5cff; }
+</style>
+</head>
+<body>
+${body}
+</body>
+</html>`
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${title.value || '未命名文档'}.html`
+  a.click()
+  URL.revokeObjectURL(url)
+  toast.success('已导出', `${title.value}.html`)
+}
+
+function exportPdf() {
+  const body = renderWithWikiLinks(renderedHtml.value)
+  const printWindow = window.open('', '_blank')
+  if (!printWindow) {
+    toast.warning('请允许弹出窗口', 'PDF导出需要打开新窗口')
+    return
+  }
+  printWindow.document.write(`<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>${title.value}</title>
+<style>
+  body { max-width: 720px; margin: 40px auto; padding: 0 20px; font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; line-height: 1.8; color: #333; }
+  h1 { font-size: 1.8em; border-bottom: 2px solid #eee; padding-bottom: 0.3em; }
+  h2 { font-size: 1.4em; margin-top: 1.5em; }
+  h3 { font-size: 1.2em; }
+  code { background: #f5f5f5; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
+  pre { background: #f5f5f5; padding: 16px; border-radius: 8px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  blockquote { border-left: 4px solid #ddd; margin: 1em 0; padding: 0.5em 1em; color: #666; background: #fafafa; }
+  table { border-collapse: collapse; width: 100%; margin: 1em 0; }
+  th, td { border: 1px solid #ddd; padding: 8px 12px; }
+  th { background: #f5f5f5; }
+  img { max-width: 100%; }
+  @media print { body { margin: 20px; } }
+</style>
+</head>
+<body>
+${body}
+<script>window.onload = function() { window.print(); }<\/script>
+</body>
+</html>`)
+  printWindow.document.close()
+  toast.success('已打开打印', '请在打印对话框中选择"另存为PDF"')
 }
 
 onMounted(() => {
@@ -310,6 +519,8 @@ onBeforeUnmount(() => {
         <BaseButton size="sm" variant="secondary" @click="toggleBacklinks">双向链接</BaseButton>
         <BaseButton size="sm" variant="secondary" @click="openHistory">历史版本</BaseButton>
         <BaseButton size="sm" variant="secondary" @click="exportMarkdown">导出 MD</BaseButton>
+        <BaseButton size="sm" variant="secondary" @click="exportHtml">导出 HTML</BaseButton>
+        <BaseButton size="sm" variant="secondary" @click="exportPdf">导出 PDF</BaseButton>
         <BaseButton v-if="mode === 'edit'" size="sm" @click="save">手动保存</BaseButton>
       </div>
     </div>
@@ -359,14 +570,41 @@ onBeforeUnmount(() => {
           v-model="content"
           class="editor__content"
           placeholder="开始写作... 支持 Markdown 与 [[双向链接]]"
+          @input="onEditorInput"
+          @keydown.esc="wikiOpen = false"
         />
+        <!-- 双向链接选择器（[[ 触发） -->
+        <Transition name="fade">
+          <div v-if="wikiOpen" class="wiki-picker">
+            <div class="wiki-picker__head">
+              <span>链接到文档</span>
+              <span class="wiki-picker__hint">↑↓ 选择 · Enter 确认 · Esc 关闭</span>
+            </div>
+            <div v-if="wikiLoading" class="wiki-picker__empty">搜索中…</div>
+            <div v-else-if="!wikiResults.length" class="wiki-picker__empty">
+              无匹配文档
+              <button class="wiki-picker__create" @click="createWikiDoc">创建「{{ wikiQuery }}」</button>
+            </div>
+            <ul v-else class="wiki-picker__list">
+              <li
+                v-for="d in wikiResults" :key="d.id"
+                class="wiki-picker__item"
+                @click="insertWikiLink(d)"
+              >
+                <AppIcon name="doc" :size="14" />
+                <span class="wiki-picker__title">{{ d.title }}</span>
+                <span class="wiki-picker__meta">{{ d.folder_name }}</span>
+              </li>
+            </ul>
+          </div>
+        </Transition>
       </div>
     </template>
 
     <!-- 预览模式（编辑/预览对照由工具栏切换承担，此处为纯预览） -->
     <template v-else-if="mode === 'preview'">
       <input v-model="title" class="editor__title" placeholder="无标题文档" />
-      <div class="editor__markdown md-preview" v-html="renderedHtml" />
+      <div class="editor__markdown md-preview" v-html="renderedHtml" @click="onPreviewClick" />
     </template>
 
     <!-- 阅读模式（M03 F08：居中排版 + 目录 + 无编辑UI） -->
@@ -383,7 +621,7 @@ onBeforeUnmount(() => {
         </aside>
         <article class="editor__read-body">
           <h1 class="editor__read-title">{{ title }}</h1>
-          <div class="editor__markdown md-preview" v-html="renderedHtml" />
+          <div class="editor__markdown md-preview" v-html="renderedHtml" @click="onPreviewClick" />
         </article>
       </div>
     </template>
@@ -437,7 +675,7 @@ onBeforeUnmount(() => {
                 class="editor__diff-row"
                 :class="`is-${row.type}`"
               >
-                <span class="editor__diff-mark">{{ row.type === 'add' ? '+' : '−' }}</span>
+                <span class="editor__diff-mark">{{ row.type === 'add' ? '+' : row.type === 'del' ? '−' : ' ' }}</span>
                 <span class="editor__diff-text">{{ row.text || '（空行）' }}</span>
               </div>
               <p v-if="!versionDiff.length" class="editor__ver-empty">与当前版本无差异</p>
@@ -734,7 +972,7 @@ onBeforeUnmount(() => {
     padding: 1px 8px;
     &.is-add { background: rgba(61, 220, 151, 0.12); color: var(--mint, #3ddc97); }
     &.is-del { background: rgba(239, 68, 68, 0.10); color: var(--strawberry, #ef4444); text-decoration: line-through; }
-    &.is-same { color: var(--text-mid); }
+    &.is-same { color: var(--text-low); opacity: 0.6; }
   }
   &__diff-mark { flex-shrink: 0; width: 14px; font-weight: 700; }
   &__diff-text { white-space: pre-wrap; word-break: break-all; }
@@ -748,6 +986,78 @@ onBeforeUnmount(() => {
 
 .slide-enter-active, .slide-leave-active { transition: transform 0.25s var(--ease-soft), opacity 0.25s; }
 .slide-enter-from, .slide-leave-to { transform: translateX(20px); opacity: 0; }
+
+.fade-enter-active, .fade-leave-active { transition: opacity 0.15s; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
+
+// ---------- 双向链接选择器 ----------
+.wiki-picker {
+  position: absolute;
+  z-index: 100;
+  width: 320px;
+  max-height: 280px;
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-raise);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  &__head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--line);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    color: var(--text-hi);
+  }
+  &__hint { font-size: 10px; color: var(--text-low); font-weight: 400; }
+  &__empty {
+    padding: 20px;
+    text-align: center;
+    font-size: var(--text-sm);
+    color: var(--text-low);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: center;
+  }
+  &__create {
+    padding: 4px 12px;
+    border: 1px solid var(--primary);
+    border-radius: var(--radius-pill);
+    background: var(--primary-soft);
+    color: var(--primary-ink, var(--primary));
+    font-size: var(--text-xs);
+    cursor: pointer;
+    &:hover { background: var(--primary); color: #fff; }
+  }
+  &__list {
+    list-style: none;
+    overflow-y: auto;
+    flex: 1;
+  }
+  &__item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    cursor: pointer;
+    transition: background 0.1s;
+    &:hover { background: var(--bg-inset); }
+  }
+  &__title {
+    flex: 1;
+    font-size: var(--text-sm);
+    color: var(--text-hi);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  &__meta { font-size: 10px; color: var(--text-low); flex-shrink: 0; }
+}
 </style>
 
 <!-- Markdown 渲染样式（非 scoped：v-html 内容） -->
@@ -786,6 +1096,13 @@ onBeforeUnmount(() => {
   th, td { border: 1px solid var(--line); padding: 6px 12px; }
   th { background: var(--bg-inset); font-weight: 600; }
   a { color: var(--primary); }
+  .wiki-link {
+    color: var(--lilac, #7c5cff);
+    text-decoration: none;
+    border-bottom: 1px dashed var(--lilac, #7c5cff);
+    cursor: pointer;
+    &:hover { background: var(--lilac-soft, rgba(124,92,255,0.1)); }
+  }
   img { max-width: 100%; border-radius: var(--radius-sm); }
   hr { border: none; border-top: 1px solid var(--line); margin: 1.2em 0; }
 }

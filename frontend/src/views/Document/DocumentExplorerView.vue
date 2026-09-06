@@ -5,6 +5,8 @@
 // ============================================================
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import dayjs from 'dayjs'
+import JSZip from 'jszip'
+import { documentApi } from '@/api'
 import { useDocument } from '@/composables/useDocument'
 import { useToast } from '@/composables/useToast'
 import { useModal } from '@/composables/useModal'
@@ -120,17 +122,136 @@ function onEditorSaved(updated: Document) {
   if (idx >= 0) documents.value[idx] = updated
 }
 
+/** 双向链接：按标题打开文档 */
+async function onOpenDocByTitle(title: string) {
+  try {
+    const res = await documentApi.search(title)
+    const doc = res.documents.find(d => d.title === title)
+    if (doc) {
+      const detail = await documentApi.detail(doc.id)
+      editingDoc.value = detail
+    } else {
+      toast.warning(`文档「${title}」不存在，可在选择器中创建`)
+    }
+  } catch { /* http层已提示 */ }
+}
+
+/** 双向链接：从wiki链接创建新文档 */
+async function onCreateDocFromWiki(title: string) {
+  try {
+    const doc = await createDocument({ title, folder_id: currentFolderId.value || undefined })
+    if (doc) {
+      editingDoc.value = doc
+      toast.success('文档已创建', title)
+    }
+  } catch { /* http层已提示 */ }
+}
+
 // 新建文档
 const createOpen = ref(false)
 const newTitle = ref('')
 const newFolderId = ref('')
+const newTemplate = ref('')
+
+// 内置模板（M03 F07）
+const DOC_TEMPLATES = [
+  { id: 'blank', name: '空白文档', content: '' },
+  { id: 'daily', name: '每日复盘', content: `# 每日复盘 - {{date}}
+
+## 今日成就
+- 
+
+## 不足与反思
+- 
+
+## 明日计划
+- 
+
+## 感恩
+- ` },
+  { id: 'meeting', name: '会议纪要', content: `# 会议纪要 - {{title}}
+
+**日期**：{{date}}
+**参会人**：
+
+## 议题
+1. 
+
+## 讨论要点
+- 
+
+## 决议
+- 
+
+## 待办
+- [ ] ` },
+  { id: 'reading', name: '读书笔记', content: `# 《{{title}}》读书笔记
+
+**作者**：
+**阅读日期**：{{date}}
+
+## 核心观点
+- 
+
+## 精彩摘录
+> 
+
+## 个人思考
+- 
+
+## 行动项
+- [ ] ` },
+  { id: 'project', name: '项目计划', content: `# {{title}} - 项目计划
+
+**创建日期**：{{date}}
+**目标**：
+
+## 里程碑
+- [ ] M1: 
+- [ ] M2: 
+- [ ] M3: 
+
+## 任务分解
+### 阶段一
+- [ ] 
+
+### 阶段二
+- [ ] 
+
+## 风险与应对
+- ` },
+  { id: 'weekly', name: '周报', content: `# 周报 - {{date}}
+
+## 本周完成
+- 
+
+## 进行中
+- 
+
+## 下周计划
+- 
+
+## 问题与求助
+- ` },
+]
+
+function applyTemplate(content: string): string {
+  const now = dayjs().format('YYYY-MM-DD')
+  return content
+    .replace(/\{\{date\}\}/g, now)
+    .replace(/\{\{title\}\}/g, newTitle.value || '未命名')
+}
+
 async function onCreate() {
   const title = newTitle.value.trim()
   if (!title) return toast.warning('请输入文档标题')
-  const doc = await createDocument({ title, folder_id: newFolderId.value || undefined })
+  const template = DOC_TEMPLATES.find(t => t.id === newTemplate.value)
+  const content = template ? applyTemplate(template.content) : ''
+  const doc = await createDocument({ title, folder_id: newFolderId.value || undefined, content })
   toast.success('文档已创建')
   createOpen.value = false
   newTitle.value = ''
+  newTemplate.value = ''
   if (doc) openEditor(doc)
 }
 
@@ -199,6 +320,43 @@ async function onDeleteFolder(f: Folder) {
 function fmtTime(v: string) {
   return dayjs(v).format('MM-DD HH:mm')
 }
+
+// ---------- 文件夹批量导出 ZIP（M03 F06） ----------
+const exporting = ref(false)
+async function exportFolderZip() {
+  if (exporting.value) return
+  exporting.value = true
+  try {
+    const zip = new JSZip()
+    const folderName = currentFolderId.value
+      ? (flatFolders.value.get(currentFolderId.value)?.name || '全部文档')
+      : '全部文档'
+    // 加载该文件夹下所有文档（不分页）
+    const res = await documentApi.list({
+      folder_id: currentFolderId.value || undefined,
+      page: 1,
+      page_size: 1000,
+    })
+    for (const doc of res.list) {
+      const detail = await documentApi.detail(doc.id)
+      const safeName = detail.title.replace(/[\\/:*?"<>|]/g, '_')
+      const md = `# ${detail.title}\n\n${detail.content || ''}\n`
+      zip.file(`${safeName}.md`, md)
+    }
+    const blob = await zip.generateAsync({ type: 'blob' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${folderName}-${dayjs().format('YYYYMMDD')}.zip`
+    a.click()
+    URL.revokeObjectURL(url)
+    toast.success('导出成功', `${folderName} 共 ${res.list.length} 篇文档`)
+  } catch (err) {
+    toast.error('导出失败', String(err))
+  } finally {
+    exporting.value = false
+  }
+}
 </script>
 
 <template>
@@ -208,6 +366,8 @@ function fmtTime(v: string) {
     :document="editingDoc"
     @close="editingDoc = null"
     @saved="onEditorSaved"
+    @open-doc-by-title="onOpenDocByTitle"
+    @create-doc="onCreateDocFromWiki"
   />
 
   <!-- 文档列表视图 -->
@@ -215,6 +375,7 @@ function fmtTime(v: string) {
     <div class="docs__head">
       <h1 class="docs__title">知识资源</h1>
       <div class="docs__head-actions">
+        <BaseButton variant="secondary" icon="download" :loading="exporting" @click="exportFolderZip">导出ZIP</BaseButton>
         <BaseButton variant="secondary" icon="folder-plus" @click="openCreateFolder">新建文件夹</BaseButton>
         <BaseButton variant="primary" icon="plus" @click="createOpen = true">新建文档</BaseButton>
       </div>
@@ -316,6 +477,17 @@ function fmtTime(v: string) {
       <div class="docs__form">
         <BaseInput v-model="newTitle" placeholder="文档标题" />
         <BaseSelect v-model="newFolderId" :options="folderOptions" placeholder="所属文件夹" />
+        <div class="docs__template-group">
+          <label class="docs__template-label">选择模板</label>
+          <div class="docs__template-grid">
+            <button
+              v-for="t in DOC_TEMPLATES" :key="t.id"
+              class="docs__template-item"
+              :class="{ 'is-active': newTemplate === t.id }"
+              @click="newTemplate = t.id"
+            >{{ t.name }}</button>
+          </div>
+        </div>
       </div>
     </BaseModal>
 
@@ -524,6 +696,39 @@ function fmtTime(v: string) {
     display: flex;
     flex-direction: column;
     gap: var(--space-3);
+  }
+  &__template-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+  &__template-label {
+    font-size: var(--text-sm);
+    color: var(--text-mid);
+    font-weight: 500;
+  }
+  &__template-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-2);
+  }
+  &__template-item {
+    padding: 8px 10px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--bg-panel);
+    color: var(--text-mid);
+    font-size: var(--text-xs);
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: center;
+    &:hover { border-color: var(--primary); color: var(--text-hi); }
+    &.is-active {
+      background: var(--primary-soft);
+      border-color: var(--primary);
+      color: var(--primary-ink, var(--primary));
+      font-weight: 600;
+    }
   }
 }
 </style>
