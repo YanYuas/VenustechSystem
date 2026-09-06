@@ -54,4 +54,10 @@ export const projectApi = {
   removeMilestone(milestoneId: string) {
     return http.delete<void>(`/projects/milestones/${milestoneId}`)
   },
+  timeline(id: string) {
+    return http.get<Array<{ type: string; title: string; time: string; icon: string }>>(`/projects/${id}/timeline`)
+  },
+  exportData(id: string) {
+    return http.get<{ project: any; tasks: any[]; documents: any[]; conversations: any[]; reviews: any[]; exported_at: string }>(`/projects/${id}/export`)
+  },
 }

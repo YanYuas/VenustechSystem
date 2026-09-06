@@ -145,3 +145,23 @@ def create_milestone(
     user: User = Depends(get_current_user),
 ):
     return success(_svc(db).create_milestone(user.id, project_id, data))
+
+
+@router.get("/{project_id}/timeline")
+def project_timeline(
+    project_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """项目时间线（M06 F05）"""
+    return success(_svc(db).timeline(user.id, project_id))
+
+
+@router.get("/{project_id}/export")
+def project_export(
+    project_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """项目导出（M06 F07）"""
+    return success(_svc(db).export(user.id, project_id))
