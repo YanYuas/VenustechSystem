@@ -7,6 +7,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import dayjs from 'dayjs'
+import JSZip from 'jszip'
 import { projectApi, taskApi, documentApi, conversationApi } from '@/api'
 import { useToast } from '@/composables/useToast'
 import { useModal } from '@/composables/useModal'
@@ -101,6 +102,61 @@ async function onDelete() {
   } catch { /* http 层已提示 */ }
 }
 
+
+// ---------- 时间线（M06 F05） ----------
+const timeline = ref<Array<{ type: string; title: string; time: string; icon: string }>>([])
+const timelineLoading = ref(false)
+
+async function loadTimeline() {
+  timelineLoading.value = true
+  try {
+    timeline.value = await projectApi.timeline(projectId)
+  } catch { /* http层已提示 */ } finally {
+    timelineLoading.value = false
+  }
+}
+
+// ---------- 项目导出（M06 F07） ----------
+const exporting = ref(false)
+async function onExport() {
+  if (exporting.value) return
+  exporting.value = true
+  try {
+    const data = await projectApi.exportData(projectId)
+    const zip = new JSZip()
+    const folder = zip.folder(data.project.name || 'project')!
+    // 元数据
+    folder.file('project.json', JSON.stringify(data.project, null, 2))
+    // 任务
+    folder.file('tasks.json', JSON.stringify(data.tasks, null, 2))
+    // 文档（MD）
+    const docFolder = folder.folder('documents')!
+    for (const d of data.documents) {
+      const safeName = (d.title || 'untitled').replace(/[\\/:*?"<>|]/g, '_')
+      docFolder.file(`${safeName}.md`, `# ${d.title}\n\n${d.content || ''}\n`)
+    }
+    // 对话
+    folder.file('conversations.json', JSON.stringify(data.conversations, null, 2))
+    // 复盘（MD）
+    const reviewFolder = folder.folder('reviews')!
+    for (const r of data.reviews) {
+      const safeName = (r.title || 'review').replace(/[\\/:*?"<>|]/g, '_')
+      reviewFolder.file(`${safeName}.md`, `# ${r.title || '复盘'}\n\n${r.content || ''}\n`)
+    }
+    const blob = await zip.generateAsync({ type: 'blob' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${data.project.name || 'project'}-export.zip`
+    a.click()
+    URL.revokeObjectURL(url)
+    toast.success('导出成功', `共 ${data.tasks.length} 任务 / ${data.documents.length} 文档`)
+  } catch {
+    toast.error('导出失败')
+  } finally {
+    exporting.value = false
+  }
+}
 // ---------- 统计区（M06 F02） ----------
 
 const circumference = 2 * Math.PI * 40
@@ -123,15 +179,20 @@ const maxTrend = computed(() =>
 
 // ---------- Tab 切换 ----------
 
-type TabKey = 'tasks' | 'documents' | 'conversations' | 'reviews' | 'milestones'
+type TabKey = 'tasks' | 'documents' | 'conversations' | 'reviews' | 'milestones' | 'timeline'
 const TABS: Array<{ key: TabKey; label: string; icon: string }> = [
   { key: 'tasks', label: '任务', icon: 'check' },
   { key: 'documents', label: '文档', icon: 'doc' },
   { key: 'conversations', label: '对话', icon: 'send' },
   { key: 'reviews', label: '复盘', icon: 'refresh' },
   { key: 'milestones', label: '里程碑', icon: 'target' },
+  { key: 'timeline', label: '动态', icon: 'clock' },
 ]
 const activeTab = ref<TabKey>('tasks')
+function onTabChange(key: TabKey) {
+  activeTab.value = key
+  if (key === 'timeline' && !timeline.value.length) loadTimeline()
+}
 
 // ---------- 任务 Tab：勾选 + 内联添加（M06 F08） ----------
 
@@ -306,7 +367,7 @@ function fmtDateTime(v: string | null): string {
           <BaseButton variant="secondary" size="sm" @click="router.push('/projects')">
             <AppIcon name="arrow-left" :size="14" /> 返回列表
           </BaseButton>
-          <BaseButton variant="secondary" size="sm" @click="onArchiveToggle">
+          <BaseButton variant="secondary" size="sm" :loading="exporting" @click="onExport"><AppIcon name="download" :size="14" /> 导出</BaseButton>`n          <BaseButton variant="secondary" size="sm" @click="onArchiveToggle">
             {{ isArchived ? '恢复项目' : '归档' }}
           </BaseButton>
           <BaseButton variant="danger" size="sm" @click="onDelete">删除</BaseButton>
@@ -376,12 +437,12 @@ function fmtDateTime(v: string | null): string {
         <button
           v-for="t in TABS" :key="t.key"
           class="pd__tab" :class="{ 'is-active': activeTab === t.key }"
-          @click="activeTab = t.key"
+          @click="onTabChange(t.key)"
         >
           <AppIcon :name="t.icon" :size="14" />
           {{ t.label }}
           <span class="pd__tab-count">
-            {{ (detail[t.key] as unknown[]).length }}
+            {{ t.key === 'timeline' ? timeline.length : (detail[t.key as Exclude<TabKey, 'timeline'> ] as unknown[]).length }}
           </span>
         </button>
       </div>
@@ -668,4 +729,44 @@ function fmtDateTime(v: string | null): string {
   .pd__stats { grid-template-columns: repeat(2, 1fr); }
   .pd__stat-ring { grid-column: span 2; }
 }
+  // 时间线（M06 F05）
+  &__timeline {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    padding: var(--space-2) 0;
+  }
+  &__tl-item {
+    display: flex;
+    gap: var(--space-3);
+    align-items: flex-start;
+  }
+  &__tl-dot {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--primary-soft);
+    color: var(--primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  &__tl-content {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+    padding-bottom: var(--space-2);
+    border-bottom: 1px dashed var(--line);
+  }
+  &__tl-title {
+    font-size: var(--text-sm);
+    color: var(--text-hi);
+  }
+  &__tl-time {
+    font-size: var(--text-xs);
+    color: var(--text-low);
+  }
 </style>
