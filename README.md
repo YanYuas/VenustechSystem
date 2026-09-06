@@ -46,6 +46,10 @@ server.js / package.json 统一 Web 服务（生产：静态 + /api 代理）
 - **项目**：项目管理页（8 色、进度、状态）、任务归属项目
 - **全局**：通知（30s 轮询+未读红点）、全局搜索(⌘K)、命令面板、三套主题、备份导入导出、API Key 加密
 
+
+<img width="2544" height="1402" alt="6f87a993-8cef-4db6-bb1d-9756c7e07738" src="https://github.com/user-attachments/assets/bea0dc76-af11-4e7a-ae53-f4fe59fc83ec" />
+
+
 ## 快速开始
 
 前置：Python 3.11+、Node 18+；前端依赖 `cd frontend && npm install`（本机策略：终端下载由你执行）

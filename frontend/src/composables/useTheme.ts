@@ -1,6 +1,6 @@
 // ============================================================
 // 主题切换 —— 三套内置主题包 × 明暗模式
-// 主题包: cream(奶油糖果) / guofeng(国风雅集) / abyss(深渊档案)
+// 主题包: cream(奶油糖果) / guofeng(国风雅集) / abyss(深渊档案) / epic(史诗典藏)
 // 模式: light / dark / system
 // 映射:
 //   cream+light   → :root（默认，不设 data-theme）
@@ -24,7 +24,7 @@ function load(): ThemeConfig {
     const saved = localStorage.getItem(STORAGE_KEY)
     if (saved) {
       const parsed = JSON.parse(saved)
-      if (['cream', 'guofeng', 'abyss'].includes(parsed.pack)
+      if (['cream', 'guofeng', 'abyss', 'epic'].includes(parsed.pack)
         && ['light', 'dark', 'system'].includes(parsed.mode)) {
         return parsed
       }
@@ -44,7 +44,9 @@ function resolveDataTheme(pack: ThemePack, mode: ThemeMode): string | null {
   if (pack === 'cream') return m === 'dark' ? 'dark' : null
   if (pack === 'guofeng') return m === 'dark' ? 'guofeng-dark' : 'guofeng'
   // abyss
-  return m === 'dark' ? 'abyss' : 'abyss-light'
+  if (pack === 'abyss') return m === 'dark' ? 'abyss' : 'abyss-light'
+  // epic
+  return m === 'dark' ? 'epic-dark' : 'epic'
 }
 
 function apply(cfg: ThemeConfig) {
@@ -78,7 +80,7 @@ function toggleMode() {
 }
 
 function cyclePack() {
-  const order: ThemePack[] = ['cream', 'guofeng', 'abyss']
+  const order: ThemePack[] = ['cream', 'guofeng', 'abyss', 'epic']
   const idx = order.indexOf(config.value.pack)
   setPack(order[(idx + 1) % order.length])
 }

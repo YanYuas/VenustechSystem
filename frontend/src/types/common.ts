@@ -18,7 +18,7 @@ export type TagSemantic = 'default' | 'primary' | 'mint' | 'butter' | 'sky' | 'l
 export type ThemeMode = 'light' | 'dark' | 'system'
 
 /** 内置主题包 */
-export type ThemePack = 'cream' | 'guofeng' | 'abyss'
+export type ThemePack = 'cream' | 'guofeng' | 'abyss' | 'epic'
 
 /** 主题配置（主题包+明暗模式） */
 export interface ThemeConfig {
