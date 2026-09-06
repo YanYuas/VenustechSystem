@@ -175,6 +175,30 @@ function fmtTime(iso: string) {
   if (Number.isNaN(d.getTime())) return iso
   return d.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
 }
+// ---------- 多模型切换（M04 P1 F06） ----------
+interface AIModel {
+  id: string; name: string; provider: string; icon: string
+  description: string; type: string; cost: string; speed: string
+}
+const availableModels: AIModel[] = [
+  { id: 'deepseek-chat', name: 'DeepSeek V3', provider: 'DeepSeek', icon: '🌊', description: '深度推理性价比高', type: 'strong', cost: '低', speed: '快' },
+  { id: 'deepseek-reasoner', name: 'DeepSeek R1', provider: 'DeepSeek', icon: '🧠', description: '深度思考复杂推理', type: 'strong', cost: '中', speed: '中' },
+  { id: 'gpt-4o', name: 'GPT-4o', provider: 'OpenAI', icon: '🤖', description: '全能型多模态', type: 'strong', cost: '高', speed: '快' },
+  { id: 'claude-3-5', name: 'Claude 3.5', provider: 'Anthropic', icon: '📝', description: '长文本写作优秀', type: 'strong', cost: '高', speed: '中' },
+  { id: 'local-ollama', name: 'Ollama本地', provider: 'Ollama', icon: '🏠', description: '完全离线隐私优先', type: 'local', cost: '免费', speed: '取决于硬件' },
+]
+const currentModel = ref<AIModel>(availableModels[0])
+const showModelPicker = ref(false)
+function selectModel(m: AIModel) {
+  currentModel.value = m
+  try { localStorage.setItem('venustech_ai_model', m.id) } catch { }
+  showModelPicker.value = false
+  toast.success('已切换至' + m.name)
+}
+try {
+  const saved = localStorage.getItem('venustech_ai_model')
+  if (saved) { const found = availableModels.find(function(m) { return m.id === saved }); if (found) currentModel.value = found }
+} catch { }
 </script>
 
 <template>
@@ -206,7 +230,7 @@ function fmtTime(iso: string) {
     </aside>
 
     <!-- 对话主区 -->
-    <section class="conv-view__main">`n      <!-- 人设状态栏 -->`n      <div class="conv-view__persona-bar">`n        <button class="conv-view__persona-btn" @click="showPersonaPicker = true">`n          <span class="conv-view__persona-avatar">{{ activePersona.avatar }}</span>`n          <span class="conv-view__persona-name">{{ activePersona.name }}</span>`n          <span class="conv-view__persona-desc">{{ activePersona.description }}</span>`n          <AppIcon name="chevron-down" :size="12" />`n        </button>`n      </div>
+    <section class="conv-view__main">`n      <!-- 人设状态栏 -->`n      <div class="conv-view__persona-bar">`n        <button class="conv-view__persona-btn" @click="showPersonaPicker = true">`n          <span class="conv-view__persona-avatar">{{ activePersona.avatar }}</span>`n          <span class="conv-view__persona-name">{{ activePersona.name }}</span>`n          <span class="conv-view__persona-desc">{{ activePersona.description }}</span>`n          <AppIcon name="chevron-down" :size="12" />`n        </button>`n        <button class="conv-view__model-btn" @click="showModelPicker = true">`n          <span class="conv-view__model-icon">{{ currentModel.icon }}</span>`n          <span class="conv-view__model-name">{{ currentModel.name }}</span>`n          <AppIcon name="chevron-down" :size="12" />`n        </button>`n      </div>
       <BaseCard class="conv-view__chat" padding="0">
         <div class="conv-view__messages">
           <div
@@ -312,6 +336,46 @@ function fmtTime(iso: string) {
             </div>
             <AppIcon v-if="p.id === activePersona.id" name="check" :size="16" class="conv-persona__check" />
           </button>
+        </div>
+      </BaseModal>
+
+      <!-- 模型选择（M04 P1 F06） -->
+      <BaseModal v-model="showModelPicker" title="选择AI模型" :width="520">
+        <div class="conv-model">
+          <div class="conv-model__section">
+            <span class="conv-model__label">强AI（云端API）</span>
+            <div class="conv-model__grid">
+              <button v-for="m in availableModels.filter(x => x.type === 'strong')" :key="m.id" class="conv-model__item" :class="{ 'is-active': m.id === currentModel.id }" @click="selectModel(m)">
+                <span class="conv-model__icon">{{ m.icon }}</span>
+                <div class="conv-model__info">
+                  <span class="conv-model__name">{{ m.name }}</span>
+                  <span class="conv-model__desc">{{ m.description }}</span>
+                  <div class="conv-model__tags">
+                    <span class="conv-model__tag">成本: {{ m.cost }}</span>
+                    <span class="conv-model__tag">速度: {{ m.speed }}</span>
+                  </div>
+                </div>
+                <AppIcon v-if="m.id === currentModel.id" name="check" :size="16" class="conv-model__check" />
+              </button>
+            </div>
+          </div>
+          <div class="conv-model__section">
+            <span class="conv-model__label">本地模型（离线运行）</span>
+            <div class="conv-model__grid">
+              <button v-for="m in availableModels.filter(x => x.type === 'local')" :key="m.id" class="conv-model__item" :class="{ 'is-active': m.id === currentModel.id }" @click="selectModel(m)">
+                <span class="conv-model__icon">{{ m.icon }}</span>
+                <div class="conv-model__info">
+                  <span class="conv-model__name">{{ m.name }}</span>
+                  <span class="conv-model__desc">{{ m.description }}</span>
+                  <div class="conv-model__tags">
+                    <span class="conv-model__tag">{{ m.cost }}</span>
+                    <span class="conv-model__tag">{{ m.speed }}</span>
+                  </div>
+                </div>
+                <AppIcon v-if="m.id === currentModel.id" name="check" :size="16" class="conv-model__check" />
+              </button>
+            </div>
+          </div>
         </div>
       </BaseModal>
     </section>
@@ -621,4 +685,41 @@ function fmtTime(iso: string) {
   &__name { font-size: var(--text-sm); font-weight: 600; color: var(--text-hi); }
   &__desc { font-size: var(--text-xs); color: var(--text-low); }
   &__check { color: var(--primary); }
+  // 模型选择按钮（M04 P1 F06）
+  &__model-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: var(--bg-inset);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all 0.15s;
+    &:hover { border-color: var(--primary); }
+  }
+  &__model-icon { font-size: 16px; }
+  &__model-name { font-size: var(--text-xs); font-weight: 500; color: var(--text-mid); }
+}
+.conv-model {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  &__section { display: flex; flex-direction: column; gap: 8px; }
+  &__label { font-size: 12px; color: var(--text-low); font-weight: 500; }
+  &__grid { display: flex; flex-direction: column; gap: 8px; max-height: 280px; overflow-y: auto; }
+  &__item {
+    display: flex; align-items: center; gap: 12px; padding: 12px 16px;
+    background: var(--bg-inset); border: 1px solid var(--line); border-radius: var(--radius-sm);
+    cursor: pointer; transition: all 0.15s; text-align: left; width: 100%;
+    &:hover { border-color: var(--primary); }
+    &.is-active { border-color: var(--primary); background: var(--primary-soft); }
+  }
+  &__icon { font-size: 24px; flex-shrink: 0; }
+  &__info { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+  &__name { font-size: var(--text-sm); font-weight: 600; color: var(--text-hi); }
+  &__desc { font-size: var(--text-xs); color: var(--text-low); }
+  &__tags { display: flex; gap: 8px; margin-top: 4px; }
+  &__tag { font-size: 10px; color: var(--text-mid); background: var(--bg-panel); padding: 2px 6px; border-radius: 4px; }
+  &__check { color: var(--primary); flex-shrink: 0; }
 </style>
