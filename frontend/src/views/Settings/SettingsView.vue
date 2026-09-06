@@ -41,6 +41,7 @@ const themePacks: { value: ThemePack; label: string; desc: string }[] = [
   { value: 'cream', label: '奶油糖果', desc: '温暖柔和，日常使用' },
   { value: 'guofeng', label: '国风雅集', desc: '古典雅致，文人气息' },
   { value: 'abyss', label: '深渊档案', desc: '深邃神秘，专注沉浸' },
+  { value: 'epic', label: '史诗典藏', desc: '金琥珀传说，史诗质感' },
 ]
 
 const modeOptions: { value: ThemeMode; label: string }[] = [
@@ -154,6 +155,59 @@ async function importBackup() {
     importing.value = false
   }
 }
+
+
+// ---------- 桌宠设置（M08 P0） ----------
+const petEnabled = ref(true)
+const petDefaultForm = ref<'pet' | 'human'>('pet')
+const petInteraction = ref(true)
+const petOpacity = ref(90)
+const PET_SETTINGS_KEY = 'venustech_pet_settings'
+function loadPetSettings() {
+  try {
+    const saved = localStorage.getItem(PET_SETTINGS_KEY)
+    if (saved) {
+      const s = JSON.parse(saved)
+      petEnabled.value = s.enabled ?? true
+      petDefaultForm.value = s.defaultForm ?? 'pet'
+      petInteraction.value = s.interaction ?? true
+      petOpacity.value = s.opacity ?? 90
+    }
+  } catch { }
+}
+function savePetSettings() {
+  try {
+    localStorage.setItem(PET_SETTINGS_KEY, JSON.stringify({
+      enabled: petEnabled.value,
+      defaultForm: petDefaultForm.value,
+      interaction: petInteraction.value,
+      opacity: petOpacity.value,
+    }))
+  } catch { }
+}
+loadPetSettings()
+
+// ---------- 通知设置（M08 P0） ----------
+const notifyTask = ref(true)
+const notifyReview = ref(true)
+const notifySystem = ref(true)
+const notifySound = ref(false)
+
+// ---------- 数据目录（M08 P0） ----------
+const dataDir = ref('')
+async function loadDataDir() {
+  try {
+    const res = await fetch('http://127.0.0.1:8765/api/v1/health')
+    const json = await res.json()
+    dataDir.value = json.data?.data_dir || '默认目录'
+  } catch {
+    dataDir.value = '后端未连接'
+  }
+}
+function openDataDir() {
+  toast.info('数据目录', dataDir.value)
+}
+loadDataDir()
 
 onMounted(() => {
   loadConfig()
@@ -281,6 +335,64 @@ onMounted(() => {
         </div>
       </BaseCard>
 
+
+      <!-- 桌宠设置 -->
+      <BaseCard title="桌宠设置" icon="spark">
+        <div class="settings__group">
+          <div class="settings__row">
+            <label class="settings__label">启用桌宠</label>
+            <BaseSwitch :model-value="petEnabled" @update:model-value="(v) => { petEnabled = v; savePetSettings() }" />
+          </div>
+        </div>
+        <div class="settings__group">
+          <label class="settings__label">默认形态</label>
+          <div class="settings__mode-btns">
+            <button class="settings__mode-btn" :class="{ 'is-active': petDefaultForm === 'pet' }" @click="petDefaultForm = 'pet'; savePetSettings()">桌宠</button>
+            <button class="settings__mode-btn" :class="{ 'is-active': petDefaultForm === 'human' }" @click="petDefaultForm = 'human'; savePetSettings()">人形</button>
+          </div>
+        </div>
+        <div class="settings__group">
+          <div class="settings__row">
+            <label class="settings__label">互动反馈</label>
+            <BaseSwitch :model-value="petInteraction" @update:model-value="(v) => { petInteraction = v; savePetSettings() }" />
+          </div>
+        </div>
+        <div class="settings__group">
+          <div class="settings__row">
+            <label class="settings__label">透明度</label>
+            <span class="settings__value">{{ petOpacity }}%</span>
+          </div>
+          <input type="range" min="30" max="100" v-model.number="petOpacity" @change="savePetSettings" class="settings__slider" />
+        </div>
+      </BaseCard>
+
+      <!-- 通知设置 -->
+      <BaseCard title="通知设置" icon="bell">
+        <div class="settings__group">
+          <div class="settings__row">
+            <label class="settings__label">任务提醒</label>
+            <BaseSwitch v-model="notifyTask" />
+          </div>
+        </div>
+        <div class="settings__group">
+          <div class="settings__row">
+            <label class="settings__label">复盘提醒</label>
+            <BaseSwitch v-model="notifyReview" />
+          </div>
+        </div>
+        <div class="settings__group">
+          <div class="settings__row">
+            <label class="settings__label">系统通知</label>
+            <BaseSwitch v-model="notifySystem" />
+          </div>
+        </div>
+        <div class="settings__group">
+          <div class="settings__row">
+            <label class="settings__label">提示音</label>
+            <BaseSwitch v-model="notifySound" />
+          </div>
+        </div>
+      </BaseCard>
       <!-- 数据管理 -->
       <BaseCard title="数据管理" icon="database">
         <div class="settings__group">
@@ -303,7 +415,14 @@ onMounted(() => {
             </div>
           </div>
         </div>
-        <div class="settings__group">
+        <div class="<div class="settings__group">
+          <label class="settings__label">数据目录</label>
+          <div class="settings__row">
+            <span class="settings__dir">{{ dataDir }}</span>
+            <BaseButton variant="secondary" size="sm" @click="openDataDir">打开</BaseButton>
+          </div>
+        </div>
+        settings__group">
           <label class="settings__label">备份与恢复</label>
           <div class="settings__row">
             <BaseButton variant="secondary" @click="exportBackup">
@@ -403,6 +522,17 @@ onMounted(() => {
     &--success { color: var(--mint); }
   }
 
+  &__dir {
+    flex: 1;
+    font-size: var(--text-xs);
+    color: var(--text-mid);
+    background: var(--bg-inset);
+    padding: var(--space-1) var(--space-2);
+    border-radius: var(--radius-sm);
+    font-family: monospace;
+    word-break: break-all;
+  }
+
   &__value {
     font-size: var(--text-sm);
     font-weight: 600;
@@ -412,7 +542,7 @@ onMounted(() => {
   /* 主题包选择 */
   &__theme-packs {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     gap: var(--space-3);
   }
 
@@ -441,6 +571,7 @@ onMounted(() => {
     &.theme-cream { background: linear-gradient(135deg, #FFF5E6, #FFE4E1, #E8F5E9); }
     &.theme-guofeng { background: linear-gradient(135deg, #F5E6D3, #D4A574, #8B6914); }
     &.theme-abyss { background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460); }
+    &.theme-epic { background: linear-gradient(135deg, #FAF6EE, #F5EFE0, #C89B3C); }
   }
 
   &__theme-name {
