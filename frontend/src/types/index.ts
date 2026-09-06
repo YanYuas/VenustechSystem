@@ -13,3 +13,9 @@ export * from './dashboard'
 export * from './panel'
 export * from './project'
 export * from './notification'
+
+// 二期新模块类型
+export * from './resource'
+export * from './learning'
+export * from './life'
+export * from './asset'

@@ -12,3 +12,8 @@ export { dashboardApi, backupApi } from './dashboard'
 export { panelApi } from './panel'
 export { notificationApi } from './notification'
 export { projectApi } from './project'
+
+export { resourceApi } from './resource'
+export { learningApi } from './learning'
+export { lifeApi } from './life'
+export { assetApi } from './asset'

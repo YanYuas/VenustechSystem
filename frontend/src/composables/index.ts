@@ -17,3 +17,8 @@ export { useReview } from './useReview'
 export { useDashboard } from './useDashboard'
 export { useNotification } from './useNotification'
 export { useReminderWatcher } from './useReminderWatcher'
+
+export { useResource } from './useResource'
+export { useLearning } from './useLearning'
+export { useLife } from './useLife'
+export { useAsset } from './useAsset'
