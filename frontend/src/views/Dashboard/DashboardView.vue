@@ -194,7 +194,7 @@ const quickActions = computed(() => data.value?.quick_actions.items ?? [])
         </template>
         <template v-else-if="projects.length">
           <div class="dash__projects">
-            <div v-for="p in projects" :key="p.id" class="dash__project" @click="router.push(`/tasks?project_id=${p.id}`)">
+            <div v-for="p in projects" :key="p.id" class="dash__project" @click="router.push(`/projects/${p.id}`)">
               <div class="dash__project-head">
                 <span class="dash__project-name">{{ p.name }}</span>
                 <span class="dash__project-pct">{{ p.progress }}%</span>
@@ -226,7 +226,7 @@ const quickActions = computed(() => data.value?.quick_actions.items ?? [])
         </template>
         <div class="dash__resources">
           <div v-for="c in resourceCategories" :key="c.id" class="dash__resource"
-            @click="router.push('/documents')">
+            @click="toast.info('资源中心', '该功能开发中')">
             <AppIcon :name="c.icon" :size="16" class="dash__resource-icon" />
             <span class="dash__resource-name">{{ c.name }}</span>
             <span class="dash__resource-count">{{ c.count }}</span>
@@ -262,7 +262,7 @@ const quickActions = computed(() => data.value?.quick_actions.items ?? [])
             <span class="dash__learning-label">知识卡片</span>
             <span class="dash__learning-value">今日复习 0 张</span>
           </div>
-          <p class="dash__learning-enter" @click="router.push('/documents')">进入学习中心 →</p>
+          <p class="dash__learning-enter" @click="toast.info('学习与成长', '该功能开发中')">进入学习中心 →</p>
         </div>
       </BaseCard>
 
@@ -300,14 +300,14 @@ const quickActions = computed(() => data.value?.quick_actions.items ?? [])
         </template>
         <div class="dash__life">
           <div v-for="c in lifeCategories" :key="c.id" class="dash__life-item"
-            @click="router.push('/tasks')">
+            @click="toast.info('生活与自我', '该功能开发中')">
             <AppIcon :name="c.icon" :size="16" class="dash__life-icon" />
             <div class="dash__life-text">
               <span class="dash__life-name">{{ c.name }}</span>
               <span class="dash__life-value">{{ c.value }}</span>
             </div>
           </div>
-          <p class="dash__life-enter" @click="router.push('/tasks')">记录生活，自我觉察 →</p>
+          <p class="dash__life-enter" @click="toast.info('生活与自我', '该功能开发中')">记录生活，自我觉察 →</p>
         </div>
       </BaseCard>
     </div>
@@ -365,7 +365,7 @@ const quickActions = computed(() => data.value?.quick_actions.items ?? [])
         </template>
         <div class="dash__assets">
           <div v-for="c in assetCategories" :key="c.id" class="dash__asset"
-            @click="router.push('/review')">
+            @click="toast.info('长期资产库', '该功能开发中')">
             <AppIcon :name="c.icon" :size="18" class="dash__asset-icon" />
             <span class="dash__asset-name">{{ c.name }}</span>
             <span class="dash__asset-count">{{ c.count }}</span>

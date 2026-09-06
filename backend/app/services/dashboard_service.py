@@ -57,8 +57,8 @@ QUICK_ACTIONS = [
     QuickAction(id="new_task", name="新建任务", icon="plus", action="/tasks"),
     QuickAction(id="new_doc", name="新建笔记", icon="doc", action="/documents"),
     QuickAction(id="new_project", name="新建项目", icon="folder", action="/projects", status="ready"),
-    QuickAction(id="voice", name="语音记录", icon="mic", action="voice://record", status="planned"),
-    QuickAction(id="inbox", name="收集箱", icon="inbox", action="/resource-center/inbox", status="planned"),
+    QuickAction(id="voice", name="语音记录", icon="mic", action="voice_record", status="planned"),
+    QuickAction(id="inbox", name="收集箱", icon="inbox", action="resource_center_inbox", status="planned"),
 ]
 
 # ---------- 资源中心占位（待开发） ----------
