@@ -3,7 +3,7 @@
 // 知识资源 —— 列表 + 文档编辑器（点击文档进入编辑）
 // 完整功能：文件夹CRUD、层级导航、文档搜索
 // ============================================================
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import dayjs from 'dayjs'
 import { useDocument } from '@/composables/useDocument'
 import { useToast } from '@/composables/useToast'
@@ -40,6 +40,31 @@ const folderOptions = computed(() => [
 
 const currentFolderId = ref('')
 const searchText = ref('')
+const searchInputRef = ref<HTMLInputElement | null>(null)
+
+/** 全部文件夹展平（含子级），用于面包屑/下拉查找 */
+const flatFolders = computed(() => {
+  const map = new Map<string, Folder>()
+  const walk = (list: Folder[]) => {
+    for (const f of list) {
+      map.set(f.id, f)
+      if (f.children?.length) walk(f.children)
+    }
+  }
+  walk(folders.value)
+  return map
+})
+
+/** 面包屑路径（M03 F01）：当前文件夹 → 根链 */
+const breadcrumbs = computed(() => {
+  const chain: Folder[] = []
+  let cur = currentFolderId.value ? flatFolders.value.get(currentFolderId.value) : undefined
+  while (cur) {
+    chain.unshift(cur)
+    cur = cur.parent_id ? flatFolders.value.get(cur.parent_id) : undefined
+  }
+  return chain
+})
 
 function onFolderChange(v: string) {
   currentFolderId.value = v
@@ -47,6 +72,28 @@ function onFolderChange(v: string) {
   query.value.page = 1
   fetchDocuments().catch(() => { /* http 层已提示 */ })
 }
+
+/** 面包屑跳转：-1=根目录，否则跳到链上第 i 级 */
+function goBreadcrumb(i: number) {
+  if (i < 0) {
+    onFolderChange('')
+  } else {
+    const f = breadcrumbs.value[i]
+    if (f) onFolderChange(f.id)
+  }
+}
+
+/** Ctrl+F 聚焦搜索框（M03 F03，useShortcuts 已预留 module-search 语义） */
+function onKeydown(e: KeyboardEvent) {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
+    e.preventDefault()
+    searchInputRef.value?.focus()
+    searchInputRef.value?.select()
+  }
+}
+
+onMounted(() => window.addEventListener('keydown', onKeydown))
+onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 
 function onPageChange(p: number) {
   query.value.page = p
@@ -198,8 +245,31 @@ function fmtTime(v: string) {
           >└ {{ c.name }}</button>
         </template>
       </div>
-      <BaseInput v-model="searchText" type="search" placeholder="搜索标题 / 内容…" @update:modelValue="onSearch" />
+      <!-- 原生 input：Ctrl+F 聚焦需直接持有元素引用（M03 F03） -->
+      <input
+        ref="searchInputRef"
+        v-model="searchText"
+        type="search"
+        class="docs__search"
+        placeholder="搜索标题 / 内容…（Ctrl+F）"
+        @input="onSearch"
+      />
     </div>
+
+    <!-- 面包屑导航（M03 F01） -->
+    <nav v-if="breadcrumbs.length" class="docs__crumbs" aria-label="文件夹路径">
+      <button class="docs__crumb" @click="goBreadcrumb(-1)">
+        <AppIcon name="folder" :size="13" /> 全部
+      </button>
+      <template v-for="(f, i) in breadcrumbs" :key="f.id">
+        <span class="docs__crumb-sep">/</span>
+        <button
+          class="docs__crumb"
+          :class="{ 'is-current': i === breadcrumbs.length - 1 }"
+          @click="goBreadcrumb(i)"
+        >{{ f.name }}</button>
+      </template>
+    </nav>
 
     <BaseCard>
       <template v-if="loading">
@@ -292,6 +362,45 @@ function fmtTime(v: string) {
       flex: 1;
     }
   }
+  &__search {
+    flex: 1;
+    padding: 8px 14px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--bg-panel);
+    color: var(--text-hi);
+    font-size: var(--text-sm);
+    outline: none;
+    transition: border-color 0.2s var(--ease-soft);
+    &:focus { border-color: var(--primary); }
+  }
+  &__crumbs {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    flex-wrap: wrap;
+  }
+  &__crumb {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-pill);
+    background: var(--bg-panel);
+    color: var(--text-mid);
+    font-size: var(--text-sm);
+    cursor: pointer;
+    transition: all 0.15s var(--ease-soft);
+    &:hover { border-color: var(--primary); color: var(--primary); }
+    &.is-current {
+      background: var(--primary-soft);
+      border-color: var(--primary);
+      color: var(--primary);
+      cursor: default;
+    }
+  }
+  &__crumb-sep { color: var(--text-low); font-size: var(--text-xs); }
   &__tree {
     display: flex;
     gap: var(--space-2);
