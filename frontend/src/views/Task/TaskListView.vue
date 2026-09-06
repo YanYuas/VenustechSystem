@@ -76,6 +76,64 @@ const priorityOptions = [
   { label: '高', value: 'high' }, { label: '紧急', value: 'urgent' },
 ]
 
+
+// ---------- 任务模板（M02 P2 F09） ----------
+interface TaskTemplate {
+  id: string
+  name: string
+  title: string
+  description?: string
+  priority: TaskPriority
+  estimated_minutes?: number
+  tags: string[]
+  builtin?: boolean
+}
+
+const TEMPLATE_KEY = 'venustech_task_templates'
+const builtinTemplates: TaskTemplate[] = [
+  { id: 'bt-study', name: '每日学习', title: '学习新知识点', priority: 'medium', estimated_minutes: 60, tags: ['学习'], builtin: true },
+  { id: 'bt-work', name: '工作任务', title: '完成工作事项', priority: 'high', estimated_minutes: 120, tags: ['工作'], builtin: true },
+  { id: 'bt-fitness', name: '健身计划', title: '健身锻炼', priority: 'low', estimated_minutes: 45, tags: ['健康'], builtin: true },
+  { id: 'bt-review', name: '每日复盘', title: '今日复盘总结', priority: 'medium', estimated_minutes: 15, tags: ['复盘'], builtin: true },
+  { id: 'bt-deepwork', name: '深度工作', title: '深度专注工作', priority: 'urgent', estimated_minutes: 90, tags: ['专注'], builtin: true },
+]
+const customTemplates = ref<TaskTemplate[]>([])
+const showTemplatePicker = ref(false)
+
+function loadTemplates() {
+  try {
+    const saved = localStorage.getItem(TEMPLATE_KEY)
+    if (saved) customTemplates.value = JSON.parse(saved)
+  } catch { /* ignore */ }
+}
+function saveTemplates() {
+  try { localStorage.setItem(TEMPLATE_KEY, JSON.stringify(customTemplates.value)) } catch { /* ignore */ }
+}
+function applyTemplate(tpl: TaskTemplate) {
+  newTitle.value = tpl.title
+  newPriority.value = tpl.priority
+  showTemplatePicker.value = false
+  toast.success(`已应用模板「${tpl.name}」`)
+}
+function saveAsTemplate() {
+  if (!newTitle.value.trim()) { toast.warning('请先填写任务标题'); return }
+  const tpl: TaskTemplate = {
+    id: 'ct-' + Date.now(),
+    name: newTitle.value.slice(0, 20),
+    title: newTitle.value,
+    priority: newPriority.value,
+    tags: [],
+  }
+  customTemplates.value.push(tpl)
+  saveTemplates()
+  toast.success('已保存为模板')
+}
+function deleteTemplate(id: string) {
+  customTemplates.value = customTemplates.value.filter(t => t.id !== id)
+  saveTemplates()
+}
+loadTemplates()
+
 function switchTab(v: TaskStatus | '') {
   query.value.status = v || undefined
   query.value.page = 1
@@ -432,7 +490,37 @@ function formatDate(iso: string | null): string {
     </div>
 
     <BaseCard>
-      <template v-if="loading"><BaseSkeleton variant="list" :rows="5" /></template>
+      <template v-if="loading"><BaseSkeleton variant="list" :rows="5" />
+    <!-- 任务模板选择弹窗（M02 P2） -->
+    <BaseModal v-model="showTemplatePicker" title="选择任务模板" :width="480">
+      <div class="task-tpl">
+        <div class="task-tpl__section">
+          <span class="task-tpl__label">内置模板</span>
+          <div class="task-tpl__grid">
+            <button v-for="t in builtinTemplates" :key="t.id" class="task-tpl__item" @click="applyTemplate(t)">
+              <span class="task-tpl__name">{{ t.name }}</span>
+              <span class="task-tpl__meta">{{ t.estimated_minutes }}分钟 · {{ priorityLabel(t.priority) }}</span>
+            </button>
+          </div>
+        </div>
+        <div v-if="customTemplates.length" class="task-tpl__section">
+          <span class="task-tpl__label">我的模板</span>
+          <div class="task-tpl__grid">
+            <div v-for="t in customTemplates" :key="t.id" class="task-tpl__item">
+              <button class="task-tpl__item-btn" @click="applyTemplate(t)">
+                <span class="task-tpl__name">{{ t.name }}</span>
+                <span class="task-tpl__meta">{{ t.estimated_minutes || '-' }}分钟 · {{ priorityLabel(t.priority) }}</span>
+              </button>
+              <button class="task-tpl__del" @click="deleteTemplate(t.id)"><AppIcon name="close" :size="12" /></button>
+            </div>
+          </div>
+        </div>
+        <div class="task-tpl__footer">
+          <BaseButton variant="secondary" size="sm" @click="saveAsTemplate"><AppIcon name="bookmark" :size="14" /> 保存当前为模板</BaseButton>
+        </div>
+      </div>
+    </BaseModal>
+</template>
       <template v-else-if="viewMode === 'kanban'">
         <div class="tasks__kanban">
           <div
@@ -466,7 +554,37 @@ function formatDate(iso: string | null): string {
             </div>
           </div>
         </div>
-      </template>
+      
+    <!-- 任务模板选择弹窗（M02 P2） -->
+    <BaseModal v-model="showTemplatePicker" title="选择任务模板" :width="480">
+      <div class="task-tpl">
+        <div class="task-tpl__section">
+          <span class="task-tpl__label">内置模板</span>
+          <div class="task-tpl__grid">
+            <button v-for="t in builtinTemplates" :key="t.id" class="task-tpl__item" @click="applyTemplate(t)">
+              <span class="task-tpl__name">{{ t.name }}</span>
+              <span class="task-tpl__meta">{{ t.estimated_minutes }}分钟 · {{ priorityLabel(t.priority) }}</span>
+            </button>
+          </div>
+        </div>
+        <div v-if="customTemplates.length" class="task-tpl__section">
+          <span class="task-tpl__label">我的模板</span>
+          <div class="task-tpl__grid">
+            <div v-for="t in customTemplates" :key="t.id" class="task-tpl__item">
+              <button class="task-tpl__item-btn" @click="applyTemplate(t)">
+                <span class="task-tpl__name">{{ t.name }}</span>
+                <span class="task-tpl__meta">{{ t.estimated_minutes || '-' }}分钟 · {{ priorityLabel(t.priority) }}</span>
+              </button>
+              <button class="task-tpl__del" @click="deleteTemplate(t.id)"><AppIcon name="close" :size="12" /></button>
+            </div>
+          </div>
+        </div>
+        <div class="task-tpl__footer">
+          <BaseButton variant="secondary" size="sm" @click="saveAsTemplate"><AppIcon name="bookmark" :size="14" /> 保存当前为模板</BaseButton>
+        </div>
+      </div>
+    </BaseModal>
+</template>
       <template v-else-if="tasks.length">
         <!-- 批量模式：全选行 -->
         <div v-if="batchMode" class="tasks__select-all">
@@ -523,12 +641,102 @@ function formatDate(iso: string | null): string {
             </div>
           </li>
         </ul>
-      </template>
+      
+    <!-- 任务模板选择弹窗（M02 P2） -->
+    <BaseModal v-model="showTemplatePicker" title="选择任务模板" :width="480">
+      <div class="task-tpl">
+        <div class="task-tpl__section">
+          <span class="task-tpl__label">内置模板</span>
+          <div class="task-tpl__grid">
+            <button v-for="t in builtinTemplates" :key="t.id" class="task-tpl__item" @click="applyTemplate(t)">
+              <span class="task-tpl__name">{{ t.name }}</span>
+              <span class="task-tpl__meta">{{ t.estimated_minutes }}分钟 · {{ priorityLabel(t.priority) }}</span>
+            </button>
+          </div>
+        </div>
+        <div v-if="customTemplates.length" class="task-tpl__section">
+          <span class="task-tpl__label">我的模板</span>
+          <div class="task-tpl__grid">
+            <div v-for="t in customTemplates" :key="t.id" class="task-tpl__item">
+              <button class="task-tpl__item-btn" @click="applyTemplate(t)">
+                <span class="task-tpl__name">{{ t.name }}</span>
+                <span class="task-tpl__meta">{{ t.estimated_minutes || '-' }}分钟 · {{ priorityLabel(t.priority) }}</span>
+              </button>
+              <button class="task-tpl__del" @click="deleteTemplate(t.id)"><AppIcon name="close" :size="12" /></button>
+            </div>
+          </div>
+        </div>
+        <div class="task-tpl__footer">
+          <BaseButton variant="secondary" size="sm" @click="saveAsTemplate"><AppIcon name="bookmark" :size="14" /> 保存当前为模板</BaseButton>
+        </div>
+      </div>
+    </BaseModal>
+</template>
       <template v-else>
         <BaseEmpty title="没有符合条件的任务" description="点击右上角「新建任务」创建第一个吧">
-          <template #action><BaseButton variant="primary" icon="plus" @click="createOpen = true">新建任务</BaseButton></template>
+          <template #action><BaseButton variant="primary" icon="plus" @click="createOpen = true">新建任务</BaseButton>
+    <!-- 任务模板选择弹窗（M02 P2） -->
+    <BaseModal v-model="showTemplatePicker" title="选择任务模板" :width="480">
+      <div class="task-tpl">
+        <div class="task-tpl__section">
+          <span class="task-tpl__label">内置模板</span>
+          <div class="task-tpl__grid">
+            <button v-for="t in builtinTemplates" :key="t.id" class="task-tpl__item" @click="applyTemplate(t)">
+              <span class="task-tpl__name">{{ t.name }}</span>
+              <span class="task-tpl__meta">{{ t.estimated_minutes }}分钟 · {{ priorityLabel(t.priority) }}</span>
+            </button>
+          </div>
+        </div>
+        <div v-if="customTemplates.length" class="task-tpl__section">
+          <span class="task-tpl__label">我的模板</span>
+          <div class="task-tpl__grid">
+            <div v-for="t in customTemplates" :key="t.id" class="task-tpl__item">
+              <button class="task-tpl__item-btn" @click="applyTemplate(t)">
+                <span class="task-tpl__name">{{ t.name }}</span>
+                <span class="task-tpl__meta">{{ t.estimated_minutes || '-' }}分钟 · {{ priorityLabel(t.priority) }}</span>
+              </button>
+              <button class="task-tpl__del" @click="deleteTemplate(t.id)"><AppIcon name="close" :size="12" /></button>
+            </div>
+          </div>
+        </div>
+        <div class="task-tpl__footer">
+          <BaseButton variant="secondary" size="sm" @click="saveAsTemplate"><AppIcon name="bookmark" :size="14" /> 保存当前为模板</BaseButton>
+        </div>
+      </div>
+    </BaseModal>
+</template>
         </BaseEmpty>
-      </template>
+      
+    <!-- 任务模板选择弹窗（M02 P2） -->
+    <BaseModal v-model="showTemplatePicker" title="选择任务模板" :width="480">
+      <div class="task-tpl">
+        <div class="task-tpl__section">
+          <span class="task-tpl__label">内置模板</span>
+          <div class="task-tpl__grid">
+            <button v-for="t in builtinTemplates" :key="t.id" class="task-tpl__item" @click="applyTemplate(t)">
+              <span class="task-tpl__name">{{ t.name }}</span>
+              <span class="task-tpl__meta">{{ t.estimated_minutes }}分钟 · {{ priorityLabel(t.priority) }}</span>
+            </button>
+          </div>
+        </div>
+        <div v-if="customTemplates.length" class="task-tpl__section">
+          <span class="task-tpl__label">我的模板</span>
+          <div class="task-tpl__grid">
+            <div v-for="t in customTemplates" :key="t.id" class="task-tpl__item">
+              <button class="task-tpl__item-btn" @click="applyTemplate(t)">
+                <span class="task-tpl__name">{{ t.name }}</span>
+                <span class="task-tpl__meta">{{ t.estimated_minutes || '-' }}分钟 · {{ priorityLabel(t.priority) }}</span>
+              </button>
+              <button class="task-tpl__del" @click="deleteTemplate(t.id)"><AppIcon name="close" :size="12" /></button>
+            </div>
+          </div>
+        </div>
+        <div class="task-tpl__footer">
+          <BaseButton variant="secondary" size="sm" @click="saveAsTemplate"><AppIcon name="bookmark" :size="14" /> 保存当前为模板</BaseButton>
+        </div>
+      </div>
+    </BaseModal>
+</template>
     </BaseCard>
 
     <!-- 分页（仅列表视图；看板展示当前页分组） -->
@@ -685,6 +893,36 @@ function formatDate(iso: string | null): string {
       </div>
     </BaseDrawer>
   </div>
+
+    <!-- 任务模板选择弹窗（M02 P2） -->
+    <BaseModal v-model="showTemplatePicker" title="选择任务模板" :width="480">
+      <div class="task-tpl">
+        <div class="task-tpl__section">
+          <span class="task-tpl__label">内置模板</span>
+          <div class="task-tpl__grid">
+            <button v-for="t in builtinTemplates" :key="t.id" class="task-tpl__item" @click="applyTemplate(t)">
+              <span class="task-tpl__name">{{ t.name }}</span>
+              <span class="task-tpl__meta">{{ t.estimated_minutes }}分钟 · {{ priorityLabel(t.priority) }}</span>
+            </button>
+          </div>
+        </div>
+        <div v-if="customTemplates.length" class="task-tpl__section">
+          <span class="task-tpl__label">我的模板</span>
+          <div class="task-tpl__grid">
+            <div v-for="t in customTemplates" :key="t.id" class="task-tpl__item">
+              <button class="task-tpl__item-btn" @click="applyTemplate(t)">
+                <span class="task-tpl__name">{{ t.name }}</span>
+                <span class="task-tpl__meta">{{ t.estimated_minutes || '-' }}分钟 · {{ priorityLabel(t.priority) }}</span>
+              </button>
+              <button class="task-tpl__del" @click="deleteTemplate(t.id)"><AppIcon name="close" :size="12" /></button>
+            </div>
+          </div>
+        </div>
+        <div class="task-tpl__footer">
+          <BaseButton variant="secondary" size="sm" @click="saveAsTemplate"><AppIcon name="bookmark" :size="14" /> 保存当前为模板</BaseButton>
+        </div>
+      </div>
+    </BaseModal>
 </template>
 
 <style scoped lang="scss">
@@ -854,4 +1092,19 @@ function formatDate(iso: string | null): string {
     padding: var(--space-6) 0; border: 1px dashed var(--line); border-radius: var(--radius-sm);
   }
 }
+  // 任务模板（M02 P2）
+  .task-tpl {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    &__section { display: flex; flex-direction: column; gap: 8px; }
+    &__label { font-size: 12px; color: var(--text-low, #999); font-weight: 500; }
+    &__grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    &__item { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: var(--bg-inset, #f8f9fa); border-radius: 8px; border: 1px solid var(--line, #eee); cursor: pointer; transition: all 0.15s; &:hover { border-color: var(--primary, #7c5cff); background: var(--primary-soft, rgba(124,92,255,0.1)); } }
+    &__item-btn { flex: 1; text-align: left; background: none; border: none; cursor: pointer; }
+    &__name { display: block; font-size: 13px; font-weight: 500; color: var(--text-hi, #333); }
+    &__meta { display: block; font-size: 11px; color: var(--text-low, #999); margin-top: 2px; }
+    &__del { background: none; border: none; color: var(--text-low, #999); cursor: pointer; padding: 4px; &:hover { color: var(--danger, #ef4444); } }
+    &__footer { display: flex; justify-content: flex-end; padding-top: 8px; border-top: 1px solid var(--line, #eee); }
+  }
 </style>
