@@ -3,8 +3,10 @@
 // 知识资源 —— 列表 + 文档编辑器（点击文档进入编辑）
 // 完整功能：文件夹CRUD、层级导航、文档搜索
 // ============================================================
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import dayjs from 'dayjs'
+import JSZip from 'jszip'
+import { documentApi } from '@/api'
 import { useDocument } from '@/composables/useDocument'
 import { useToast } from '@/composables/useToast'
 import { useModal } from '@/composables/useModal'
@@ -18,6 +20,7 @@ import BaseEmpty from '@/components/common/BaseEmpty.vue'
 import BaseSkeleton from '@/components/common/BaseSkeleton.vue'
 import AppIcon from '@/components/common/AppIcon.vue'
 import DocumentEditor from './DocumentEditor.vue'
+import DocumentGraph from '@/components/document/DocumentGraph.vue'
 import type { Document, Folder } from '@/types'
 
 const {
@@ -27,6 +30,9 @@ const {
 } = useDocument()
 const toast = useToast()
 const modal = useModal()
+
+// 视图切换（M03 P2：列表/图谱）
+const viewMode = ref<'list' | 'graph'>('list')
 
 onMounted(() => {
   fetchFolders().catch(() => { /* http 层已提示 */ })
@@ -40,6 +46,31 @@ const folderOptions = computed(() => [
 
 const currentFolderId = ref('')
 const searchText = ref('')
+const searchInputRef = ref<HTMLInputElement | null>(null)
+
+/** 全部文件夹展平（含子级），用于面包屑/下拉查找 */
+const flatFolders = computed(() => {
+  const map = new Map<string, Folder>()
+  const walk = (list: Folder[]) => {
+    for (const f of list) {
+      map.set(f.id, f)
+      if (f.children?.length) walk(f.children)
+    }
+  }
+  walk(folders.value)
+  return map
+})
+
+/** 面包屑路径（M03 F01）：当前文件夹 → 根链 */
+const breadcrumbs = computed(() => {
+  const chain: Folder[] = []
+  let cur = currentFolderId.value ? flatFolders.value.get(currentFolderId.value) : undefined
+  while (cur) {
+    chain.unshift(cur)
+    cur = cur.parent_id ? flatFolders.value.get(cur.parent_id) : undefined
+  }
+  return chain
+})
 
 function onFolderChange(v: string) {
   currentFolderId.value = v
@@ -47,6 +78,28 @@ function onFolderChange(v: string) {
   query.value.page = 1
   fetchDocuments().catch(() => { /* http 层已提示 */ })
 }
+
+/** 面包屑跳转：-1=根目录，否则跳到链上第 i 级 */
+function goBreadcrumb(i: number) {
+  if (i < 0) {
+    onFolderChange('')
+  } else {
+    const f = breadcrumbs.value[i]
+    if (f) onFolderChange(f.id)
+  }
+}
+
+/** Ctrl+F 聚焦搜索框（M03 F03，useShortcuts 已预留 module-search 语义） */
+function onKeydown(e: KeyboardEvent) {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
+    e.preventDefault()
+    searchInputRef.value?.focus()
+    searchInputRef.value?.select()
+  }
+}
+
+onMounted(() => window.addEventListener('keydown', onKeydown))
+onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 
 function onPageChange(p: number) {
   query.value.page = p
@@ -73,17 +126,144 @@ function onEditorSaved(updated: Document) {
   if (idx >= 0) documents.value[idx] = updated
 }
 
+/** 双向链接：按标题打开文档 */
+async function onOpenDocByTitle(title: string) {
+  try {
+    const res = await documentApi.search(title)
+    const doc = res.documents.find(d => d.title === title)
+    if (doc) {
+      const detail = await documentApi.detail(doc.id)
+      editingDoc.value = detail
+    } else {
+      toast.warning(`文档「${title}」不存在，可在选择器中创建`)
+    }
+  } catch { /* http层已提示 */ }
+}
+
+/** 双向链接：从wiki链接创建新文档 */
+async function onCreateDocFromWiki(title: string) {
+  try {
+    const doc = await createDocument({ title, folder_id: currentFolderId.value || undefined })
+    if (doc) {
+      editingDoc.value = doc
+      toast.success('文档已创建', title)
+    }
+  } catch { /* http层已提示 */ }
+}
+
+/** 图谱视图：点击节点打开文档 */
+async function onGraphOpenDoc(id: string) {
+  try {
+    const doc = await documentApi.detail(id)
+    editingDoc.value = doc
+  } catch { /* http层已提示 */ }
+}
+
 // 新建文档
 const createOpen = ref(false)
 const newTitle = ref('')
 const newFolderId = ref('')
+const newTemplate = ref('')
+
+// 内置模板（M03 F07）
+const DOC_TEMPLATES = [
+  { id: 'blank', name: '空白文档', content: '' },
+  { id: 'daily', name: '每日复盘', content: `# 每日复盘 - {{date}}
+
+## 今日成就
+- 
+
+## 不足与反思
+- 
+
+## 明日计划
+- 
+
+## 感恩
+- ` },
+  { id: 'meeting', name: '会议纪要', content: `# 会议纪要 - {{title}}
+
+**日期**：{{date}}
+**参会人**：
+
+## 议题
+1. 
+
+## 讨论要点
+- 
+
+## 决议
+- 
+
+## 待办
+- [ ] ` },
+  { id: 'reading', name: '读书笔记', content: `# 《{{title}}》读书笔记
+
+**作者**：
+**阅读日期**：{{date}}
+
+## 核心观点
+- 
+
+## 精彩摘录
+> 
+
+## 个人思考
+- 
+
+## 行动项
+- [ ] ` },
+  { id: 'project', name: '项目计划', content: `# {{title}} - 项目计划
+
+**创建日期**：{{date}}
+**目标**：
+
+## 里程碑
+- [ ] M1: 
+- [ ] M2: 
+- [ ] M3: 
+
+## 任务分解
+### 阶段一
+- [ ] 
+
+### 阶段二
+- [ ] 
+
+## 风险与应对
+- ` },
+  { id: 'weekly', name: '周报', content: `# 周报 - {{date}}
+
+## 本周完成
+- 
+
+## 进行中
+- 
+
+## 下周计划
+- 
+
+## 问题与求助
+- ` },
+]
+
+function applyTemplate(content: string): string {
+  const now = dayjs().format('YYYY-MM-DD')
+  return content
+    .replace(/\{\{date\}\}/g, now)
+    .replace(/\{\{title\}\}/g, newTitle.value || '未命名')
+}
+
 async function onCreate() {
   const title = newTitle.value.trim()
   if (!title) return toast.warning('请输入文档标题')
-  const doc = await createDocument({ title, folder_id: newFolderId.value || undefined })
+  const template = DOC_TEMPLATES.find(t => t.id === newTemplate.value)
+  const content = template ? applyTemplate(template.content) : ''
+  const doc = await createDocument({ title, folder_id: newFolderId.value || undefined, content })
   toast.success('文档已创建')
   createOpen.value = false
   newTitle.value = ''
+  newTemplate.value = ''
   if (doc) openEditor(doc)
 }
 
@@ -152,6 +332,43 @@ async function onDeleteFolder(f: Folder) {
 function fmtTime(v: string) {
   return dayjs(v).format('MM-DD HH:mm')
 }
+
+// ---------- 文件夹批量导出 ZIP（M03 F06） ----------
+const exporting = ref(false)
+async function exportFolderZip() {
+  if (exporting.value) return
+  exporting.value = true
+  try {
+    const zip = new JSZip()
+    const folderName = currentFolderId.value
+      ? (flatFolders.value.get(currentFolderId.value)?.name || '全部文档')
+      : '全部文档'
+    // 加载该文件夹下所有文档（不分页）
+    const res = await documentApi.list({
+      folder_id: currentFolderId.value || undefined,
+      page: 1,
+      page_size: 1000,
+    })
+    for (const doc of res.list) {
+      const detail = await documentApi.detail(doc.id)
+      const safeName = detail.title.replace(/[\\/:*?"<>|]/g, '_')
+      const md = `# ${detail.title}\n\n${detail.content || ''}\n`
+      zip.file(`${safeName}.md`, md)
+    }
+    const blob = await zip.generateAsync({ type: 'blob' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${folderName}-${dayjs().format('YYYYMMDD')}.zip`
+    a.click()
+    URL.revokeObjectURL(url)
+    toast.success('导出成功', `${folderName} 共 ${res.list.length} 篇文档`)
+  } catch (err) {
+    toast.error('导出失败', String(err))
+  } finally {
+    exporting.value = false
+  }
+}
 </script>
 
 <template>
@@ -161,6 +378,8 @@ function fmtTime(v: string) {
     :document="editingDoc"
     @close="editingDoc = null"
     @saved="onEditorSaved"
+    @open-doc-by-title="onOpenDocByTitle"
+    @create-doc="onCreateDocFromWiki"
   />
 
   <!-- 文档列表视图 -->
@@ -168,6 +387,15 @@ function fmtTime(v: string) {
     <div class="docs__head">
       <h1 class="docs__title">知识资源</h1>
       <div class="docs__head-actions">
+        <div class="docs__view-toggle">
+          <button class="docs__view-btn" :class="{ 'is-active': viewMode === 'list' }" @click="viewMode = 'list'">
+            <AppIcon name="list" :size="14" />
+          </button>
+          <button class="docs__view-btn" :class="{ 'is-active': viewMode === 'graph' }" @click="viewMode = 'graph'">
+            <AppIcon name="graph" :size="14" />
+          </button>
+        </div>
+        <BaseButton variant="secondary" icon="download" :loading="exporting" @click="exportFolderZip">导出ZIP</BaseButton>
         <BaseButton variant="secondary" icon="folder-plus" @click="openCreateFolder">新建文件夹</BaseButton>
         <BaseButton variant="primary" icon="plus" @click="createOpen = true">新建文档</BaseButton>
       </div>
@@ -198,54 +426,98 @@ function fmtTime(v: string) {
           >└ {{ c.name }}</button>
         </template>
       </div>
-      <BaseInput v-model="searchText" type="search" placeholder="搜索标题 / 内容…" @update:modelValue="onSearch" />
+      <!-- 原生 input：Ctrl+F 聚焦需直接持有元素引用（M03 F03） -->
+      <input
+        ref="searchInputRef"
+        v-model="searchText"
+        type="search"
+        class="docs__search"
+        placeholder="搜索标题 / 内容…（Ctrl+F）"
+        @input="onSearch"
+      />
     </div>
 
-    <BaseCard>
-      <template v-if="loading">
-        <BaseSkeleton variant="list" :rows="5" />
+    <!-- 面包屑导航（M03 F01） -->
+    <nav v-if="breadcrumbs.length" class="docs__crumbs" aria-label="文件夹路径">
+      <button class="docs__crumb" @click="goBreadcrumb(-1)">
+        <AppIcon name="folder" :size="13" /> 全部
+      </button>
+      <template v-for="(f, i) in breadcrumbs" :key="f.id">
+        <span class="docs__crumb-sep">/</span>
+        <button
+          class="docs__crumb"
+          :class="{ 'is-current': i === breadcrumbs.length - 1 }"
+          @click="goBreadcrumb(i)"
+        >{{ f.name }}</button>
       </template>
-      <template v-else-if="documents.length">
-        <ul class="docs__list">
-          <li v-for="d in documents" :key="d.id" class="docs__item" @click="openEditor(d)">
-            <div class="docs__row">
-              <AppIcon name="doc" :size="18" class="docs__doc-icon" />
-              <span class="docs__name">{{ d.title }}</span>
-              <div class="docs__tags">
-                <BaseTag v-for="t in d.tags" :key="t" semantic="lilac">{{ t }}</BaseTag>
-              </div>
-              <span class="docs__meta">{{ fmtTime(d.updated_at) }} · {{ d.word_count }} 字 · v{{ d.version }}</span>
-              <button class="docs__del" title="删除" @click.stop="onDelete(d)">
-                <AppIcon name="trash" :size="15" />
-              </button>
-            </div>
-            <p v-if="d.summary" class="docs__summary">✨ {{ d.summary }}</p>
-          </li>
-        </ul>
-      </template>
-      <template v-else>
-        <BaseEmpty title="没有文档" description="换一个文件夹，或创建第一篇笔记吧">
-          <template #action>
-            <BaseButton variant="primary" icon="plus" @click="createOpen = true">新建文档</BaseButton>
-          </template>
-        </BaseEmpty>
-      </template>
-    </BaseCard>
+    </nav>
 
-    <!-- 分页 -->
-    <BasePagination
-      v-if="!loading"
-      :total="total"
-      :page="query.page ?? 1"
-      :page-size="query.page_size ?? 20"
-      @change="onPageChange"
-    />
+    <!-- 列表视图 -->
+    <template v-if="viewMode === 'list'">
+      <BaseCard>
+        <template v-if="loading">
+          <BaseSkeleton variant="list" :rows="5" />
+        </template>
+        <template v-else-if="documents.length">
+          <ul class="docs__list">
+            <li v-for="d in documents" :key="d.id" class="docs__item" @click="openEditor(d)">
+              <div class="docs__row">
+                <AppIcon name="doc" :size="18" class="docs__doc-icon" />
+                <span class="docs__name">{{ d.title }}</span>
+                <div class="docs__tags">
+                  <BaseTag v-for="t in d.tags" :key="t" semantic="lilac">{{ t }}</BaseTag>
+                </div>
+                <span class="docs__meta">{{ fmtTime(d.updated_at) }} · {{ d.word_count }} 字 · v{{ d.version }}</span>
+                <button class="docs__del" title="删除" @click.stop="onDelete(d)">
+                  <AppIcon name="trash" :size="15" />
+                </button>
+              </div>
+              <p v-if="d.summary" class="docs__summary">✨ {{ d.summary }}</p>
+            </li>
+          </ul>
+        </template>
+        <template v-else>
+          <BaseEmpty title="没有文档" description="换一个文件夹，或创建第一篇笔记吧">
+            <template #action>
+              <BaseButton variant="primary" icon="plus" @click="createOpen = true">新建文档</BaseButton>
+            </template>
+          </BaseEmpty>
+        </template>
+      </BaseCard>
+
+      <!-- 分页 -->
+      <BasePagination
+        v-if="!loading"
+        :total="total"
+        :page="query.page ?? 1"
+        :page-size="query.page_size ?? 20"
+        @change="onPageChange"
+      />
+    </template>
+
+    <!-- 图谱视图（M03 P2） -->
+    <template v-else>
+      <div class="docs__graph-wrap">
+        <DocumentGraph @open-doc="onGraphOpenDoc" />
+      </div>
+    </template>
 
     <!-- 新建文档弹窗 -->
     <BaseModal v-model="createOpen" title="新建文档" @confirm="onCreate">
       <div class="docs__form">
         <BaseInput v-model="newTitle" placeholder="文档标题" />
         <BaseSelect v-model="newFolderId" :options="folderOptions" placeholder="所属文件夹" />
+        <div class="docs__template-group">
+          <label class="docs__template-label">选择模板</label>
+          <div class="docs__template-grid">
+            <button
+              v-for="t in DOC_TEMPLATES" :key="t.id"
+              class="docs__template-item"
+              :class="{ 'is-active': newTemplate === t.id }"
+              @click="newTemplate = t.id"
+            >{{ t.name }}</button>
+          </div>
+        </div>
       </div>
     </BaseModal>
 
@@ -279,7 +551,33 @@ function fmtTime(v: string) {
   }
   &__head-actions {
     display: flex;
+    align-items: center;
     gap: var(--space-2);
+  }
+  &__view-toggle {
+    display: flex;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+  }
+  &__view-btn {
+    padding: 6px 10px;
+    background: var(--bg-panel);
+    border: none;
+    cursor: pointer;
+    color: var(--text-mid);
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    &:hover { background: var(--bg-inset); }
+    &.is-active {
+      background: var(--primary-soft);
+      color: var(--primary-ink, var(--primary));
+    }
+  }
+  &__graph-wrap {
+    height: calc(100vh - 280px);
+    min-height: 400px;
   }
   &__title {
     font-size: var(--text-2xl);
@@ -292,6 +590,45 @@ function fmtTime(v: string) {
       flex: 1;
     }
   }
+  &__search {
+    flex: 1;
+    padding: 8px 14px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--bg-panel);
+    color: var(--text-hi);
+    font-size: var(--text-sm);
+    outline: none;
+    transition: border-color 0.2s var(--ease-soft);
+    &:focus { border-color: var(--primary); }
+  }
+  &__crumbs {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    flex-wrap: wrap;
+  }
+  &__crumb {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-pill);
+    background: var(--bg-panel);
+    color: var(--text-mid);
+    font-size: var(--text-sm);
+    cursor: pointer;
+    transition: all 0.15s var(--ease-soft);
+    &:hover { border-color: var(--primary); color: var(--primary); }
+    &.is-current {
+      background: var(--primary-soft);
+      border-color: var(--primary);
+      color: var(--primary);
+      cursor: default;
+    }
+  }
+  &__crumb-sep { color: var(--text-low); font-size: var(--text-xs); }
   &__tree {
     display: flex;
     gap: var(--space-2);
@@ -415,6 +752,39 @@ function fmtTime(v: string) {
     display: flex;
     flex-direction: column;
     gap: var(--space-3);
+  }
+  &__template-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+  &__template-label {
+    font-size: var(--text-sm);
+    color: var(--text-mid);
+    font-weight: 500;
+  }
+  &__template-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-2);
+  }
+  &__template-item {
+    padding: 8px 10px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--bg-panel);
+    color: var(--text-mid);
+    font-size: var(--text-xs);
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: center;
+    &:hover { border-color: var(--primary); color: var(--text-hi); }
+    &.is-active {
+      background: var(--primary-soft);
+      border-color: var(--primary);
+      color: var(--primary-ink, var(--primary));
+      font-weight: 600;
+    }
   }
 }
 </style>

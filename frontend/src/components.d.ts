@@ -36,6 +36,7 @@ declare module 'vue' {
     FocusTimer: typeof import('./components/task/FocusTimer.vue')['default']
     GlobalSearch: typeof import('./components/layout/GlobalSearch.vue')['default']
     LeftInfoPanel: typeof import('./components/layout/LeftInfoPanel.vue')['default']
+    MarkdownToolbar: typeof import('./components/document/MarkdownToolbar.vue')['default']
     ModalHost: typeof import('./components/common/ModalHost.vue')['default']
     ModalItem: typeof import('./components/common/ModalItem.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']

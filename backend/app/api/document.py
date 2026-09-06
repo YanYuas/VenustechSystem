@@ -45,6 +45,12 @@ def create_document(data: CreateDocumentRequest, db: Session = Depends(get_db), 
     return success(DocumentService(db).create_document(user.id, data))
 
 
+@router.get("/graph/data")
+def document_graph(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """文档关系图谱数据（M03 P2）"""
+    return success(DocumentService(db).graph(user.id))
+
+
 @router.get("/{doc_id}")
 def document_detail(doc_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     return success(DocumentService(db).get_document(user.id, doc_id))
