@@ -8,7 +8,7 @@ from datetime import date, datetime, time
 from sqlalchemy import Date, DateTime, ForeignKey, Integer, String, Text, Time, Index, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.models.base import Base, TimestampMixin, UUIDMixin
+from app.models.base import Base, TimestampMixin, UUIDMixin, utcnow
 from app.models.types import JSONType
 
 
@@ -46,9 +46,9 @@ class HabitCheckin(UUIDMixin, Base):
     user_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
-    checkin_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    checkin_date: Mapped[date] = mapped_column(Date, nullable=False)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
 class MoodLog(UUIDMixin, Base):
@@ -64,8 +64,8 @@ class MoodLog(UUIDMixin, Base):
     score: Mapped[int] = mapped_column(Integer, nullable=False)  # 1-5
     tags: Mapped[list] = mapped_column(JSONType, default=list)
     content: Mapped[str | None] = mapped_column(Text, nullable=True)
-    logged_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    logged_date: Mapped[date] = mapped_column(Date, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
 class Diary(UUIDMixin, TimestampMixin, Base):
@@ -81,5 +81,5 @@ class Diary(UUIDMixin, TimestampMixin, Base):
     dimension: Mapped[str | None] = mapped_column(String(20), nullable=True)  # family/health/energy/growth
     title: Mapped[str | None] = mapped_column(String(200), nullable=True)
     content: Mapped[str | None] = mapped_column(Text, nullable=True)
-    diary_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    diary_date: Mapped[date] = mapped_column(Date, nullable=False)
     tags: Mapped[list] = mapped_column(JSONType, default=list)

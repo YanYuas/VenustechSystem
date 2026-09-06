@@ -4,9 +4,10 @@
 from __future__ import annotations
 
 from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, Float, Index
+from datetime import datetime
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.models.base import Base, TimestampMixin, UUIDMixin
+from app.models.base import Base, TimestampMixin, UUIDMixin, utcnow
 from app.models.types import JSONType
 
 
@@ -33,6 +34,9 @@ class SOP(UUIDMixin, TimestampMixin, Base):
 class SOPVersion(UUIDMixin, Base):
     """SOP版本历史"""
     __tablename__ = "sop_versions"
+    __table_args__ = (
+        Index("idx_sop_versions_sop", "sop_id"),
+    )
 
     sop_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("sops.id", ondelete="CASCADE"), nullable=False
@@ -40,7 +44,7 @@ class SOPVersion(UUIDMixin, Base):
     version: Mapped[int] = mapped_column(Integer, nullable=False)
     content: Mapped[dict] = mapped_column(JSONType, default=dict)
     change_note: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[object] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=utcnow)
 
 
 class PromptTemplate(UUIDMixin, TimestampMixin, Base):
@@ -89,6 +93,7 @@ class ProjectMemory(UUIDMixin, TimestampMixin, Base):
     __tablename__ = "project_memories"
     __table_args__ = (
         Index("idx_project_memories_user", "user_id"),
+        Index("idx_project_memories_project", "project_id"),
     )
 
     user_id: Mapped[str] = mapped_column(

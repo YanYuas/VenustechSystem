@@ -1,27 +1,36 @@
 # ============================================================
 # 生活记录 API（二期骨架）
+# 对齐一期风格：Depends(get_db) + Depends(get_current_user) + success()
 # ============================================================
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+
+from app.api.deps import get_current_user, get_db
+from app.core.response import success
+from app.models.user import User
 
 router = APIRouter(prefix="/life", tags=["生活记录"])
 
-@router.get("/habits")
-async def list_habits():
-    return {"code": 0, "message": "success", "data": {"module": "生活记录", "endpoint": "list_habits", "status": "skeleton"}}
-@router.post("/habits")
-async def create_habit():
-    return {"code": 0, "message": "success", "data": {"module": "生活记录", "endpoint": "create_habit", "status": "skeleton"}}
-@router.post("/habits/{habit_id}/check-in")
-async def checkin_habit():
-    return {"code": 0, "message": "success", "data": {"module": "生活记录", "endpoint": "checkin_habit", "status": "skeleton"}}
-@router.get("/moods")
-async def list_moods():
-    return {"code": 0, "message": "success", "data": {"module": "生活记录", "endpoint": "list_moods", "status": "skeleton"}}
-@router.post("/moods")
-async def create_mood():
-    return {"code": 0, "message": "success", "data": {"module": "生活记录", "endpoint": "create_mood", "status": "skeleton"}}
-@router.get("/diaries")
-async def list_diaries():
-    return {"code": 0, "message": "success", "data": {"module": "生活记录", "endpoint": "list_diaries", "status": "skeleton"}}
+@router.get("/habits", summary="习惯列表")
+async def list_habits(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    return success({"module": "生活记录", "endpoint": "list_habits", "status": "skeleton", "user": user.id})
+
+@router.get("/moods", summary="心情记录列表")
+async def list_moods(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    return success({"module": "生活记录", "endpoint": "list_moods", "status": "skeleton", "user": user.id})
+
+@router.get("/diaries", summary="日记列表")
+async def list_diaries(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    return success({"module": "生活记录", "endpoint": "list_diaries", "status": "skeleton", "user": user.id})
+

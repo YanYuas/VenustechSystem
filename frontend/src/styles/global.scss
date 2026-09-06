@@ -144,3 +144,70 @@ img {
     display: none !important;
   }
 }
+
+/* ============================================================
+   开发中页面共享样式（二期新模块占位页）
+   ============================================================ */
+.dev-page {
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.dev-hero {
+  text-align: center;
+  padding: var(--space-8) var(--space-4);
+}
+.dev-hero-icon {
+  font-size: 48px;
+  margin-bottom: var(--space-3);
+}
+.dev-hero-title {
+  font-size: var(--text-2xl);
+  font-weight: 800;
+  color: var(--text-hi);
+  font-family: var(--font-cute);
+}
+.dev-hero-sub {
+  margin-top: var(--space-2);
+  color: var(--text-mid);
+  font-size: var(--text-sm);
+}
+.dev-badge {
+  display: inline-block;
+  margin-top: var(--space-3);
+  padding: 4px 12px;
+  border-radius: var(--radius-pill);
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+.dev-features {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--space-3);
+}
+.dev-feature {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--bg-panel);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line);
+}
+.dev-feature-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+.dev-feature-name {
+  font-weight: 600;
+  color: var(--text-hi);
+  font-size: var(--text-sm);
+}
+.dev-feature-desc {
+  margin-top: 2px;
+  color: var(--text-mid);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+}

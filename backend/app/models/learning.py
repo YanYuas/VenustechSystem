@@ -8,7 +8,7 @@ from datetime import date, datetime
 from sqlalchemy import Date, DateTime, ForeignKey, Integer, String, Text, Index, Float
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.models.base import Base, TimestampMixin, UUIDMixin
+from app.models.base import Base, TimestampMixin, UUIDMixin, utcnow
 from app.models.types import JSONType
 
 
@@ -55,7 +55,7 @@ class Flashcard(UUIDMixin, TimestampMixin, Base):
     ef: Mapped[float] = mapped_column(Float, default=2.5)
     interval: Mapped[int] = mapped_column(Integer, default=0)
     repetition: Mapped[int] = mapped_column(Integer, default=0)
-    next_review: Mapped[date | None] = mapped_column(Date, nullable=True, index=True)
+    next_review: Mapped[date | None] = mapped_column(Date, nullable=True)
     last_reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     review_count: Mapped[int] = mapped_column(Integer, default=0)
 
@@ -78,4 +78,4 @@ class StudyTimeLog(UUIDMixin, Base):
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     source: Mapped[str | None] = mapped_column(String(50), nullable=True)  # manual/pomodoro/auto
     logged_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

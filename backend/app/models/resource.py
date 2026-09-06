@@ -29,7 +29,7 @@ class InboxItem(UUIDMixin, TimestampMixin, Base):
     file_path: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     source: Mapped[str | None] = mapped_column(String(500), nullable=True)
     tags: Mapped[list] = mapped_column(JSONType, default=list)
-    status: Mapped[str] = mapped_column(String(20), default="pending", index=True)  # pending/processed/archived
+    status: Mapped[str] = mapped_column(String(20), default="pending")  # pending/processed/archived
     processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
@@ -56,6 +56,9 @@ class Template(UUIDMixin, TimestampMixin, Base):
 class Domain(UUIDMixin, TimestampMixin, Base):
     """领域库"""
     __tablename__ = "domains"
+    __table_args__ = (
+        Index("idx_domains_user", "user_id"),
+    )
 
     user_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
