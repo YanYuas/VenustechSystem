@@ -134,10 +134,10 @@ class DashboardService:
         projects = self._build_projects(all_tasks)
 
         # 待开发模块占位
-        resource_center = ResourceCenter(categories=RESOURCE_CATEGORIES, status="beta")
-        learning = LearningSection(status="beta")
-        life = LifeSection(categories=LIFE_CATEGORIES, status="beta")
-        assets = AssetsSection(categories=ASSET_CATEGORIES, status="beta")
+        resource_center = ResourceCenter(categories=RESOURCE_CATEGORIES, status="planned")
+        learning = LearningSection(status="planned")
+        life = LifeSection(categories=LIFE_CATEGORIES, status="planned")
+        assets = AssetsSection(categories=ASSET_CATEGORIES, status="planned")
         quick_actions = QuickActions(items=QUICK_ACTIONS)
 
         # 本周进度环（M01 F04）
@@ -240,7 +240,7 @@ class DashboardService:
                 status="beta",
             ))
 
-        return ProjectsSection(items=items, status="beta")
+        return ProjectsSection(items=items, status="planned")
 
 
     def _build_week_progress(self, all_tasks: list) -> WeekProgress:

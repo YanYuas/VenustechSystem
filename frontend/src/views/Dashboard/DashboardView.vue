@@ -8,6 +8,7 @@ import { computed, ref } from 'vue'
 import type { TagSemantic } from '@/types/common'
 import type { ModuleStatus } from '@/types'
 import { useDashboard } from '@/composables/useDashboard'
+import { useTask } from '@/composables/useTask'
 import { useToast } from '@/composables/useToast'
 import { useRouter } from 'vue-router'
 import BaseCard from '@/components/common/BaseCard.vue'
@@ -18,6 +19,7 @@ import BaseSkeleton from '@/components/common/BaseSkeleton.vue'
 import AppIcon from '@/components/common/AppIcon.vue'
 
 const { data, loading } = useDashboard()
+const { updateTask } = useTask()
 const toast = useToast()
 const router = useRouter()
 
@@ -70,6 +72,16 @@ function statusBadge(status: ModuleStatus) {
 
 function isPlanned(status: ModuleStatus) {
   return status === 'planned'
+}
+
+async function submitFocusTask() {
+  if (!data.value?.focus_task) return
+  try {
+    await updateTask(data.value.focus_task.id, { status: 'completed' })
+    toast.success('提交成果', '任务已标记完成 🎉')
+  } catch {
+    toast.error('操作失败', '请稍后重试')
+  }
 }
 
 function handleQuickAction(action: string) {
@@ -133,7 +145,7 @@ const quickActions = computed(() => data.value?.quick_actions.items ?? [])
         <p class="dash__bar-label">进度 {{ data.focus_task.progress }}%</p>
         <div class="dash__actions">
           <BaseButton variant="primary" @click="router.push('/tasks')">继续工作</BaseButton>
-          <BaseButton variant="secondary" @click="toast.success('提交成果', '任务已标记完成 🎉')">提交成果</BaseButton>
+          <BaseButton variant="secondary" @click="submitFocusTask">提交成果</BaseButton>
         </div>
       </template>
       <template v-else>
@@ -148,7 +160,7 @@ const quickActions = computed(() => data.value?.quick_actions.items ?? [])
     <!-- 第一行三列：今日执行 | 当前项目 | 资源中心 -->
     <div class="dash__grid-3">
       <!-- 今日执行 -->
-      <BaseCard scroll draggable="true" @dragstart="onDragStart($event, 'execution')" @dragover="onDragOver($event, 'execution')" @dragleave="onDragLeave" @drop="onDrop($event, 'execution')" :class="{ 'is-drag-over': dragOverCard === 'execution' }">
+      <BaseCard :style="{ order: cardOrder.indexOf('execution') }" scroll draggable="true" @dragstart="onDragStart($event, 'execution')" @dragover="onDragOver($event, 'execution')" @dragleave="onDragLeave" @drop="onDrop($event, 'execution')" :class="{ 'is-drag-over': dragOverCard === 'execution' }">
         <template #title>
           <div class="dash__card-head">
             <h3 class="dash__card-title">📋 今日执行</h3>
@@ -179,7 +191,7 @@ const quickActions = computed(() => data.value?.quick_actions.items ?? [])
       </BaseCard>
 
       <!-- 当前项目 -->
-      <BaseCard :class="{ 'is-planned': isPlanned(data?.projects.status ?? 'ready'), 'is-drag-over': dragOverCard === 'projects' }" scroll draggable="true" @dragstart="onDragStart($event, 'projects')" @dragover="onDragOver($event, 'projects')" @dragleave="onDragLeave" @drop="onDrop($event, 'projects')">
+      <BaseCard :class="{ 'is-planned': isPlanned(data?.projects.status ?? 'ready'), 'is-drag-over': dragOverCard === 'projects' }" :style="{ order: cardOrder.indexOf('projects') }" scroll draggable="true" @dragstart="onDragStart($event, 'projects')" @dragover="onDragOver($event, 'projects')" @dragleave="onDragLeave" @drop="onDrop($event, 'projects')">
         <template #title>
           <div class="dash__card-head">
             <h3 class="dash__card-title">📁 当前项目</h3>
@@ -214,7 +226,7 @@ const quickActions = computed(() => data.value?.quick_actions.items ?? [])
       </BaseCard>
 
       <!-- 资源中心（待开发） -->
-      <BaseCard :class="{ 'is-planned': isPlanned(data?.resource_center.status ?? 'planned'), 'is-drag-over': dragOverCard === 'resources' }" scroll draggable="true" @dragstart="onDragStart($event, 'resources')" @dragover="onDragOver($event, 'resources')" @dragleave="onDragLeave" @drop="onDrop($event, 'resources')">
+      <BaseCard :class="{ 'is-planned': isPlanned(data?.resource_center.status ?? 'planned'), 'is-drag-over': dragOverCard === 'resources' }" :style="{ order: cardOrder.indexOf('resources') }" scroll draggable="true" @dragstart="onDragStart($event, 'resources')" @dragover="onDragOver($event, 'resources')" @dragleave="onDragLeave" @drop="onDrop($event, 'resources')">
         <template #title>
           <div class="dash__card-head">
             <h3 class="dash__card-title">🗂️ 资源中心</h3>
@@ -238,7 +250,7 @@ const quickActions = computed(() => data.value?.quick_actions.items ?? [])
     <!-- 第二行三列：学习与成长 | 最近沉淀 | 生活与自我 -->
     <div class="dash__grid-3">
       <!-- 学习与成长（待开发） -->
-      <BaseCard :class="{ 'is-planned': isPlanned(data?.learning.status ?? 'planned'), 'is-drag-over': dragOverCard === 'learning' }" scroll draggable="true" @dragstart="onDragStart($event, 'learning')" @dragover="onDragOver($event, 'learning')" @dragleave="onDragLeave" @drop="onDrop($event, 'learning')">
+      <BaseCard :class="{ 'is-planned': isPlanned(data?.learning.status ?? 'planned'), 'is-drag-over': dragOverCard === 'learning' }" :style="{ order: cardOrder.indexOf('learning') }" scroll draggable="true" @dragstart="onDragStart($event, 'learning')" @dragover="onDragOver($event, 'learning')" @dragleave="onDragLeave" @drop="onDrop($event, 'learning')">
         <template #title>
           <div class="dash__card-head">
             <h3 class="dash__card-title">📚 学习与成长</h3>
@@ -267,7 +279,7 @@ const quickActions = computed(() => data.value?.quick_actions.items ?? [])
       </BaseCard>
 
       <!-- 最近沉淀（已实现） -->
-      <BaseCard scroll draggable="true" @dragstart="onDragStart($event, 'execution')" @dragover="onDragOver($event, 'execution')" @dragleave="onDragLeave" @drop="onDrop($event, 'execution')" :class="{ 'is-drag-over': dragOverCard === 'execution' }">
+      <BaseCard scroll draggable="true" @dragstart="onDragStart($event, 'recent')" @dragover="onDragOver($event, 'recent')" @dragleave="onDragLeave" @drop="onDrop($event, 'recent')" :class="{ 'is-drag-over': dragOverCard === 'recent' }" :style="{ order: cardOrder.indexOf('recent') }">
         <template #title><h3 class="dash__card-title">📝 最近沉淀</h3></template>
         <template v-if="loading">
           <BaseSkeleton variant="list" :rows="3" />
@@ -288,7 +300,7 @@ const quickActions = computed(() => data.value?.quick_actions.items ?? [])
       </BaseCard>
 
       <!-- 生活与自我（待开发） -->
-      <BaseCard :class="{ 'is-planned': isPlanned(data?.life.status ?? 'planned'), 'is-drag-over': dragOverCard === 'life' }" scroll draggable="true" @dragstart="onDragStart($event, 'life')" @dragover="onDragOver($event, 'life')" @dragleave="onDragLeave" @drop="onDrop($event, 'life')">
+      <BaseCard :class="{ 'is-planned': isPlanned(data?.life.status ?? 'planned'), 'is-drag-over': dragOverCard === 'life' }" :style="{ order: cardOrder.indexOf('life') }" scroll draggable="true" @dragstart="onDragStart($event, 'life')" @dragover="onDragOver($event, 'life')" @dragleave="onDragLeave" @drop="onDrop($event, 'life')">
         <template #title>
           <div class="dash__card-head">
             <h3 class="dash__card-title">💚 生活与自我</h3>
@@ -315,7 +327,7 @@ const quickActions = computed(() => data.value?.quick_actions.items ?? [])
     <!-- 第三行三列：快速入口 | AI助手 | 长期资产库 -->
     <div class="dash__grid-3">
       <!-- 快速入口 -->
-      <BaseCard scroll draggable="true" @dragstart="onDragStart($event, 'execution')" @dragover="onDragOver($event, 'execution')" @dragleave="onDragLeave" @drop="onDrop($event, 'execution')" :class="{ 'is-drag-over': dragOverCard === 'execution' }">
+      <BaseCard scroll draggable="true" @dragstart="onDragStart($event, 'quick')" @dragover="onDragOver($event, 'quick')" @dragleave="onDragLeave" @drop="onDrop($event, 'quick')" :class="{ 'is-drag-over': dragOverCard === 'quick' }" :style="{ order: cardOrder.indexOf('quick') }">
         <template #title><h3 class="dash__card-title">⚡ 工作台 · 快速入口</h3></template>
         <div class="dash__quick">
           <button v-for="a in quickActions" :key="a.id" class="dash__quick-item"
@@ -331,7 +343,7 @@ const quickActions = computed(() => data.value?.quick_actions.items ?? [])
       </BaseCard>
 
       <!-- AI协作小助手 -->
-      <BaseCard scroll draggable="true" @dragstart="onDragStart($event, 'execution')" @dragover="onDragOver($event, 'execution')" @dragleave="onDragLeave" @drop="onDrop($event, 'execution')" :class="{ 'is-drag-over': dragOverCard === 'execution' }">
+      <BaseCard scroll draggable="true" @dragstart="onDragStart($event, 'ai')" @dragover="onDragOver($event, 'ai')" @dragleave="onDragLeave" @drop="onDrop($event, 'ai')" :class="{ 'is-drag-over': dragOverCard === 'ai' }" :style="{ order: cardOrder.indexOf('ai') }">
         <template #title>
           <div class="dash__card-head">
             <h3 class="dash__card-title">🤖 AI 协作小助手</h3>
@@ -353,7 +365,7 @@ const quickActions = computed(() => data.value?.quick_actions.items ?? [])
       </BaseCard>
 
       <!-- 长期资产库（待开发） -->
-      <BaseCard :class="{ 'is-planned': isPlanned(data?.assets.status ?? 'planned'), 'is-drag-over': dragOverCard === 'assets' }" scroll draggable="true" @dragstart="onDragStart($event, 'assets')" @dragover="onDragOver($event, 'assets')" @dragleave="onDragLeave" @drop="onDrop($event, 'assets')">
+      <BaseCard :class="{ 'is-planned': isPlanned(data?.assets.status ?? 'planned'), 'is-drag-over': dragOverCard === 'assets' }" :style="{ order: cardOrder.indexOf('assets') }" scroll draggable="true" @dragstart="onDragStart($event, 'assets')" @dragover="onDragOver($event, 'assets')" @dragleave="onDragLeave" @drop="onDrop($event, 'assets')">
         <template #title>
           <div class="dash__card-head">
             <h3 class="dash__card-title">💎 长期资产库</h3>

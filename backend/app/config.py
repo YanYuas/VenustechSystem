@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     """应用配置，全部可由环境变量覆盖，无硬编码。"""
 
     app_name: str = "启明星系统后端"
-    version: str = "0.1.0"
+    version: str = "0.2.0"
 
     # 运行
     dev: bool = True
