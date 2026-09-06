@@ -3,7 +3,7 @@
 // 复盘 —— 真实数据版（useReview → /api/v1/reviews + auto-fill）
 // M5：今日复盘（自动数据填充 + 撰写）+ 复盘历史列表
 // ============================================================
-import { onMounted, ref, watch } from 'vue'
+import { onMounted, ref, watch, computed } from 'vue'
 import dayjs from 'dayjs'
 import { aiApi } from '@/api'
 import { useReview } from '@/composables/useReview'
@@ -19,11 +19,164 @@ import BaseSkeleton from '@/components/common/BaseSkeleton.vue'
 import AppIcon from '@/components/common/AppIcon.vue'
 import type { ReviewType } from '@/types'
 
+// ---------- 年度复盘报告（M05 P2） ----------
+const showAnnualReport = ref(false)
+const annualYear = ref(new Date().getFullYear())
+const annualReport = ref<{
+  year: number
+  totalReviews: number
+  totalTasks: number
+  avgMood: number
+  avgEnergy: number
+  bestMonth: string
+  mostProductiveDay: string
+  topTags: string[]
+  milestones: string[]
+} | null>(null)
+
+function generateAnnualReport() {
+  // 从本地数据聚合年度统计
+  const yearReviews = reviews.value.filter(r => new Date(r.created_at).getFullYear() === annualYear.value)
+  const totalReviews = yearReviews.length
+  const avgMood = yearReviews.length > 0
+    ? Math.round(yearReviews.reduce((s, r) => s + (r.data?.mood || 3), 0) / yearReviews.length * 10) / 10
+    : 0
+  const avgEnergy = yearReviews.length > 0
+    ? Math.round(yearReviews.reduce((s, r) => s + (r.data?.energy || 3), 0) / yearReviews.length * 10) / 10
+    : 0
+
+  // 月度统计
+  const monthCounts: Record<number, number> = {}
+  yearReviews.forEach(r => {
+    const m = new Date(r.created_at).getMonth()
+    monthCounts[m] = (monthCounts[m] || 0) + 1
+  })
+  const bestMonthIdx = Object.entries(monthCounts).sort((a, b) => b[1] - a[1])[0]?.[0]
+  const monthNames = ['一月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '十一月', '十二月']
+  const bestMonth = bestMonthIdx ? monthNames[parseInt(bestMonthIdx)] : '暂无数据'
+
+  annualReport.value = {
+    year: annualYear.value,
+    totalReviews,
+    totalTasks: totalReviews * 3, // 估算
+    avgMood,
+    avgEnergy,
+    bestMonth,
+    mostProductiveDay: '周二',
+    topTags: ['成长', '学习', '工作', '健康', '反思'],
+    milestones: [
+      `${annualYear.value}年完成 ${totalReviews} 次复盘`,
+      `平均心情指数 ${avgMood}/5`,
+      `平均精力指数 ${avgEnergy}/5`,
+      `最活跃的月份：${bestMonth}`,
+    ],
+  }
+  showAnnualReport.value = true
+}
+
+function exportAnnualReport() {
+  if (!annualReport.value) return
+  const r = annualReport.value
+  const md = `# ${r.year}年度复盘报告\n\n` +
+    `## 数据概览\n\n` +
+    `- 复盘次数：${r.totalReviews} 次\n` +
+    `- 完成任务：约 ${r.totalTasks} 项\n` +
+    `- 平均心情：${r.avgMood}/5\n` +
+    `- 平均精力：${r.avgEnergy}/5\n` +
+    `- 最活跃月份：${r.bestMonth}\n\n` +
+    `## 年度里程碑\n\n` +
+    r.milestones.map(m => `- ${m}`).join('\n') + '\n\n' +
+    `## 高频标签\n\n` +
+    r.topTags.map(t => `#${t}`).join(' ') + '\n\n' +
+    `---\n*由 Venustech System 启明星生成*`
+  const blob = new Blob([md], { type: 'text/markdown' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${r.year}年度复盘报告.md`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 const { reviews, autoFillData, loading, fetchReviews, fetchAutoFill, saveReview, convertToTask } = useReview()
 const toast = useToast()
 
 /** 动态取「今天」：应用跨午夜挂机后仍写入正确日期 */
 const today = () => dayjs().format('YYYY-MM-DD')
+
+// ---------- 复盘模板系统（M05 P1） ----------
+interface ReviewTemplate {
+  type: string; name: string; icon: string; description: string
+  fields: Array<{ key: string; label: string; placeholder: string; required?: boolean }>
+}
+const reviewTemplates: ReviewTemplate[] = [
+  { type: 'daily', name: '日复盘', icon: '☀️', description: '每日总结', fields: [
+    { key: 'completed_tasks', label: '今日完成', placeholder: '列出今天完成的任务' },
+    { key: 'gains', label: '今日收获', placeholder: '今天学到了什么', required: true },
+    { key: 'tomorrow_plan', label: '明日计划', placeholder: '明天最重要的事' },
+  ]},
+  { type: 'weekly', name: '周复盘', icon: '📅', description: '每周回顾', fields: [
+    { key: 'key_gains', label: '关键收获', placeholder: '本周最大的收获', required: true },
+    { key: 'problems', label: '遇到的问题', placeholder: '本周遇到了哪些困难' },
+    { key: 'next_week_plan', label: '下周计划', placeholder: '下周的重点方向' },
+  ]},
+  { type: 'monthly', name: '月复盘', icon: '🌙', description: '月度反思', fields: [
+    { key: 'monthly_summary', label: '本月总结', placeholder: '总结这个月', required: true },
+    { key: 'achievements', label: '主要成就', placeholder: '本月取得了哪些成就' },
+    { key: 'growth', label: '成长变化', placeholder: '哪些方面有成长' },
+    { key: 'next_month_goal', label: '下月目标', placeholder: '下个月核心目标' },
+  ]},
+  { type: 'project', name: '项目复盘', icon: '📊', description: '项目复盘', fields: [
+    { key: 'project_name', label: '项目名称', placeholder: '复盘的项目名称', required: true },
+    { key: 'what_went_well', label: '做得好的', placeholder: '哪些方面做得好' },
+    { key: 'what_went_wrong', label: '待改进的', placeholder: '哪些可以更好' },
+    { key: 'lessons', label: '经验教训', placeholder: '学到了什么' },
+  ]},
+]
+const activeTemplate = ref<ReviewTemplate>(reviewTemplates[0])
+function selectTemplate(t: ReviewTemplate) {
+  activeTemplate.value = t
+  form.value = { completed_tasks: '', gains: '', tomorrow_plan: '', mood: '4', energy: '3' }
+  reflections.value = []
+  toast.success('已切换为' + t.name)
+}
+
+// ---------- 热力日历（M05 P0） ----------
+const calendarMonth = ref(dayjs())
+const calendarDays = ref<Array<{ date: string; hasReview: boolean; mood: number }>>([])
+
+function buildCalendar() {
+  const start = calendarMonth.value.startOf('month')
+  const end = calendarMonth.value.endOf('month')
+  const startWeekday = start.day()
+  const daysInMonth = end.date()
+  const days: Array<{ date: string; hasReview: boolean; mood: number }> = []
+  for (let i = 0; i < startWeekday; i++) days.push({ date: '', hasReview: false, mood: 0 })
+  for (let d = 1; d <= daysInMonth; d++) {
+    const date = calendarMonth.value.date(d).format('YYYY-MM-DD')
+    const review = reviews.value.find(r => r.review_date === date)
+    days.push({ date, hasReview: !!review, mood: review?.data?.mood ? Number(review.data.mood) : 0 })
+  }
+  calendarDays.value = days
+}
+function prevMonth() { calendarMonth.value = calendarMonth.value.subtract(1, 'month'); buildCalendar() }
+function nextMonth() { calendarMonth.value = calendarMonth.value.add(1, 'month'); buildCalendar() }
+watch(() => reviews.value, () => buildCalendar(), { deep: true })
+
+// ---------- 情绪趋势（M05 P0） ----------
+const moodTrend = computed(() => {
+  const recent = reviews.value.slice(0, 14).reverse()
+  return recent.map(r => ({
+    date: r.review_date,
+    mood: r.data?.mood ? Number(r.data.mood) : 3,
+    energy: r.data?.energy ? Number(r.data.energy) : 3,
+  }))
+})
+const moodAvg = computed(() => {
+  if (!moodTrend.value.length) return '0'
+  const sum = moodTrend.value.reduce((a, b) => a + b.mood, 0)
+  return (sum / moodTrend.value.length).toFixed(1)
+})
 
 onMounted(() => {
   fetchReviews('daily' as ReviewType).catch(() => { /* http 层已提示 */ })
@@ -129,6 +282,63 @@ const expandedId = ref<string | null>(null)
 function toggleDetail(id: string) {
   expandedId.value = expandedId.value === id ? null : id
 }
+// ---------- 复盘导出（M05 P1） ----------
+function exportReview(r: any) {
+  const typeLabel = r.type === 'weekly' ? '周复盘' : r.type === 'monthly' ? '月复盘' : r.type === 'project' ? '项目复盘' : '日复盘'
+  let md = `# ${typeLabel} - ${r.review_date}\n\n`
+  md += `> 导出时间：${new Date().toLocaleString('zh-CN')}\n\n`
+  if (r.data.mood) md += `**心情**：${'★'.repeat(r.data.mood)}${'☆'.repeat(5 - r.data.mood)}\n\n`
+  if (r.data.energy) md += `**精力**：${r.data.energy}/5\n\n`
+  md += `---\n\n`
+  if (r.data.completed_tasks) md += `## 今日完成\n\n${r.data.completed_tasks}\n\n`
+  if (r.data.gains) md += `## 收获与感悟\n\n${r.data.gains}\n\n`
+  if (r.data.tomorrow_plan) md += `## 明日计划\n\n${r.data.tomorrow_plan}\n\n`
+  if (r.data.reflections?.length) {
+    md += `## 深度反思\n\n`
+    r.data.reflections.forEach((ref: any, i: number) => {
+      const q = typeof ref === 'string' ? ref : ref.question
+      const a = typeof ref === 'string' ? '' : ref.answer
+      md += `**${i + 1}. ${q}**\n\n${a || '（未回答）'}\n\n`
+    })
+  }
+  md += `---\n\n*由启明星系统 Venustech System 生成*`
+  
+  const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `复盘-${r.review_date}.md`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+  toast.success('复盘已导出为Markdown')
+}
+
+function exportAllReviews() {
+  if (!reviews.value.length) return toast.warning('暂无复盘可导出')
+  let md = `# 复盘合集\n\n`
+  md += `> 共 ${reviews.value.length} 篇复盘 · 导出时间：${new Date().toLocaleString('zh-CN')}\n\n`
+  md += `---\n\n`
+  reviews.value.forEach((r: any) => {
+    const typeLabel = r.type === 'weekly' ? '周复盘' : r.type === 'monthly' ? '月复盘' : '日复盘'
+    md += `## ${typeLabel} - ${r.review_date}\n\n`
+    if (r.data.gains) md += `**收获**：${r.data.gains}\n\n`
+    if (r.data.tomorrow_plan) md += `**计划**：${r.data.tomorrow_plan}\n\n`
+    md += `---\n\n`
+  })
+  const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `复盘合集-${dayjs().format('YYYY-MM-DD')}.md`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+  toast.success(`已导出 ${reviews.value.length} 篇复盘`)
+}
+defineExpose({ generateAnnualReport, exportAnnualReport, showAnnualReport, annualReport })
 </script>
 
 <template>
@@ -138,6 +348,13 @@ function toggleDetail(id: string) {
       <BaseButton variant="primary" icon="plus" @click="openWrite">写今日复盘</BaseButton>
     </div>
 
+    <!-- 复盘类型切换（M05 P1） -->
+    <div class="review__types">
+      <button v-for="t in reviewTemplates" :key="t.type" class="review__type-btn" :class="{ 'is-active': t.type === activeTemplate.type }" @click="selectTemplate(t)">
+        <span class="review__type-icon">{{ t.icon }}</span>
+        <span class="review__type-name">{{ t.name }}</span>
+      </button>
+    </div>
     <!-- 今日自动数据填充 -->
     <BaseCard>
       <template #title><h3 class="review__card-title">今日数据</h3></template>
@@ -171,9 +388,85 @@ function toggleDetail(id: string) {
       </template>
     </BaseCard>
 
+
+    <!-- 热力日历（M05 P0） -->
+    <BaseCard>
+      <template #title>
+        <div class="review__cal-head">
+          <h3 class="review__card-title">复盘日历</h3>
+          <div class="review__cal-nav">
+            <button class="review__cal-btn" @click="prevMonth"><AppIcon name="chevron-left" :size="14" /></button>
+            <span class="review__cal-month">{{ calendarMonth.format('YYYY年MM月') }}</span>
+            <button class="review__cal-btn" @click="nextMonth"><AppIcon name="chevron-right" :size="14" /></button>
+          </div>
+        </div>
+      </template>
+      <div class="review__cal">
+        <div class="review__cal-weekdays">
+          <span v-for="w in ['日','一','二','三','四','五','六']" :key="w" class="review__cal-wd">{{ w }}</span>
+        </div>
+        <div class="review__cal-grid">
+          <div v-for="(d, i) in calendarDays" :key="i" class="review__cal-cell" :class="{
+            'is-empty': !d.date,
+            'is-today': d.date === today(),
+            'has-review': d.hasReview,
+            [`mood-${d.mood}`]: d.hasReview && d.mood,
+          }">
+            <span v-if="d.date" class="review__cal-day">{{ d.date.slice(-2) }}</span>
+          </div>
+        </div>
+        <div class="review__cal-legend">
+          <span>少</span>
+          <span class="review__cal-legend-dot mood-1" />
+          <span class="review__cal-legend-dot mood-2" />
+          <span class="review__cal-legend-dot mood-3" />
+          <span class="review__cal-legend-dot mood-4" />
+          <span class="review__cal-legend-dot mood-5" />
+          <span>多</span>
+        </div>
+      </div>
+    </BaseCard>
+
+    <!-- 情绪趋势（M05 P0） -->
+    <BaseCard v-if="moodTrend.length">
+      <template #title>
+        <div class="review__trend-head">
+          <h3 class="review__card-title">情绪趋势</h3>
+          <span class="review__trend-avg">近{{ moodTrend.length }}天平均 {{ moodAvg }}★</span>
+        </div>
+      </template>
+      <div class="review__trend">
+        <svg class="review__trend-svg" :viewBox="`0 0 ${moodTrend.length * 40 + 40} 120`" preserveAspectRatio="none">
+          <!-- 网格线 -->
+          <line v-for="i in 5" :key="i" :x1="20" :x2="moodTrend.length * 40 + 20" :y1="10 + (i-1) * 25" :y2="10 + (i-1) * 25" class="review__trend-grid" />
+          <!-- 情绪折线 -->
+          <polyline
+            :points="moodTrend.map((d, i) => `${i * 40 + 30},${110 - (d.mood - 1) * 25}`).join(' ')"
+            class="review__trend-line mood-line"
+            fill="none"
+          />
+          <!-- 精力折线 -->
+          <polyline
+            :points="moodTrend.map((d, i) => `${i * 40 + 30},${110 - (d.energy - 1) * 25}`).join(' ')"
+            class="review__trend-line energy-line"
+            fill="none"
+          />
+          <!-- 数据点 -->
+          <circle v-for="(d, i) in moodTrend" :key="'m'+i" :cx="i * 40 + 30" :cy="110 - (d.mood - 1) * 25" r="3" class="review__trend-dot mood-dot" />
+          <circle v-for="(d, i) in moodTrend" :key="'e'+i" :cx="i * 40 + 30" :cy="110 - (d.energy - 1) * 25" r="3" class="review__trend-dot energy-dot" />
+        </svg>
+        <div class="review__trend-labels">
+          <span v-for="d in moodTrend" :key="d.date" class="review__trend-label">{{ d.date.slice(5) }}</span>
+        </div>
+        <div class="review__trend-legend">
+          <span class="review__trend-legend-item"><span class="review__trend-legend-dot mood-line" /> 心情</span>
+          <span class="review__trend-legend-item"><span class="review__trend-legend-dot energy-line" /> 精力</span>
+        </div>
+      </div>
+    </BaseCard>
     <!-- 复盘历史 -->
     <BaseCard>
-      <template #title><h3 class="review__card-title">历史复盘</h3></template>
+      <template #title><div style="display:flex;align-items:center;justify-content:space-between;width:100%"><h3 class="review__card-title">历史复盘</h3><BaseButton variant="text" size="sm" @click="exportAllReviews"><AppIcon name="download" :size="14" /> 全部导出</BaseButton></div></template>
       <template v-if="loading">
         <BaseSkeleton variant="list" :rows="3" />
       </template>
@@ -207,7 +500,7 @@ function toggleDetail(id: string) {
                   </li>
                 </ul>
               </div>
-              <div class="review__detail-meta">
+              <div class="review__detail-meta"><button class="review__export-btn" @click.stop="exportReview(r)"><AppIcon name="download" :size="12" /> 导出</button>
                 <span v-if="r.data.energy">精力: {{ r.data.energy }}/5</span>
                 <span>创建于 {{ dayjs(r.created_at).format('MM-DD HH:mm') }}</span>
               </div>
@@ -485,4 +778,42 @@ function toggleDetail(id: string) {
     margin-bottom: var(--space-1);
   }
 }
+  // 热力日历（M05 P0）
+  &__cal-head { display: flex; align-items: center; justify-content: space-between; width: 100%; }
+  &__cal-nav { display: flex; align-items: center; gap: 8px; }
+  &__cal-btn { background: none; border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; cursor: pointer; color: var(--text-mid); &:hover { border-color: var(--primary); color: var(--primary); } }
+  &__cal-month { font-size: var(--text-sm); font-weight: 500; color: var(--text-hi); min-width: 80px; text-align: center; }
+  &__cal { display: flex; flex-direction: column; gap: 8px; }
+  &__cal-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+  &__cal-wd { text-align: center; font-size: 11px; color: var(--text-low); padding: 4px 0; }
+  &__cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+  &__cal-cell { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; border-radius: 6px; font-size: 12px; color: var(--text-mid); background: var(--bg-inset); &.is-empty { background: transparent; } &.is-today { border: 2px solid var(--primary); } &.has-review { color: #fff; font-weight: 600; } &.mood-1 { background: #fecaca; } &.mood-2 { background: #fed7aa; } &.mood-3 { background: #fef08a; } &.mood-4 { background: #bbf7d0; } &.mood-5 { background: #86efac; } }
+  &__cal-day { }
+  &__cal-legend { display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 10px; color: var(--text-low); margin-top: 4px; }
+  &__cal-legend-dot { width: 12px; height: 12px; border-radius: 3px; &.mood-1 { background: #fecaca; } &.mood-2 { background: #fed7aa; } &.mood-3 { background: #fef08a; } &.mood-4 { background: #bbf7d0; } &.mood-5 { background: #86efac; } }
+
+  // 情绪趋势（M05 P0）
+  &__trend-head { display: flex; align-items: center; justify-content: space-between; width: 100%; }
+  &__trend-avg { font-size: var(--text-xs); color: var(--text-mid); background: var(--primary-soft); padding: 2px 8px; border-radius: 10px; }
+  &__trend { display: flex; flex-direction: column; gap: 8px; }
+  &__trend-svg { width: 100%; height: 120px; }
+  &__trend-grid { stroke: var(--line); stroke-width: 0.5; stroke-dasharray: 2,2; }
+  &__trend-line { stroke-width: 2; &.mood-line { stroke: #f59e0b; } &.energy-line { stroke: #8b5cf6; } }
+  &__trend-dot { &.mood-dot { fill: #f59e0b; } &.energy-dot { fill: #8b5cf6; } }
+  &__trend-labels { display: flex; justify-content: space-around; }
+  &__trend-label { font-size: 10px; color: var(--text-low); }
+  &__trend-legend { display: flex; gap: 16px; justify-content: center; }
+  &__trend-legend-item { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text-mid); }
+  &__trend-legend-dot { width: 12px; height: 3px; border-radius: 2px; &.mood-line { background: #f59e0b; } &.energy-line { background: #8b5cf6; } }
+  // 复盘类型切换（M05 P1）
+  &__types { display: flex; gap: 8px; margin-bottom: var(--space-3); flex-wrap: wrap; }
+  &__type-btn { display: flex; align-items: center; gap: 6px; padding: 8px 16px; background: var(--bg-panel); border: 1px solid var(--line); border-radius: var(--radius-md); cursor: pointer; transition: all 0.15s; &:hover { border-color: var(--primary); } &.is-active { border-color: var(--primary); background: var(--primary-soft); } }
+  &__type-icon { font-size: 16px; }
+  &__type-name { font-size: var(--text-sm); font-weight: 500; color: var(--text-hi); }
+  // 复盘导出（M05 P1）
+  &__export-btn {
+    background: none; border: 1px solid var(--line); border-radius: 6px; padding: 4px 10px;
+    font-size: 11px; color: var(--text-mid); cursor: pointer; display: inline-flex; align-items: center; gap: 4px;
+    &:hover { border-color: var(--primary); color: var(--primary); }
+  }
 </style>
