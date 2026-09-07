@@ -27,6 +27,7 @@ from app.api import (
     life,
     asset,
     workflow,
+    avatar,
 )
 
 api_router = APIRouter(prefix="/api/v1")
@@ -58,3 +59,4 @@ api_router.include_router(learning.router)
 api_router.include_router(life.router)
 api_router.include_router(asset.router)
 api_router.include_router(workflow.router)
+api_router.include_router(avatar.router)

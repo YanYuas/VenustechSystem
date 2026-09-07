@@ -93,6 +93,12 @@ const router = createRouter({
           meta: { icon: 'workflow', title: '工作流中心', crumbs: ['工作流中心'], hidden: true },
         },
         {
+          path: 'avatar',
+          name: 'avatar',
+          component: () => import('@/views/Avatar/AvatarSettingsView.vue'),
+          meta: { icon: 'robot', title: '第二分身', crumbs: ['第二分身'], hidden: true },
+        },
+        {
           path: 'settings',
           name: 'settings',
           component: () => import('@/views/Settings/SettingsView.vue'),
