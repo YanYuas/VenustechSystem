@@ -48,3 +48,4 @@ from app.repositories.sop_version_repo import SOPVersionRepository
 from app.repositories.prompt_repo import PromptRepository
 from app.repositories.skill_repo import SkillRepository
 from app.repositories.project_memory_repo import ProjectMemoryRepository
+from app.repositories.workflow_repo import WorkflowRepository, WorkflowApplicationRepository

@@ -14,6 +14,7 @@ from app.models.task import Subtask, Task
 from app.models.user import User
 
 from app.models.asset import SOP, SOPVersion, PromptTemplate, Skill, ProjectMemory
+from app.models.workflow import Workflow, WorkflowApplication
 from app.models.learning import StudyPlan, Flashcard, StudyTimeLog
 from app.models.life import Habit, HabitCheckin, MoodLog, Diary
 from app.models.resource import InboxItem, Template, Domain

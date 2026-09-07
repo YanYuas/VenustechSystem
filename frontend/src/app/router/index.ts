@@ -87,6 +87,12 @@ const router = createRouter({
           meta: { icon: 'award', title: '长期资产库', crumbs: ['长期资产库'], hidden: true },
         },
         {
+          path: 'workflows',
+          name: 'workflows',
+          component: () => import('@/views/Workflow/WorkflowCenterView.vue'),
+          meta: { icon: 'workflow', title: '工作流中心', crumbs: ['工作流中心'], hidden: true },
+        },
+        {
           path: 'settings',
           name: 'settings',
           component: () => import('@/views/Settings/SettingsView.vue'),
