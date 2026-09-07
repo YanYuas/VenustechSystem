@@ -99,6 +99,12 @@ const router = createRouter({
           meta: { icon: 'robot', title: '第二分身', crumbs: ['第二分身'], hidden: true },
         },
         {
+          path: 'pet',
+          name: 'pet',
+          component: () => import('@/views/Pet/PetSettingsView.vue'),
+          meta: { icon: 'pet', title: '桌宠设置', crumbs: ['桌宠设置'], hidden: true },
+        },
+        {
           path: 'settings',
           name: 'settings',
           component: () => import('@/views/Settings/SettingsView.vue'),

@@ -50,3 +50,4 @@ from app.repositories.skill_repo import SkillRepository
 from app.repositories.project_memory_repo import ProjectMemoryRepository
 from app.repositories.workflow_repo import WorkflowRepository, WorkflowApplicationRepository
 from app.repositories.avatar_repo import AvatarMemoryRepository, AvatarInspirationRepository, AvatarConfigRepository
+from app.repositories.pet_repo import PetConfigRepository, PetAvatarRepository
