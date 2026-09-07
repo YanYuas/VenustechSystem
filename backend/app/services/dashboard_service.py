@@ -22,6 +22,7 @@ from app.schemas.dashboard import (
     DashboardUser,
     ExecutionGroup,
     LearningSection,
+    LearningItem,
     LifeCategory,
     LifeSection,
     ModuleStatusItem,
@@ -36,6 +37,10 @@ from app.schemas.dashboard import (
 )
 from app.schemas.task import TodayStatsOut
 from app.services.task_service import TaskService
+from app.services.resource_service import ResourceService
+from app.services.learning_service import LearningService
+from app.services.life_service import LifeService
+from app.services.asset_service import AssetService
 
 
 # ---------- 模块开发状态清单（供前端灰度判断） ----------
@@ -57,8 +62,11 @@ QUICK_ACTIONS = [
     QuickAction(id="new_task", name="新建任务", icon="plus", action="/tasks"),
     QuickAction(id="new_doc", name="新建笔记", icon="doc", action="/documents"),
     QuickAction(id="new_project", name="新建项目", icon="folder", action="/projects", status="ready"),
+    QuickAction(id="inbox", name="收集箱", icon="inbox", action="/resource-center", status="ready"),
+    QuickAction(id="workflow", name="工作流", icon="workflow", action="/workflows", status="ready"),
+    QuickAction(id="avatar", name="第二分身", icon="robot", action="/avatar", status="ready"),
+    QuickAction(id="pet", name="桌宠设置", icon="pet", action="/pet", status="ready"),
     QuickAction(id="voice", name="语音记录", icon="mic", action="voice_record", status="planned"),
-    QuickAction(id="inbox", name="收集箱", icon="inbox", action="resource_center_inbox", status="planned"),
 ]
 
 # ---------- 资源中心占位（待开发） ----------
@@ -96,6 +104,10 @@ class DashboardService:
         self.task_svc = TaskService(db)
         self.task_repo = TaskRepository(db)
         self.doc_repo = DocumentRepository(db)
+        self.resource_svc = ResourceService(db)
+        self.learning_svc = LearningService(db)
+        self.life_svc = LifeService(db)
+        self.asset_svc = AssetService(db)
 
     def get(self) -> DashboardDataOut:
         now = datetime.now()
@@ -133,11 +145,74 @@ class DashboardService:
         # 当前项目（内存分组，复用 all_tasks）
         projects = self._build_projects(all_tasks)
 
-        # 待开发模块占位
-        resource_center = ResourceCenter(categories=RESOURCE_CATEGORIES, status="planned")
-        learning = LearningSection(status="planned")
-        life = LifeSection(categories=LIFE_CATEGORIES, status="planned")
-        assets = AssetsSection(categories=ASSET_CATEGORIES, status="planned")
+        # 资源中心（真实数据）
+        try:
+            inbox_count = self.resource_svc.list_inbox(self.user.id, status="pending", page=1, page_size=1)["total"]
+            template_count = self.resource_svc.list_templates(self.user.id, page=1, page_size=1)["total"]
+            domain_count = len(self.resource_svc.list_domains(self.user.id))
+            resource_categories = [
+                ResourceCategory(id="inbox", name="收集箱", count=inbox_count, icon="inbox"),
+                ResourceCategory(id="template", name="模板库", count=template_count, icon="layout"),
+                ResourceCategory(id="domain", name="领域库", count=domain_count, icon="book"),
+            ]
+            resource_center = ResourceCenter(categories=resource_categories, status="ready")
+        except Exception:
+            resource_center = ResourceCenter(categories=RESOURCE_CATEGORIES, status="planned")
+
+        # 学习成长（真实数据）
+        try:
+            plans_data = self.learning_svc.list_plans(self.user.id, page=1, page_size=3)
+            card_count = self.learning_svc.list_cards(self.user.id, page=1, page_size=1)["total"]
+            today_review = self.learning_svc.get_today_review(self.user.id)["total"]
+            plan_items = [
+                LearningItem(id=p["id"], title=p["name"], progress=p.get("progress", 0), type="plan")
+                for p in plans_data["list"]
+            ]
+            today_item = LearningItem(
+                id="today", title=f"今日复习 {today_review} 张",
+                progress=0, type="review"
+            ) if today_review > 0 else None
+            learning = LearningSection(
+                status="ready",
+                today_study=today_item,
+                plans=plan_items,
+                cards_count=card_count,
+            )
+        except Exception:
+            learning = LearningSection(status="planned")
+
+        # 生活记录（真实数据）
+        try:
+            habit_count = self.life_svc.list_habits(self.user.id, page=1, page_size=1)["total"]
+            mood_stats = self.life_svc.get_mood_stats(self.user.id, days=7)
+            avg_score = mood_stats.get('avg_score', 0)
+            mood_value = f"近7天均分{avg_score:.1f}" if mood_stats.get('count', 0) > 0 else "暂无记录"
+            life_categories = [
+                LifeCategory(id="habit", name=f"习惯 {habit_count}项", value="坚持打卡", icon="activity"),
+                LifeCategory(id="mood", name="心情", value=mood_value, icon="heart"),
+                LifeCategory(id="diary", name="日记", value="记录生活点滴", icon="book"),
+                LifeCategory(id="growth", name="成长", value="每天进步一点点", icon="trending-up"),
+            ]
+            life = LifeSection(categories=life_categories, status="ready")
+        except Exception:
+            life = LifeSection(categories=LIFE_CATEGORIES, status="planned")
+
+        # 长期资产库（真实数据）
+        try:
+            sop_count = self.asset_svc.list_sops(self.user.id, page=1, page_size=1)["total"]
+            prompt_count = self.asset_svc.list_prompts(self.user.id, page=1, page_size=1)["total"]
+            skill_count = self.asset_svc.list_skills(self.user.id, page=1, page_size=1)["total"]
+            memory_count = self.asset_svc.list_memories(self.user.id, page=1, page_size=1)["total"]
+            asset_categories = [
+                AssetCategory(id="sop", name="SOP", count=sop_count, icon="book"),
+                AssetCategory(id="prompt", name="Prompt", count=prompt_count, icon="sparkles"),
+                AssetCategory(id="skill", name="Skill", count=skill_count, icon="zap"),
+                AssetCategory(id="memory", name="项目记忆", count=memory_count, icon="database"),
+            ]
+            assets = AssetsSection(categories=asset_categories, status="ready")
+        except Exception:
+            assets = AssetsSection(categories=ASSET_CATEGORIES, status="planned")
+
         quick_actions = QuickActions(items=QUICK_ACTIONS)
 
         # 本周进度环（M01 F04）
