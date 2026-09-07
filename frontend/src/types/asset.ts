@@ -7,7 +7,7 @@ export interface SOP {
   name: string
   category: string | null
   description: string | null
-  steps: SOPStep[]
+  steps: string[]
   checklist: string[]
   tags: string[]
   use_count: number

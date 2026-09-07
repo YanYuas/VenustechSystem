@@ -1,5 +1,5 @@
 // ============================================================
-// 长期资产库 composable（二期 M10）
+// 长期资产库 composable（二期 M10 P0）
 // ============================================================
 import { ref } from 'vue'
 import { useDataCache } from './useDataCache'
@@ -15,32 +15,41 @@ export function useAsset() {
   const skills = ref<Skill[]>([])
   const memories = ref<ProjectMemory[]>([])
 
-  async function fetchSOPs(category?: string) {
+  async function fetchSOPs() {
     loading.value = true
-    try { sops.value = await assetApi.listSOPs(category) }
-    catch (e: unknown) { error.value = e instanceof Error ? e.message : String(e) }
+    try {
+      const data = await cachedFetch('asset:sops', () => assetApi.listSOPs({ page: 1, page_size: 50 }))
+      sops.value = data.list
+    } catch (e: unknown) { error.value = e instanceof Error ? e.message : String(e) }
     finally { loading.value = false }
   }
 
-  async function fetchPrompts(category?: string) {
+  async function fetchPrompts() {
     loading.value = true
-    try { prompts.value = await assetApi.listPrompts(category) }
-    catch (e: unknown) { error.value = e instanceof Error ? e.message : String(e) }
+    try {
+      const data = await assetApi.listPrompts({ page: 1, page_size: 50 })
+      prompts.value = data.list
+    } catch (e: unknown) { error.value = e instanceof Error ? e.message : String(e) }
     finally { loading.value = false }
   }
 
   async function fetchSkills() {
     loading.value = true
-    try { skills.value = await cachedFetch('asset:skills', () => assetApi.listSkills()) }
-    catch (e: unknown) { error.value = e instanceof Error ? e.message : String(e) }
+    try {
+      const data = await assetApi.listSkills({ page: 1, page_size: 50 })
+      skills.value = data.list
+    } catch (e: unknown) { error.value = e instanceof Error ? e.message : String(e) }
     finally { loading.value = false }
   }
 
-  async function fetchMemories(projectId?: string) {
+  async function fetchMemories() {
     loading.value = true
-    try { memories.value = await assetApi.listMemories(projectId) }
-    catch (e: unknown) { error.value = e instanceof Error ? e.message : String(e) }
+    try {
+      const data = await assetApi.listMemories({ page: 1, page_size: 50 })
+      memories.value = data.list
+    } catch (e: unknown) { error.value = e instanceof Error ? e.message : String(e) }
     finally { loading.value = false }
   }
+
   return { loading, error, sops, prompts, skills, memories, fetchSOPs, fetchPrompts, fetchSkills, fetchMemories }
 }

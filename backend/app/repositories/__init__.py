@@ -44,6 +44,7 @@ from app.repositories.habit_checkin_repo import HabitCheckinRepository
 from app.repositories.mood_repo import MoodRepository
 from app.repositories.diary_repo import DiaryRepository
 from app.repositories.sop_repo import SOPRepository
+from app.repositories.sop_version_repo import SOPVersionRepository
 from app.repositories.prompt_repo import PromptRepository
 from app.repositories.skill_repo import SkillRepository
 from app.repositories.project_memory_repo import ProjectMemoryRepository
