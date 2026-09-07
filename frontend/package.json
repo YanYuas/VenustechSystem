@@ -1,7 +1,7 @@
 {
   "name": "qimingxing",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.7.0",
   "type": "module",
   "description": "启明星系统（Venustech System）— Electron 桌面端前端",
   "scripts": {

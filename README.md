@@ -1,7 +1,7 @@
 # Venustech System（启明星）
 
 > AI 驱动的个人操作系统（Personal OS）· 产品 Slogan：**方向启明，人生推演**
-> 当前版本 **v0.2.0**（2026-09-06）· 9 模块深度开发完成 · 四套 UI 主题
+> 当前版本 **v0.7.0**（2026-09-07）· 二期开发中 · 13个模块 · 四套 UI 主题
 
 ## 项目简介
 
@@ -13,10 +13,10 @@
 
 | 层 | 技术 |
 |----|------|
-| 后端 | FastAPI + SQLAlchemy 2.0 + SQLite(WAL/StaticPool) + Alembic + loguru + pytest |
+| 后端 | FastAPI + SQLAlchemy 2.0 + SQLite(WAL/NullPool) + Alembic + loguru |
 | 前端 | Vue 3 + TypeScript 严格模式 + Vite + Pinia + Vue Router(Hash) + Element Plus（按需） + SCSS |
 | AI | DeepSeek（OpenAI 兼容，httpx 自研客户端）；多模型切换（GPT/Claude/Ollama）；未配 Key 时本地规则降级 |
-| 基础设施 | 事件总线（18 种事件/异步/历史 500 条）、插件系统（发现/加载/热重载）、加密存储（AES-128-CBC + HMAC + PBKDF2）、日志查看 API |
+| 基础设施 | 事件总线（28 种事件/异步/历史 500 条）、TTL内存缓存、插件系统（发现/加载/热重载）、加密存储（AES-128-CBC + HMAC + PBKDF2）、日志查看 API |
 | 部署 | 开发：8765 后端 + 5173 前端（一键脚本）；生产：Node 统一服务单端口 3000（API 代理 + 静态资源） |
 
 ## 目录结构
@@ -24,14 +24,17 @@
 `
 backend/                 FastAPI 后端（app 分层：api → services → repositories → models）
   ├── app/main.py        应用入口（lifespan：迁移/种子/事件订阅/维护）
-  ├── app/core/          核心：event_bus / plugin_manager / encryption / config
-  ├── app/api/           18 个路由模块（auth/task/folder/document/conversation/review/dashboard/backup/panel/notification/project/events/plugins/security/logs/health...）
-  ├── migrations/        Alembic 迁移（0001-0004）
+  ├── app/core/          核心：event_bus / plugin_manager / encryption / config / cache
+  ├── app/api/           22 个路由模块（auth/task/folder/document/conversation/review/dashboard/backup/panel/notification/project/events/plugins/security/logs/health/resource/learning/life/asset/workflow/avatar/pet）
+  ├── app/schemas/       Pydantic schema 层（20+ 文件）
+  ├── app/repositories/  数据访问层（29 个 Repository）
+  ├── app/services/      业务逻辑层（15+ Service）
+  ├── migrations/        Alembic 迁移（0001-0011）
   └── scripts/           冒烟测试
 frontend/                Vue3 前端
-  ├── src/views/         8 视图（Dashboard/Task/Document/Conversation/Review/Project/Settings/NotFound）
-  ├── src/api/           HTTP API 层（9 模块 + http 封装/SSE）
-  ├── src/composables/   业务逻辑（14+ 个 useXxx）
+  ├── src/views/         15 视图（Dashboard/Task/Document/Conversation/Review/Project/Settings/Resource/Learning/Life/Asset/Workflow/Avatar/Pet/NotFound）
+  ├── src/api/           HTTP API 层（15 模块 + http 封装/SSE）
+  ├── src/composables/   业务逻辑（15+ 个 useXxx）
   ├── src/components/    组件（common 基础 + layout 壳 + pet 桌宠 + document/task 业务组件）
   └── src/styles/        主题变量（4 套主题 × 明暗模式）
 docs/                    文档
@@ -39,7 +42,7 @@ docs/                    文档
   ├── prd/               9 模块深度开发 PRD（M01-M09）
   ├── frontend/          前端开发说明
   ├── backend/           后端开发说明
-  └── management/        进度评估 / 决策日志 / 项目计划
+  └── management/        进度评估 / 决策日志 / 项目计划 / 考校报告
 scripts/                 开发脚本（dev.ps1 一键启动）
 server.js / package.json 统一 Web 服务（生产：静态 + /api 代理）
 启动开发.bat             一键启动（双击）
@@ -71,9 +74,19 @@ server.js / package.json 统一 Web 服务（生产：静态 + /api 代理）
 - 备份导入导出、API Key 加密、数据目录管理
 - 插件系统基础架构、加密存储、事件总线
 
-### 待开发（二期方向）
+### 二期新模块（开发中，v0.7.0）
 
-资源中心、学习与成长、生活与自我、长期资产库、Electron 桌面打包、云端同步、移动端适配
+- **资源中心**：收集箱（捕获/处理/归档/转任务/转文档）、模板库（{{变量}}替换引擎）、领域库
+- **学习成长**：SM-2间隔重复算法、3D翻卡复习、学习计划、学习时长统计
+- **生活记录**：习惯打卡（连续天数+月历）、心情记录（5档+趋势）、四维日记
+- **长期资产库**：SOP（版本管理）、Prompt模板（变量替换）、Skill技能库、项目记忆
+- **工作流系统**：3套预设（数学学习/项目开发/小说写作）、一键应用引擎（自动创建标签/模板/任务）
+- **第二分身进化**：长期记忆（4类）、五档自动化（L1-L5）、灵感工作流（生成→提示词→执行→反馈）
+- **桌宠形象进化**：Marvis式状态感知（时间/任务/心情）、本地TTS语音、自定义形象管理
+
+### 待开发（后续方向）
+
+强AI能力扩展（任务拆解/RAG/长文写作）、本地模型推理接入（Ollama/LM Studio）、Electron 桌面打包、云端同步、移动端适配
 
 ## UI 组件画廊
 
@@ -105,9 +118,10 @@ pm run build。
 
 ## 文档
 
-- [PRD v1.0](docs/design/PRD-启明星系统-v1.0.md) · [需求分析](docs/design/01-需求分析.md)
+- [PRD v1.0（一期）](docs/design/PRD-启明星系统-v1.0.md) · [PRD v2.0（二期）](docs/design/PRD-启明星系统-v2.0-二期.md)
 - [技术架构 v2.0](docs/design/02-技术架构-v2.0.md) · [交互设计](docs/design/04-交互设计.md)
 - [模块深度开发 PRD](docs/prd/00-模块深度开发PRD总览.md)（M01-M09）
+- [一期模块考校报告](docs/management/一期模块考校报告-2026-09-06.md)（评分85/100）
 - [前端开发说明](docs/frontend/前端开发说明.md) · [后端开发说明](docs/backend/后端开发说明.md)
 - [一期进度评估](docs/management/一期工程进度评估-2026-09-04.md) · [决策日志](docs/management/决策日志.md) · [项目计划](docs/management/项目计划.md)
 - [方法论](docs/methodology.md) · [变更日志](CHANGELOG.md) · [贡献指南](CONTRIBUTING.md)
