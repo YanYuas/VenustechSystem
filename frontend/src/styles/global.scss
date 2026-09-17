@@ -297,3 +297,82 @@ img {
     grid-template-columns: repeat(2, 1fr) !important;
   }
 }
+
+
+/* ============================================================
+   移动端适配层 v2 —— 全局兜底（< 768px）
+   原则：栅格塌缩为单列 / 解除固定宽度 / 表格横滚 / 防横向溢出
+   只在小屏生效，桌面端零影响
+   ============================================================ */
+@media (max-width: 767px) {
+  // 防横向溢出（混乱的头号来源）
+  html, body {
+    overflow-x: hidden;
+    max-width: 100vw;
+  }
+
+  // 一切页面网格：单列塌缩（覆盖桌面定义的多列 repeat）
+  [class*="__grid"],
+  [class*="-grid"],
+  [class*="__cards"],
+  [class*="__panels"],
+  [class*="__columns"] {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: var(--space-3) !important;
+  }
+
+  // 固定宽度面板/侧栏/表单：解除，改为纵向流
+  [class*="__sidebar"],
+  [class*="__panel"],
+  [class*="__aside"],
+  [class*="__form-card"],
+  [class*="__layout"] {
+    width: auto !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  // 常见"左右分栏"flex 布局：改纵向
+  [class*="__layout"],
+  [class*="__body"]:has(> [class*="__sidebar"]),
+  [class*="__two-col"],
+  [class*="__split"] {
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  // 表格：横向滚动容器化（避免挤爆）
+  .table-wrapper,
+  [class*="__table-wrap"],
+  [class*="table-card"] {
+    overflow-x: auto !important;
+  }
+  table {
+    min-width: 560px; // 保证列可读，横向滑动查看
+  }
+
+  // 大数字/图表区域：等比收缩
+  [class*="__chart"],
+  [class*="__canvas"],
+  svg { max-width: 100% !important; height: auto; }
+
+  // 触控目标：可点击行/卡片间距放大
+  [class*="__item"], [class*="__card"], [class*="__row"] {
+    min-height: 40px;
+  }
+
+  // 弹层全屏化倾向
+  .base-modal, [class*="__modal"] {
+    width: calc(100vw - 24px) !important;
+    max-height: 88vh !important;
+  }
+}
+
+// 平板过渡（768-1023）：三列网格降为两列
+@media (min-width: 768px) and (max-width: 1023px) {
+  [class*="__grid"],
+  [class*="-grid"] {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}

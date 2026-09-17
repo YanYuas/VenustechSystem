@@ -124,4 +124,23 @@ function goTab(tab: DimensionTab) {
     line-height: 1.4;
   }
 }
+
+// 移动端：横向滑动，不换行不隐藏
+@media (max-width: 767px) {
+  .dim-tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    &::-webkit-scrollbar { display: none; }
+  }
+  .dim-tabs__scroll,
+  .dim-tabs__inner {
+    flex-wrap: nowrap;
+  }
+  .dim-tabs__tab {
+    flex-shrink: 0;
+    padding: 6px var(--space-2);
+  }
+  .dim-tabs__optional-badge { display: none; }
+}
 </style>

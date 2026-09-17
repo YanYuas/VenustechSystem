@@ -35,7 +35,9 @@ export function setApiToken(token: string): void {
 }
 
 export function setApiBase(url: string): void {
-  const clean = url.trim().replace(/\/+$/, '')
+  let clean = url.trim().replace(/\/+$/, '')
+  // 防呆：服务器地址漏带 /api/v1 时自动补全（头号连接故障源）
+  if (clean && !clean.endsWith('/api/v1')) clean = `${clean}/api/v1`
   if (clean) localStorage.setItem(API_BASE_KEY, clean)
   else localStorage.removeItem(API_BASE_KEY)
 }
