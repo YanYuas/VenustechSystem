@@ -18,12 +18,15 @@ import CommandPalette from './CommandPalette.vue'
 import DesktopPet from '@/components/pet/DesktopPet.vue'
 import DimensionTabs from './DimensionTabs.vue'
 import Breadcrumb from './Breadcrumb.vue'
+import MobileTabBar from './MobileTabBar.vue'
+import { useDevice } from '@/composables/useDevice'
 import type { SearchResultItem } from '@/types/common'
 
 const router = useRouter()
 const toast = useToast()
 const { toggleMode, cyclePack } = useTheme()
 useReminderWatcher() // 启动提醒到期监控
+const { isMobile } = useDevice()
 
 const searchOpen = ref(false)
 const paletteOpen = ref(false)
@@ -70,16 +73,16 @@ useShortcuts({
 </script>
 
 <template>
-  <div class="shell">
-    <AppTitleBar />
+  <div class="shell" :class="{ 'is-mobile': isMobile }">
+    <AppTitleBar v-if="!isMobile" />
     <TopNav
       @open-search="searchOpen = true"
       @open-user-menu="router.push('/settings')"
     />
     <DimensionTabs />
-    <Breadcrumb />
+    <Breadcrumb v-if="!isMobile" />
     <div class="shell__body">
-      <LeftInfoPanel />
+      <LeftInfoPanel v-if="!isMobile" />
       <main class="shell__content">
         <router-view />
       </main>
@@ -88,6 +91,7 @@ useShortcuts({
     <GlobalSearch v-model="searchOpen" @select="onGlobalSelect" />
     <CommandPalette v-model="paletteOpen" @exec="onExec" />
     <DesktopPet :position="petPosition" />
+    <MobileTabBar />
   </div>
 </template>
 
@@ -109,6 +113,22 @@ useShortcuts({
     overflow-x: hidden;
     padding: var(--space-4) var(--space-6);
     background: var(--bg-body);
+  }
+
+  // 移动端适配
+  &.is-mobile {
+    .shell__content {
+      padding: var(--space-3);
+      padding-bottom: 72px; // 底部TabBar空间
+    }
+  }
+}
+
+// 移动端全局适配
+@media (max-width: 767px) {
+  .shell__content {
+    padding: var(--space-3) !important;
+    padding-bottom: 72px !important;
   }
 }
 </style>

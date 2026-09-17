@@ -211,3 +211,89 @@ img {
   font-size: var(--text-xs);
   line-height: 1.5;
 }
+
+
+/* ============================================================
+   移动端适配（< 768px）
+   ============================================================ */
+@media (max-width: 767px) {
+  // 全局字体微调
+  html {
+    font-size: 14px;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  // 首页卡片单列
+  .dash__grid-3 {
+    grid-template-columns: 1fr !important;
+  }
+
+  // Modal宽度适配
+  .modal-mask .modal {
+    width: calc(100vw - 32px) !important;
+    max-width: calc(100vw - 32px) !important;
+    max-height: 85vh !important;
+  }
+
+  // Drawer宽度适配
+  .drawer {
+    width: 85vw !important;
+    max-width: 85vw !important;
+  }
+
+  // 表格横向滚动
+  .table-wrapper,
+  table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  // 按钮最小触控尺寸
+  button,
+  .btn,
+  .base-button {
+    min-height: 40px;
+  }
+
+  // 输入框触控尺寸
+  input,
+  select,
+  textarea {
+    font-size: 16px; // 防止iOS缩放
+    min-height: 40px;
+  }
+
+  // 隐藏桌面端专用元素
+  .desktop-only {
+    display: none !important;
+  }
+
+  // 安全区域适配
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  // 卡片间距减小
+  .card {
+    padding: var(--space-3) !important;
+  }
+
+  // 分页适配
+  .pagination {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  // Toast位置上移（避开底部TabBar）
+  .toast-container {
+    bottom: 80px !important;
+  }
+}
+
+/* 平板适配（768px - 1023px） */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .dash__grid-3 {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}

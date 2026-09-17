@@ -1005,4 +1005,73 @@ loadTraits()
   &__select { padding: 8px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; background: var(--bg-panel); }
   &__hint { font-size: 11px; color: var(--text-low); text-align: center; margin: 0; }
 }
+
+/* 移动端适配 */
+@media (max-width: 767px) {
+  .conv-view {
+    flex-direction: column;
+    gap: var(--space-2);
+
+    &__sidebar {
+      display: none; // 移动端隐藏对话列表，后续可加抽屉
+      width: 100%;
+    }
+
+    &__main {
+      flex: 1;
+      min-height: 0;
+    }
+
+    // 人设状态栏精简
+    &__persona-bar {
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    &__persona-btn,
+    &__model-btn {
+      padding: 6px 10px;
+      font-size: 12px;
+    }
+
+    &__persona-desc {
+      display: none; // 移动端隐藏人设描述
+    }
+
+    // 消息区
+    &__chat {
+      border-radius: var(--radius-md);
+    }
+
+    &__messages {
+      padding: var(--space-3) !important;
+    }
+
+    &__msg-bubble {
+      max-width: 85% !important;
+      font-size: 14px;
+    }
+
+    // 输入栏
+    &__input-bar {
+      padding: var(--space-2) !important;
+      gap: 8px !important;
+    }
+
+    &__modes {
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+
+    &__mode-btn {
+      padding: 4px 8px;
+      font-size: 11px;
+    }
+
+    &__input {
+      font-size: 14px;
+      min-height: 40px;
+    }
+  }
+}
 </style>

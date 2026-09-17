@@ -455,3 +455,41 @@ function handleNotifClick(n: { id: string; is_read: boolean; type: string; relat
   transform: translateY(-6px) scale(0.98);
 }
 </style>
+
+<style scoped lang="scss">
+// 移动端适配：隐藏顶部维度导航（底部TabBar替代），精简搜索框
+@media (max-width: 767px) {
+  .topnav {
+    padding: 0 var(--space-3);
+    gap: var(--space-2);
+    height: 48px;
+  }
+
+  // 隐藏品牌副标题
+  .topnav__brand-sub {
+    display: none;
+  }
+
+  // 隐藏维度导航（底部TabBar替代）
+  .topnav__nav {
+    display: none;
+  }
+
+  // 搜索框缩小为图标按钮
+  .topnav__search {
+    width: auto;
+    padding: 0 var(--space-2);
+    .topnav__search-placeholder,
+    .topnav__search-kbd {
+      display: none;
+    }
+  }
+
+  // 通知面板适配
+  .topnav__notif-panel {
+    width: calc(100vw - 32px);
+    right: -8px;
+    max-height: 60vh;
+  }
+}
+</style>
