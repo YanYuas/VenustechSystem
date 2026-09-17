@@ -26,3 +26,10 @@ setupErrorHandler(app)
 setupDirectives(app)
 
 app.mount('#app')
+
+// PWA Service Worker（M1：manifest + SW；API 永不缓存，静态资源 cache-first）
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => { /* SW 失败不影响应用 */ })
+  })
+}

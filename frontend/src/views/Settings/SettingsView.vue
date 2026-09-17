@@ -5,6 +5,7 @@
 import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { authApi, backupApi, systemApi, settingsApi, syncApi } from '@/api'
 import type { SyncPackage } from '@/api/sync'
+import { getApiBase, setApiBase } from '@/api/http'
 import type { EncryptionStatus, LogFile, PluginItem } from '@/api/system'
 import { useTheme } from '@/composables/useTheme'
 import { useToast } from '@/composables/useToast'
@@ -21,6 +22,12 @@ const toast = useToast()
 // ---------- 数据同步（S6-3b 前端出口） ----------
 const syncExporting = ref(false)
 const syncImporting = ref('')
+const apiBaseDraft = ref(getApiBase())
+
+function onSaveApiBase() {
+  setApiBase(apiBaseDraft.value)
+  toast.success('服务器地址已保存', '重新进入页面后生效')
+}
 const syncPackagesOpen = ref(false)
 const syncPackages = ref<SyncPackage[]>([])
 
@@ -695,6 +702,14 @@ onMounted(() => {
             </BaseButton>
           </div>
           <p class="settings__hint">用主密码加密保存账号密码、令牌与密钥（明文不落盘）</p>
+        </div>
+        <div class="settings__group">
+          <div class="settings__row">
+            <label class="settings__label">服务器地址</label>
+            <BaseInput v-model="apiBaseDraft" placeholder="http://100.x.y.z:3000/api/v1" />
+            <BaseButton size="sm" variant="secondary" @click="onSaveApiBase">保存</BaseButton>
+          </div>
+          <p class="settings__hint">App 壳专用：填电脑的 Tailscale 地址。Web/PWA 模式无需改动。</p>
         </div>
         <div class="settings__group">
           <div class="settings__row">

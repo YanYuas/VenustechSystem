@@ -12,6 +12,10 @@
     "typecheck": "vue-tsc --noEmit"
   },
   "dependencies": {
+    "@capacitor-community/speech-recognition": "^7.0.0",
+    "@capacitor/android": "^7.6.9",
+    "@capacitor/cli": "^7.0.0",
+    "@capacitor/core": "^7.0.0",
     "@element-plus/icons-vue": "^2.3.1",
     "dayjs": "^1.11.11",
     "element-plus": "^2.7.6",

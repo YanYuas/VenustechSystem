@@ -81,6 +81,7 @@ export const DIMENSIONS: Dimension[] = [
     icon: 'send',
     defaultRoute: '/conversation',
     tabs: [
+      { id: 'assistant', label: 'AI 助理', icon: 'spark', route: '/assistant' },
       { id: 'conversation', label: '第二分身', icon: 'send', route: '/conversation' },
       { id: 'pet', label: '桌宠', icon: 'pet', route: '/pet' },
       { id: 'workspace', label: '工作区', icon: 'folder', route: '/workspace', optional: true },
@@ -107,6 +108,7 @@ export const ROUTE_TO_DIMENSION: Record<string, DimensionId> = {
   '/assets': 'asset',
   '/workflows': 'asset',
   '/conversation': 'companion',
+  '/assistant': 'companion',
   '/avatar': 'companion',
   '/pet': 'companion',
   '/workspace': 'companion',

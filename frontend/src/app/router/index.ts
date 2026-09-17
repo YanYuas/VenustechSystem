@@ -155,6 +155,12 @@ const router = createRouter({
           meta: { icon: 'spark', title: 'AI 资讯', crumbs: ['AI 资讯'], hidden: true },
         },
         {
+          path: 'assistant',
+          name: 'assistant',
+          component: () => import('@/views/Assistant/AssistantView.vue'),
+          meta: { icon: 'spark', title: 'AI 助理', crumbs: ['AI 助理'], hidden: true },
+        },
+        {
           path: 'settings',
           name: 'settings',
           component: () => import('@/views/Settings/SettingsView.vue'),

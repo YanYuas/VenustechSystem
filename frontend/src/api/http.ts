@@ -8,7 +8,23 @@ import { ApiErrorCode, type ApiResponse } from '@/types/api'
 import type { SseEvent } from '@/types/conversation'
 import { toast } from '@/composables/useToast'
 
-const BASE_URL = import.meta.env.VITE_API_BASE ?? 'http://127.0.0.1:8765/api/v1'
+const ENV_BASE = import.meta.env.VITE_API_BASE ?? 'http://127.0.0.1:8765/api/v1'
+// 运行时可覆盖（Capacitor App 壳里指向 PC 的 Tailscale 地址；localStorage 持久）
+const API_BASE_KEY = 'qm-star-api-base'
+
+export function getApiBase(): string {
+  try {
+    return localStorage.getItem(API_BASE_KEY) || ENV_BASE
+  } catch {
+    return ENV_BASE
+  }
+}
+
+export function setApiBase(url: string): void {
+  const clean = url.trim().replace(/\/+$/, '')
+  if (clean) localStorage.setItem(API_BASE_KEY, clean)
+  else localStorage.removeItem(API_BASE_KEY)
+}
 const TIMEOUT = 15000
 /** SSE 首包超时：LLM 冷启动/长 prompt 时首包可能远超 15s */
 const SSE_TIMEOUT = 60000
@@ -49,7 +65,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 }
 
 async function doRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const url = `${BASE_URL}${path}`
+  const url = `${getApiBase()}${path}`
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), TIMEOUT)
 
@@ -151,7 +167,7 @@ export async function sseRequest(
   }
 
   try {
-    const res = await fetch(`${BASE_URL}${path}`, {
+    const res = await fetch(`${getApiBase()}${path}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),

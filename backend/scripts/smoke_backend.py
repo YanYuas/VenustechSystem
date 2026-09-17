@@ -780,6 +780,76 @@ def main() -> int:
                   r.status_code == 200 and d.get("ok") is True and d.get("source") in ("mock", "live"),
                   str(d)[:160])
 
+        # ==================== AI 行程助理（移动端方案 M2/M3） ====================
+        # DeepSeek 调用全程 mock（冒烟不碰外网）；降级/配置加密/白名单落库全覆盖。
+        from app.config import get_settings as _gs
+        from app.database import SessionLocal as _S2
+        from app.models.user import User as _U
+        from app.services.settings_service import SettingsService as _SS
+        import app.services.assistant_service as _am
+
+        _sdb = _S2()
+        _uid = _sdb.query(_U.id).first()[0]
+        _ss = _SS(_sdb, _uid)
+
+        r = client.get("/api/v1/assistant/status")
+        check("assistant not configured by default",
+              r.json()["data"]["configured"] is False, r.text[:120])
+
+        r = client.put("/api/v1/assistant/config", json={"api_key": "sk-test-1234567890"})
+        check("assistant config saved (encrypted)",
+              r.json()["data"]["configured"] is True, r.text[:120])
+        _raw = _ss.get("assistant.deepseek_key")
+        check("assistant key stored encrypted",
+              _raw is not None and "sk-test" not in str(_raw), str(_raw)[:80])
+
+        # 无 Key 降级解析（临时清 Key）：明天下午3点 → 具体时间
+        _ss.set("assistant.deepseek_key", "")
+        _sdb.commit()
+        r = client.post("/api/v1/assistant/parse", json={
+            "text": "明天下午3点找老师谈开题，然后买高铁票。还要给妈妈打电话",
+        })
+        d = r.json()["data"]
+        check("assistant local fallback parses",
+              d["source"] == "local" and len(d["items"]) >= 2, str(d)[:240])
+        _teacher = next((i for i in d["items"] if "老师" in i["title"]), None)
+        check("assistant local time extraction",
+              _teacher is not None and _teacher["deadline"] is not None
+              and "15:00" in _teacher["deadline"], str(_teacher)[:200])
+
+        # mock DeepSeek 通道：验证解析结构透传
+        async def _fake_deepseek(text, now, key):
+            return ([
+                {"kind": "task", "title": "找老师谈开题", "deadline": "2026-09-18T15:00:00",
+                 "people": ["老师"], "location": None, "priority": "high", "notes": None},
+                {"kind": "note", "title": "买高铁票", "deadline": None,
+                 "people": [], "location": None, "priority": "medium", "notes": None},
+            ], ["开题的具体形式？"], "deepseek")
+
+        _am.AssistantService._deepseek_parse = staticmethod(_fake_deepseek)
+        _ss.set("assistant.deepseek_key",
+                _am.EncryptionManager(Path(_gs().data_dir)).encrypt(b"sk-test-1234567890").decode())
+        _sdb.commit()
+        r = client.post("/api/v1/assistant/parse", json={"text": "明天下午3点找老师谈开题"})
+        d = r.json()["data"]
+        check("assistant deepseek mock parse",
+              d["source"] == "deepseek" and len(d["items"]) == 2
+              and d["clarifications"] == ["开题的具体形式？"], str(d)[:240])
+
+        # apply 白名单落库：1 任务（带截止）+ 1 收集箱
+        r = client.post("/api/v1/assistant/apply", json={"items": [
+            {"kind": "task", "title": "找老师谈开题", "deadline": "2026-09-18T15:00:00", "priority": "high"},
+            {"kind": "note", "title": "买高铁票"},
+        ]})
+        d = r.json()["data"]
+        check("assistant apply applies", d["applied"] == 2 and d["by_kind"]["task"] == 1
+              and d["by_kind"]["note"] == 1, str(d)[:200])
+        _hit = _sdb.execute(_text(
+            "SELECT COUNT(*) FROM tasks WHERE title = '找老师谈开题' AND due_date = '2026-09-18'"
+        )).scalar()
+        check("assistant apply created real task row", int(_hit) == 1, str(_hit))
+        _sdb.close()
+
         # ==================== S6-3a 同步字段就绪性 ====================
         # 这是一条**长期防线**：S6-3 的 diff-sync 依赖 updated_at（增量）
         # 与 deleted_at（墓碑）在每张业务表上都存在。

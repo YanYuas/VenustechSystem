@@ -35,6 +35,10 @@ DEFAULT_SETTINGS: dict[str, str] = {
     "workspace.terminal": "cmd",  # cmd / powershell / wt
     "workspace.noise_dirs": "node_modules,venv,.venv,__pycache__,.git,dist,build,.idea,.vscode,site-packages,.pytest_cache,.mypy_cache,.ruff_cache",
     "workspace.noise_exts": ".pyc,.pyo,.log,.tmp,.swp,.DS_Store,.egg-info",
+    # ---------- AI 行程助理（移动端方案 M2） ----------
+    # deepseek_key 存的是 encryption 加密后的密文，明文永不落库不回显
+    "assistant.deepseek_key": "",
+    "assistant.deepseek_model": "deepseek-chat",
 }
 
 TRUE_VALUES = {"true", "1", "yes", "on"}
@@ -67,6 +71,10 @@ class SettingsService:
         return raw in TRUE_VALUES
 
     # ---------- 写 ----------
+
+    def set(self, key: str, value: str) -> None:
+        """单键写入便捷方法（内部仍走批量校验）。"""
+        self.set_many({key: value})
 
     def set_many(self, values: dict[str, str]) -> dict[str, str]:
         """批量写入，返回写入后的完整配置字典。"""

@@ -43,7 +43,7 @@ class Settings(BaseSettings):
 
     # CORS 允许来源（逗号分隔，环境变量 VENUSTECH_CORS_ORIGINS 覆盖）
     # 公网部署时通过 VENUSTECH_CORS_ORIGINS=* 允许所有来源
-    cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000"
+    cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000,https://localhost,capacitor://localhost"
 
     # 数据目录（开发默认 ./data，打包后走 %APPDATA%/VenustechSystem，可由环境变量注入）
     data_dir: Path = _default_data_dir()
