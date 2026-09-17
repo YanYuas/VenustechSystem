@@ -1,0 +1,126 @@
+// ============================================================
+// 动效关键帧库 —— "活"的来源（甜点店拟人语言）
+// 依据: docs/design/03-UI组件index.md §0.4
+// 硬约束: 动画只动 transform/opacity；降级见 global.scss reduced-motion
+// ============================================================
+
+// 招牌：咕嘟弹入（面板/卡片/消息/弹窗入场 450ms）
+@keyframes gudu {
+  0% { opacity: 0; transform: scale(0.96) translateY(4px); }
+  60% { opacity: 1; transform: scale(1.01) translateY(-1px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+// 云朵漂浮（空状态插画/装饰 6s 循环）
+@keyframes floaty {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-6px) rotate(2deg); }
+}
+
+// 状态呼吸灯（在线/进行中/告警圆点）
+@keyframes breathe {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.55; transform: scale(0.86); }
+}
+
+// 流式打字机光标
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+// 通知红点扩散
+@keyframes ping {
+  0% { transform: scale(1); opacity: 0.8; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+
+// 骨架屏 shimmer 扫过
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+// 辉光呼吸（焦点任务/主按钮）
+// 注意：box-shadow 动画性能较差，此处用 opacity 模拟辉光强弱
+@keyframes glow-breathe {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
+}
+
+// 星尘闪烁（灵感/成就出现）
+@keyframes sparkle {
+  0% { opacity: 0; transform: scale(0.4); }
+  50% { opacity: 1; transform: scale(1.15); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+// 图标摇摆（hover 铃铛/装饰图标）
+@keyframes wiggle {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-4deg); }
+  75% { transform: rotate(4deg); }
+}
+
+// 果冻回弹（按钮按下 scale(.96)→1 由 --ease-spring 驱动）
+@keyframes jelly-pop {
+  0% { transform: scale(0.96); }
+  70% { transform: scale(1.04); }
+  100% { transform: scale(1); }
+}
+
+// Loading 旋转
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+// ---------- 出入场 ----------
+@keyframes slide-in-right {
+  from { opacity: 0; transform: translateX(16px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slide-in-left {
+  from { opacity: 0; transform: translateX(-16px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slide-in-down {
+  from { opacity: 0; transform: translateY(-12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slide-in-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+// 抽屉/弹层滑入（宽度方向由抽屉自身 transform 控制，此帧只做横向进入）
+@keyframes drawer-in-right {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+@keyframes drawer-in-left {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+
+// 列表行错峰入场 —— 通过 --i 变量延迟，组件里用 animation-delay: calc(var(--i,0) * 30ms)
+// 容器需显式设置 animation-name
+
+// 划下线动画（待办完成）
+@keyframes strike {
+  from { width: 0; }
+  to { width: 100%; }
+}

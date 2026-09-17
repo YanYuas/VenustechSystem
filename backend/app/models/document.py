@@ -1,0 +1,60 @@
+# ============================================================
+# documents + document_versions + backlinks（PRD §15.5-15.7）
+# ============================================================
+from __future__ import annotations
+
+from sqlalchemy import ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy.orm import Mapped, mapped_column
+
+from app.models.base import Base, SoftDeleteMixin, TimestampMixin, UUIDMixin
+from app.models.types import StringListType
+
+
+class Document(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
+    __tablename__ = "documents"
+
+    # user_id/folder_id 加索引：列表页按两者过滤是最高频查询路径
+    user_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    title: Mapped[str] = mapped_column(String(500), nullable=False)
+    # 身份轴（三期 B）：横切标签，可空 = 未归类；应用层关联，不加外键
+    identity_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    content: Mapped[str | None] = mapped_column(Text, nullable=True)
+    folder_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("folders.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    # 项目关联（M06 F01/F05/F07：项目详情页/时间线/导出需要）
+    project_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("projects.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    tags: Mapped[list] = mapped_column(StringListType, default=list)
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ai_suggested_tags: Mapped[list] = mapped_column(StringListType, default=list)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    word_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    file_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
+
+class DocumentVersion(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
+    __tablename__ = "document_versions"
+
+    document_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("documents.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    word_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+
+class Backlink(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
+    __tablename__ = "backlinks"
+    __table_args__ = (UniqueConstraint("source_doc_id", "target_doc_id"),)
+
+    source_doc_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("documents.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    target_doc_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("documents.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    target_title: Mapped[str | None] = mapped_column(String(500), nullable=True)

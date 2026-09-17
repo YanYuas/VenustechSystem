@@ -1,0 +1,110 @@
+# ============================================================
+# tasks + subtasks + focus_sessions（PRD §15.2 / §15.3 + M02 深度开发）
+# ============================================================
+from __future__ import annotations
+
+from datetime import date, datetime
+
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Index, Integer, String, Text, text
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.models.base import Base, SoftDeleteMixin, TimestampMixin, UUIDMixin
+from app.models.types import JSONType
+
+
+class Task(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
+    __tablename__ = "tasks"
+    __table_args__ = (
+        # 同一用户同时只能有一个今日最重要（部分唯一索引，is_focus=1）
+        Index(
+            "idx_tasks_unique_focus",
+            "user_id",
+            unique=True,
+            sqlite_where=text("is_focus = 1"),
+        ),
+        Index("idx_tasks_user_status", "user_id", "status"),
+        Index("idx_tasks_user_due", "user_id", "due_date"),
+        Index("idx_tasks_user_project", "user_id", "project_id"),
+    )
+
+    user_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    title: Mapped[str] = mapped_column(String(500), nullable=False)
+    # 身份轴（三期 B）：横切标签，可空 = 未归类；应用层关联，不加外键
+    identity_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="pending", index=True
+    )
+    priority: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="medium"
+    )
+    # 保留 project_tag 用于向后兼容，新数据使用 project_id
+    project_tag: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    project_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("projects.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    due_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    is_focus: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    # ---------- M02 深度开发新增 ----------
+    # 任务提醒时间（本地 naive，到期触发通知）
+    reminder_time: Mapped[datetime | None] = mapped_column(
+        DateTime, nullable=True, index=True
+    )
+    # 重复规则 JSON：{type: daily|weekly|monthly|custom, interval: int, days: [0-6]}
+    recurrence: Mapped[dict | None] = mapped_column(JSONType, nullable=True)
+    # 累计专注秒数（番茄钟）
+    focus_duration: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # ---------- S6-1 领域规则引擎新增（迁移 0012）----------
+    # 预估时长（分钟）。来源：领域库任务的 time 字段，由
+    # domain_engine.parse_duration_minutes 从文本（"40分钟"/"约 3 小时"）归一。
+    # 独立成列的用途：可按时长做日程排布与统计 —— 挤进 description 就做不到。
+    estimated_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # 达标标准：做到什么程度算完成。领域库 90/90 条任务都带这一项，
+    # 它把任务从「做什么」升级为「可验收的交付」，故单独成列。
+    acceptance_criteria: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    subtasks: Mapped[list["Subtask"]] = relationship(
+        back_populates="task",
+        cascade="all, delete-orphan",
+        order_by="Subtask.sort_order",
+    )
+    project: Mapped["Project | None"] = relationship(
+        back_populates="tasks",
+        foreign_keys=[project_id],
+    )
+
+
+class Subtask(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
+    __tablename__ = "subtasks"
+
+    task_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    title: Mapped[str] = mapped_column(String(500), nullable=False)
+    completed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    task: Mapped[Task] = relationship(back_populates="subtasks")
+
+
+class FocusSession(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
+    """番茄钟专注会话（M02 F08）：start 后 stop 结算，duration 秒。"""
+
+    __tablename__ = "focus_sessions"
+
+    task_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("tasks.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    user_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    start_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    end_time: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    duration: Mapped[int] = mapped_column(Integer, nullable=False, default=0)  # 秒
+    note: Mapped[str | None] = mapped_column(String(500), nullable=True)

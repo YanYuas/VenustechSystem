@@ -1,0 +1,13 @@
+{
+  "id": "aihot",
+  "name": "AI HOT 信息源",
+  "version": "1.0.0",
+  "author": "Venustech",
+  "description": "AI HOT（aihot.virxact.com）中文 AI 资讯：精选动态 / 当前热点 / 日报。匿名只读，无 API Key，离线降级读缓存。",
+  "entry_point": "main.py",
+  "permissions": ["network"],
+  "metadata": {
+    "source": "https://aihot.virxact.com",
+    "security": "固定 base URL + 参数白名单；返回内容视为不可信资讯，仅展示"
+  }
+}

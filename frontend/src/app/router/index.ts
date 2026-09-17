@@ -1,0 +1,201 @@
+// ============================================================
+// 路由 —— 依据技术架构 v2.0 §4.4
+// 一期模块: 首页 / 项目 / 任务 / 知识 / 第二分身 / 复盘
+// ============================================================
+import { createRouter, createWebHashHistory } from 'vue-router'
+import DefaultLayout from '@/components/layout/DefaultLayout.vue'
+import { STORAGE_KEYS } from '@/constants'
+
+const router = createRouter({
+  history: createWebHashHistory(),
+  // 路由切换滚动行为：保存滚动位置，新路由回到顶部
+  scrollBehavior(to, _from, savedPosition) {
+    if (savedPosition) return savedPosition
+    if (to.hash) return { el: to.hash, behavior: 'smooth' }
+    return { top: 0 }
+  },
+  routes: [
+    {
+      path: '/',
+      component: DefaultLayout,
+      redirect: '/dashboard',
+      children: [
+        {
+          path: 'dashboard',
+          name: 'dashboard',
+          component: () => import('@/views/Dashboard/DashboardView.vue'),
+          meta: { icon: 'home', title: '首页', crumbs: ['首页'] },
+        },
+        {
+          path: 'projects',
+          name: 'projects',
+          component: () => import('@/views/Project/ProjectListView.vue'),
+          meta: { icon: 'folder', title: '项目', crumbs: ['项目'] },
+        },
+        {
+          path: 'projects/:id',
+          name: 'project-detail',
+          component: () => import('@/views/Project/ProjectDetailView.vue'),
+          meta: { icon: 'folder', title: '项目详情', crumbs: ['项目', '详情'], hidden: true },
+        },
+        {
+          path: 'tasks',
+          name: 'tasks',
+          component: () => import('@/views/Task/TaskListView.vue'),
+          meta: { icon: 'check', title: '任务', crumbs: ['任务'] },
+        },
+        {
+          path: 'documents',
+          name: 'documents',
+          component: () => import('@/views/Document/DocumentExplorerView.vue'),
+          meta: { icon: 'doc', title: '知识', crumbs: ['知识'] },
+        },
+        {
+          path: 'conversation',
+          name: 'conversation',
+          component: () => import('@/views/Conversation/ConversationView.vue'),
+          meta: { icon: 'send', title: '第二分身', crumbs: ['第二分身'] },
+        },
+        {
+          path: 'review',
+          name: 'review',
+          component: () => import('@/views/Review/ReviewView.vue'),
+          meta: { icon: 'refresh', title: '复盘', crumbs: ['复盘'] },
+        },
+        {
+          path: 'resource-center',
+          name: 'resource-center',
+          component: () => import('@/views/Resource/ResourceCenterView.vue'),
+          meta: { icon: 'folder', title: '资源中心', crumbs: ['资源中心'], hidden: true },
+        },
+        {
+          path: 'learning',
+          name: 'learning',
+          component: () => import('@/views/Learning/LearningView.vue'),
+          meta: { icon: 'book', title: '学习成长', crumbs: ['学习成长'], hidden: true },
+        },
+        {
+          path: 'life',
+          name: 'life',
+          component: () => import('@/views/Life/LifeView.vue'),
+          meta: { icon: 'heart', title: '生活记录', crumbs: ['生活记录'], hidden: true },
+        },
+        {
+          path: 'assets',
+          name: 'assets',
+          component: () => import('@/views/Asset/AssetLibraryView.vue'),
+          meta: { icon: 'award', title: '长期资产库', crumbs: ['长期资产库'], hidden: true },
+        },
+        {
+          path: 'workflows',
+          name: 'workflows',
+          component: () => import('@/views/Workflow/WorkflowCenterView.vue'),
+          meta: { icon: 'workflow', title: '工作流中心', crumbs: ['工作流中心'], hidden: true },
+        },
+        {
+          path: 'avatar',
+          name: 'avatar',
+          component: () => import('@/views/Avatar/AvatarSettingsView.vue'),
+          meta: { icon: 'robot', title: '第二分身', crumbs: ['第二分身'], hidden: true },
+        },
+        {
+          path: 'pet',
+          name: 'pet',
+          component: () => import('@/views/Pet/PetSettingsView.vue'),
+          meta: { icon: 'pet', title: '桌宠设置', crumbs: ['桌宠设置'], hidden: true },
+        },
+        {
+          path: 'growth',
+          name: 'growth',
+          component: () => import('@/views/Growth/GrowthView.vue'),
+          meta: { icon: 'spark', title: '成长体系', crumbs: ['成长体系'], hidden: true },
+        },
+        {
+          path: 'identities',
+          name: 'identities',
+          component: () => import('@/views/Identity/IdentityView.vue'),
+          meta: { icon: 'star', title: '身份管理', crumbs: ['身份管理'], hidden: true },
+        },
+        {
+          path: 'experience',
+          name: 'experience',
+          component: () => import('@/views/Experience/ExperienceView.vue'),
+          meta: { icon: 'book', title: '经历时间线', crumbs: ['经历时间线'], hidden: true },
+        },
+        {
+          path: 'workspace',
+          name: 'workspace',
+          component: () => import('@/views/Workspace/WorkspaceView.vue'),
+          // 工作区是可选功能（三期规划 §5.0）：入口由 TopNav 按 enabled
+          // 状态条件渲染，不进静态导航
+          meta: { icon: 'folder', title: '工作区', crumbs: ['工作区'], hidden: true },
+        },
+        {
+          path: 'workspace/setup',
+          name: 'workspace-setup',
+          component: () => import('@/views/Workspace/WorkspaceSetupView.vue'),
+          meta: { icon: 'spark', title: '工作区引导', crumbs: ['工作区', '引导设置'], hidden: true },
+        },
+        {
+          path: 'report',
+          name: 'report',
+          component: () => import('@/views/Report/ReportView.vue'),
+          meta: { icon: 'doc', title: '人生报告', crumbs: ['人生报告'], hidden: true },
+        },
+        {
+          path: 'vault',
+          name: 'vault',
+          component: () => import('@/views/Vault/VaultView.vue'),
+          meta: { icon: 'command', title: '保险箱', crumbs: ['保险箱'], hidden: true },
+        },
+        {
+          path: 'aihot',
+          name: 'aihot',
+          component: () => import('@/views/AiHot/AiHotView.vue'),
+          meta: { icon: 'spark', title: 'AI 资讯', crumbs: ['AI 资讯'], hidden: true },
+        },
+        {
+          path: 'settings',
+          name: 'settings',
+          component: () => import('@/views/Settings/SettingsView.vue'),
+          meta: { icon: 'setting', title: '设置', crumbs: ['设置'], hidden: true },
+        },
+      ],
+    },
+    // 404 兜底
+    {
+      path: '/:pathMatch(.*)*',
+      name: 'not-found',
+      component: () => import('@/views/NotFound/NotFoundView.vue'),
+      meta: { title: '页面未找到', hidden: true },
+    },
+  ],
+})
+
+// 启动时恢复最后访问的路由
+let restored = false
+router.beforeEach((to, _from, next) => {
+  if (!restored && to.path === '/dashboard') {
+    restored = true
+    try {
+      const last = localStorage.getItem(STORAGE_KEYS.lastRoute)
+      if (last && last !== '/dashboard') {
+        next(last)
+        return
+      }
+    } catch { /* ignore */ }
+  }
+  restored = true
+  next()
+})
+
+router.afterEach((to) => {
+  const title = (to.meta.title as string) ?? '启明星'
+  document.title = `${title} · 启明星`
+  // 记录最后访问路由
+  try {
+    localStorage.setItem(STORAGE_KEYS.lastRoute, to.fullPath)
+  } catch { /* ignore */ }
+})
+
+export default router

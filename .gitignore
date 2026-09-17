@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.pyc
+venv/
+.env
+# Node
+node_modules/
+dist/
+build/
+# IDE
+.vscode/
+.idea/
+# OS
+.DS_Store
+Thumbs.db
+*.log
+# 运行期数据（避免切分支时覆盖本地数据库）
+backend/data/
+backend/data_test/
+backend/data_smoke/
+backend/data_diag/
+data-fusion/
+data-*/
+data_*/
+# 本地工具状态（智能体记忆/会话数据，非项目源码）
+.workbuddy/
+
+# git 灾难恢复备份（2026-09-17，勿删，待确认后清理）
+.git-broken-20260917/
+.claude/

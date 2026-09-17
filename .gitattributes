@@ -1,0 +1,43 @@
+# ============================================================
+# 行尾符规范化（2026-09-16 新增 · W0 封板）
+#
+# 立此文件的直接原因（实测数据，非推测）：
+#   本仓库 core.autocrlf=false 且此前无 .gitattributes，行尾符按工作区
+#   原样入档。2026-09-15 的一轮批量编辑在 Windows 上把 26 个原为 LF 的
+#   文件整体改写为 CRLF，使 `git diff --stat` 虚增至：
+#      5839 插入 / 5297 删除
+#   而逐文件还原 LF 后的真实改动仅为：
+#      792 插入 / 250 删除
+#   —— 噪声是真实改动的 7 倍。
+#
+#   危害不止于 diff 难看：并行分支（二期 W1~W3 会同时开多个 feature 分支）
+#   若同时修改同一文件，行尾符差异会让该文件整体被判为冲突，三方合并失效。
+#   **这是多窗口协作的隐形杀手，必须在封板阶段根治。**
+#
+# 策略：文本一律 LF；Windows 脚本保留 CRLF；二进制不做任何转换。
+# ============================================================
+
+* text=auto eol=lf
+
+# Windows 脚本：cmd.exe 对 LF 结尾的 .bat 在 label 跳转等场景下有风险
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# 二进制 / 禁止转换
+# 数据库文件尤其重要 —— 一旦被"规范化"即损坏，且此处正是本地优先应用的数据主权所在
+*.db binary
+*.sqlite binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.zip binary
+*.pdf binary
+*.map binary
+
+# SVG 是本项目主题资产与图标载体，属文本，统一 LF
+*.svg text eol=lf
