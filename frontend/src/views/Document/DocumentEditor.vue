@@ -7,6 +7,7 @@
 import { ref, watch, computed, onMounted, onBeforeUnmount } from 'vue'
 import dayjs from 'dayjs'
 import { marked } from 'marked'
+import DOMPurify from 'dompurify'
 import { documentApi } from '@/api'
 import { useAutoSave } from '@/composables/useAutoSave'
 import { useToast } from '@/composables/useToast'
@@ -83,6 +84,7 @@ const mode = ref<EditorMode>('edit')
 const renderedHtml = computed(() => {
   try {
     const raw = marked.parse(content.value || '（空文档）', { async: false }) as string
+    return DOMPurify.sanitize(raw)
     return renderWithWikiLinks(raw)
   } catch {
     return '<p>渲染失败</p>'

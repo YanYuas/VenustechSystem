@@ -20,6 +20,20 @@ export function getApiBase(): string {
   }
 }
 
+export function getApiToken(): string {
+  try {
+    return localStorage.getItem('qm-star-token') || ''
+  } catch {
+    return ''
+  }
+}
+
+export function setApiToken(token: string): void {
+  try {
+    localStorage.setItem('qm-star-token', token.trim())
+  } catch { /* ignore */ }
+}
+
 export function setApiBase(url: string): void {
   const clean = url.trim().replace(/\/+$/, '')
   if (clean) localStorage.setItem(API_BASE_KEY, clean)
@@ -44,6 +58,10 @@ class ApiError extends Error {
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const headers: Record<string, string> = { ...(options.headers as Record<string, string>) }
+  const token = getApiToken()
+  if (token) headers['X-API-Token'] = token
+  options = { ...options, headers }
   let lastError: unknown
   const method = (options.method ?? 'GET').toUpperCase()
   const retryable = IDEMPOTENT_METHODS.has(method)

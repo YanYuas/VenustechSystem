@@ -13,7 +13,7 @@ import pkg from 'http-proxy'
 const { createProxyServer } = pkg
 import { fileURLToPath } from 'node:url'
 import { extname, join, resolve } from 'node:path'
-import { readFileSync, existsSync } from 'node:fs'
+import { readFileSync, writeFileSync, existsSync } from 'node:fs'
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
 
@@ -60,10 +60,56 @@ function getMimeType(path) {
   return MIME_TYPES[extname(path).toLowerCase()] ?? 'application/octet-stream'
 }
 
+// ---------- 访问令牌（安全审计修复：API 单点鉴权） ----------
+// 后端只绑 127.0.0.1，server.js 是唯一外部入口 —— /api/* 必须携带
+// X-API-Token（静态资源放行，App/PWA 首屏加载不受影响）。
+// Token 来源：环境变量 QM_TOKEN > .qm-token 文件（首次启动自动生成）。
+import { randomBytes } from 'node:crypto'
+const TOKEN_FILE = resolve(__dirname, '.qm-token')
+let API_TOKEN = process.env.QM_TOKEN ?? ''
+if (!API_TOKEN) {
+  try {
+    API_TOKEN = readFileSync(TOKEN_FILE, 'utf8').trim()
+  } catch { /* 首次启动 */ }
+  if (!API_TOKEN) {
+    API_TOKEN = randomBytes(24).toString('hex')
+    try {
+      writeFileSync(TOKEN_FILE, API_TOKEN)
+      console.log(`🔑 已生成访问令牌（手机端"设置 → 服务器地址"页需填入）: ${API_TOKEN}`)
+      console.log(`   令牌文件: ${TOKEN_FILE}`)
+    } catch (e) {
+      console.error('⚠️ 令牌写入失败，/api 将拒绝外部访问:', e.message)
+    }
+  }
+}
+// 本机回环来源不校验（PC 前端零改动可用）；外部来源必须持令牌
+const LOOPBACK_HOSTS = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1'])
+
+function isAuthorized(req) {
+  if (LOOPBACK_HOSTS.has(req.socket.remoteAddress ?? '')) return true
+  const token = req.headers['x-api-token'] ?? ''
+  return API_TOKEN.length > 0 && token === API_TOKEN
+}
+
 // ---------- 静态文件服务器 ----------
 const server = createServer((req, res) => {
-  // 1. /api/* → 代理到后端
+  // 1. /api/* → 代理到后端（带令牌校验）
   if (req.url?.startsWith('/api')) {
+    if (req.method === 'OPTIONS') {
+      // CORS 预检放行（浏览器会先发预检，此时未必带令牌）
+      res.writeHead(204, {
+        'Access-Control-Allow-Origin': req.headers.origin ?? '*',
+        'Access-Control-Allow-Methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-API-Token',
+      })
+      res.end()
+      return
+    }
+    if (!isAuthorized(req)) {
+      res.writeHead(401, { 'Content-Type': 'application/json; charset=utf-8' })
+      res.end(JSON.stringify({ code: 4010, message: '需要访问令牌：请在设置页填入服务器访问令牌', data: null }))
+      return
+    }
     proxy.web(req, res, { target: BACKEND_URL })
     return
   }
@@ -93,8 +139,13 @@ const server = createServer((req, res) => {
   res.end(content)
 })
 
-// SSE 长连接代理
+// SSE 长连接代理（同样校验令牌 —— WS/升级通道不得绕过）
 server.on('upgrade', (req, socket, head) => {
+  if (req.url?.startsWith('/api') && !isAuthorized(req)) {
+    socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n')
+    socket.destroy()
+    return
+  }
   proxy.ws(req, socket, head, { target: BACKEND_URL })
 })
 

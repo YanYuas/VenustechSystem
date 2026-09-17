@@ -5,7 +5,7 @@
 import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { authApi, backupApi, systemApi, settingsApi, syncApi } from '@/api'
 import type { SyncPackage } from '@/api/sync'
-import { getApiBase, setApiBase } from '@/api/http'
+import { getApiBase, setApiBase, getApiToken, setApiToken } from '@/api/http'
 import type { EncryptionStatus, LogFile, PluginItem } from '@/api/system'
 import { useTheme } from '@/composables/useTheme'
 import { useToast } from '@/composables/useToast'
@@ -23,8 +23,10 @@ const toast = useToast()
 const syncExporting = ref(false)
 const syncImporting = ref('')
 const apiBaseDraft = ref(getApiBase())
+const tokenDraft = ref(getApiToken())
 
 function onSaveApiBase() {
+  setApiToken(tokenDraft.value)
   setApiBase(apiBaseDraft.value)
   toast.success('服务器地址已保存', '重新进入页面后生效')
 }
@@ -709,7 +711,11 @@ onMounted(() => {
             <BaseInput v-model="apiBaseDraft" placeholder="http://100.x.y.z:3000/api/v1" />
             <BaseButton size="sm" variant="secondary" @click="onSaveApiBase">保存</BaseButton>
           </div>
-          <p class="settings__hint">App 壳专用：填电脑的 Tailscale 地址。Web/PWA 模式无需改动。</p>
+          <div class="settings__row">
+            <label class="settings__label">访问令牌</label>
+            <BaseInput v-model="tokenDraft" placeholder="电脑首次启动服务时打印的令牌" />
+          </div>
+          <p class="settings__hint">App 壳专用：填电脑首次启动服务时打印的访问令牌。Web/PWA 模式无需改动。</p>
         </div>
         <div class="settings__group">
           <div class="settings__row">
