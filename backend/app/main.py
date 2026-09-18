@@ -43,6 +43,18 @@ async def lifespan(_app: FastAPI):
     setup_logger()
     run_migrations()
     run_maintenance()
+    # 加密管理器初始化（mod-platform P1）：此前从未初始化，导致
+    # get_encryption() 恒为 None —— API Key 加密被迫降级、vault/
+    # assistant 每次自己 new 一个实例。统一在此初始化一次。
+    try:
+        from pathlib import Path
+
+        from app.core.encryption import init_encryption
+
+        init_encryption(Path(settings.data_dir))
+        logger.info("加密管理器已初始化")
+    except Exception:
+        logger.exception("加密管理器初始化失败（敏感信息加密将不可用）")
     with SessionLocal() as db:
         if settings.demo_seed:
             seed_if_empty(db)

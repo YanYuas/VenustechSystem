@@ -834,6 +834,16 @@ def main() -> int:
         _pm._plugins.pop("evil-probe", None)
         check("plugin valid permission passes", _vp(["network", "files"])[0] is True, "should pass")
 
+        # ---------- mod-platform P1：敏感信息加密不得落明文 ----------
+        from app.core.encryption import get_encryption as _get_enc
+        from app.core.security import decrypt_secret as _dec, encrypt_secret as _enc
+        check("encryption manager initialized at startup",
+              _get_enc() is not None and _get_enc().is_available is True, "not initialized")
+        _tok = _enc("sk-smoke-secret-001")
+        check("secret encryption never plaintext",
+              not _tok.startswith("plain:") and _dec(_tok) == "sk-smoke-secret-001",
+              _tok[:24])
+
         r = client.get("/api/v1/plugins/aihot/items", params={"window": "99h"})
         d = r.json().get("data", {})
         check("aihot rejects bad window (graceful envelope)",

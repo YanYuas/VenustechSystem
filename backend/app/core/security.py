@@ -26,22 +26,36 @@ def encrypt_secret(plaintext: str) -> str:
             desc="Venustech API Key",
         )
         return "dpapi:" + base64.b64encode(blob).decode("ascii")
-    # 仅开发模式允许占位（本地跑通流程用），生产一律拒绝
+    # 回退 1：Fernet（AES-128-CBC+HMAC，文件密钥，真实加密）—— 不是明文
+    from app.core.encryption import get_encryption
+
+    enc = get_encryption()
+    if enc is not None and enc.is_available:
+        return "fernet:" + enc.encrypt(plaintext).decode()
+
+    # 回退 2：仅开发模式允许占位（本地跑通流程用），生产一律拒绝
     from app.config import get_settings
 
     if get_settings().dev:
         return "plain:" + base64.b64encode(plaintext.encode("utf-8")).decode("ascii")
     raise RuntimeError(
-        "DPAPI 不可用且当前非开发模式：拒绝以明文占位存储密钥（请安装 pywin32）"
+        "无可用加密后端（DPAPI 与 Fernet 均不可用）且当前非开发模式：拒绝以明文存储密钥"
     )
 
 
 def decrypt_secret(ciphertext: str) -> str:
-    """解密密文。"""
+    """解密密文。支持 dpapi: / fernet: / plain:（仅历史兼容读取）。"""
     if ciphertext.startswith("plain:"):
         return base64.b64decode(ciphertext[6:]).decode("utf-8")
+    if ciphertext.startswith("fernet:"):
+        from app.core.encryption import get_encryption
+
+        enc = get_encryption()
+        if enc is None or not enc.is_available:
+            raise ValueError("无法解密：Fernet 加密后端不可用")
+        return enc.decrypt(ciphertext[7:])
     if ciphertext.startswith("dpapi:") and _DPAPI_AVAILABLE:
         blob = base64.b64decode(ciphertext[6:])
         _, decrypted = win32crypt.CryptUnprotectData(blob)
         return decrypted.decode("utf-8")
-    raise ValueError("无法解密：DPAPI 不可用")
+    raise ValueError("无法解密：密文格式不支持或对应后端不可用")
