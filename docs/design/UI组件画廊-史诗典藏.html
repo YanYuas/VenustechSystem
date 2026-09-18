@@ -1,0 +1,835 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="version" content="V3.0"><meta name="alignment" content="47组件标准对齐"><meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="data:,">
+<title>启明星 · 史诗典藏 · 组件画廊 47</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=ZCOOL+XiaoWei&family=Noto+Serif+SC:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+/* ============ 设计令牌 · 明亮传说版 ============ */
+:root{
+  --bg-parchment:#FAF6EB;--bg-panel:#FFFFFF;--bg-raised:#FDFBF5;--bg-inset:#F5EFE0;
+  --line:#E8DCC8;--line-strong:#D4C4A8;
+  --text-hi:#2A1F14;--text-mid:#6B5A4A;--text-low:#9B8A7A;
+  --gold:#C9A227;--gold-light:#E8C84A;--gold-dark:#A07D1A;
+  --amber:#E07B39;--amber-light:#F09A5C;--amber-dark:#B85A20;
+  --azure:#3A6B8C;--azure-light:#5A8BAC;--azure-dark:#2A4F6B;
+  --jade:#4A9E6E;--jade-light:#6ABE8E;--jade-dark:#357A52;
+  --crimson:#C45A4A;--crimson-light:#E07A6A;--crimson-dark:#9A3A2A;
+  --gold-soft:rgba(201,162,39,.12);--amber-soft:rgba(224,123,57,.12);
+  --azure-soft:rgba(58,107,140,.10);--jade-soft:rgba(74,158,110,.12);--crimson-soft:rgba(196,90,74,.12);
+  --on-gold:#2A1F14;--white:#FFFFFF;--overlay:rgba(42,31,20,.4);
+  --radius-sm:8px;--radius-md:12px;--radius-lg:18px;--radius-xl:26px;--radius-pill:999px;
+  --shadow-card:0 4px 14px rgba(201,162,39,.12);
+  --shadow-raise:0 10px 28px rgba(201,162,39,.20);
+  --glow:0 0 18px rgba(201,162,39,.25);
+  --glow-strong:0 0 28px rgba(201,162,39,.40);
+  --glow-amber:0 0 18px rgba(224,123,57,.30);
+  --shadow-danger:0 4px 14px rgba(196,90,74,.25);
+  --space-1:4px;--space-2:8px;--space-3:12px;--space-4:16px;--space-5:20px;--space-6:24px;--space-8:32px;
+  --ease-spring:cubic-bezier(.34,1.56,.64,1);--ease-soft:cubic-bezier(.22,1,.36,1);
+  --font-epic:'ZCOOL XiaoWei','Noto Serif SC',serif;
+  --font-serif:'Noto Serif SC','Songti SC',serif;
+  --font-body:'PingFang SC','Microsoft YaHei',sans-serif;
+  --font-mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+}
+[data-theme="dark"]{
+  --bg-parchment:#1A1410;--bg-panel:#2A221C;--bg-raised:#352C24;--bg-inset:#221A14;
+  --line:#3D3228;--line-strong:#524438;
+  --text-hi:#F5EFE0;--text-mid:#C4B4A0;--text-low:#8A7A6A;
+  --gold:#E8C84A;--gold-light:#F0D86A;--gold-dark:#C9A227;
+  --amber:#F09A5C;--amber-light:#F5B07C;--amber-dark:#E07B39;
+  --azure:#5A8BAC;--azure-light:#7AABCC;--azure-dark:#3A6B8C;
+  --jade:#6ABE8E;--jade-light:#8ADEAE;--jade-dark:#4A9E6E;
+  --crimson:#E07A6A;--crimson-light:#F09A8A;--crimson-dark:#C45A4A;
+  --gold-soft:rgba(232,200,74,.14);--amber-soft:rgba(240,154,92,.14);
+  --azure-soft:rgba(90,139,172,.12);--jade-soft:rgba(106,190,142,.14);--crimson-soft:rgba(224,122,106,.14);
+  --on-gold:#1A1410;--overlay:rgba(0,0,0,.5);
+  --shadow-card:0 4px 14px rgba(0,0,0,.3);--shadow-raise:0 10px 28px rgba(0,0,0,.45);
+  --glow:0 0 18px rgba(232,200,74,.25);--glow-strong:0 0 28px rgba(232,200,74,.35);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{
+  background:
+    radial-gradient(circle at 12% 0,rgba(201,162,39,.10),transparent 400px),
+    radial-gradient(circle at 88% 8%,rgba(224,123,57,.08),transparent 350px),
+    radial-gradient(circle at 50% 100%,rgba(58,107,140,.06),transparent 500px),
+    repeating-linear-gradient(0deg,transparent,transparent 28px,rgba(201,162,39,.025) 28px,rgba(201,162,39,.025) 29px),
+    var(--bg-parchment);
+  color:var(--text-hi);font-family:var(--font-body);font-size:13px;line-height:1.6;
+  min-height:100vh;transition:background .4s var(--ease-soft),color .4s var(--ease-soft);overflow-x:hidden;
+}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+::selection{background:var(--gold-soft);color:var(--gold-dark)}
+@keyframes epic-enter{0%{opacity:0;transform:scale(.94) translateY(10px)}60%{opacity:1;transform:scale(1.01) translateY(-2px)}100%{opacity:1;transform:scale(1) translateY(0)}}
+@keyframes epic-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+@keyframes epic-glow-pulse{0%,100%{box-shadow:var(--glow)}50%{box-shadow:var(--glow-strong)}}
+@keyframes epic-shimmer{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
+@keyframes epic-spin{to{transform:rotate(360deg)}}
+@keyframes epic-twinkle{0%,100%{opacity:.3;transform:scale(.8)}50%{opacity:1;transform:scale(1.2)}}
+@keyframes epic-breathe{0%,100%{opacity:1}50%{opacity:.4}}
+.bp{animation:epic-enter .5s var(--ease-spring) both}
+.bp-d1{animation-delay:.05s}.bp-d2{animation-delay:.1s}.bp-d3{animation-delay:.15s}.bp-d4{animation-delay:.2s}
+.bp-d5{animation-delay:.25s}.bp-d6{animation-delay:.3s}.bp-d7{animation-delay:.35s}.bp-d8{animation-delay:.4s}
+
+/* ============ 页面骨架 ============ */
+.hero{padding:48px 32px 8px;text-align:center;position:relative;overflow:hidden}
+.hero h1{font-family:var(--font-epic);font-weight:400;font-size:clamp(28px,4.5vw,42px);letter-spacing:4px;
+  background:linear-gradient(135deg,var(--gold-dark),var(--gold),var(--amber),var(--gold));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero .ver{font-family:var(--font-epic);font-size:13px;color:var(--gold-dark);margin-left:10px;
+  background:var(--gold-soft);padding:3px 12px;border-radius:var(--radius-pill);border:1px solid var(--line);-webkit-text-fill-color:var(--gold-dark)}
+.hero p{color:var(--text-mid);margin-top:10px;font-size:15px;font-family:var(--font-serif)}
+.hero .sub{color:var(--text-low);margin-top:4px;font-size:12px}
+.hero-ornament{position:absolute;top:20px;left:50%;transform:translateX(-50%);width:200px;height:40px;opacity:.4;pointer-events:none}
+.toolbar{position:fixed;top:18px;right:24px;display:flex;gap:8px;z-index:100}
+.tb-btn{font-family:var(--font-epic);font-size:13px;color:var(--text-mid);background:var(--bg-panel);
+  border:1px solid var(--line);border-radius:var(--radius-pill);padding:8px 18px;cursor:pointer;
+  transition:transform .25s var(--ease-spring),color .3s,border-color .3s,box-shadow .3s;
+  display:inline-flex;align-items:center;gap:6px}
+.tb-btn:hover{transform:translateY(-2px);color:var(--gold-dark);border-color:var(--gold);box-shadow:var(--shadow-card)}
+main{max-width:1320px;margin:0 auto;padding:24px 28px 100px}
+section{margin-top:40px;position:relative}
+.sec-head{display:flex;align-items:center;gap:14px;margin-bottom:20px;flex-wrap:wrap;position:relative}
+.sec-head::before{content:'';position:absolute;left:-16px;top:50%;transform:translateY(-50%);
+  width:4px;height:28px;border-radius:var(--radius-pill);background:linear-gradient(var(--gold),var(--amber))}
+.sec-head h2{font-family:var(--font-epic);font-weight:400;font-size:24px;display:flex;align-items:center;gap:10px;letter-spacing:2px}
+.sec-head h2 .sec-icon{width:28px;height:28px;color:var(--gold)}
+.sec-head .badge{font-family:var(--font-epic);font-size:12px;color:var(--on-gold);background:linear-gradient(135deg,var(--gold),var(--amber));
+  padding:3px 14px;border-radius:var(--radius-pill);box-shadow:var(--glow)}
+.sec-head .note{color:var(--text-low);font-size:12px;margin-left:auto;font-family:var(--font-serif)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:24px}
+.ccard{background:var(--bg-panel);border:1px solid var(--line);border-radius:var(--radius-lg);
+  box-shadow:var(--shadow-card);padding:20px;position:relative;overflow:hidden;
+  transition:transform .35s var(--ease-soft),box-shadow .35s var(--ease-soft),border-color .3s}
+.ccard:hover{transform:translateY(-4px);box-shadow:var(--shadow-raise);border-color:var(--gold)}
+.ccard::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,var(--gold),var(--amber),var(--gold),transparent);opacity:.6}
+.ccard .num{position:absolute;top:16px;right:18px;font-family:var(--font-epic);font-size:12px;
+  color:var(--gold-dark);letter-spacing:1px;background:var(--gold-soft);padding:2px 10px;border-radius:var(--radius-pill);border:1px solid var(--line)}
+.ccard .t{font-family:var(--font-epic);font-weight:400;font-size:16px;color:var(--text-hi);
+  display:flex;align-items:center;gap:10px;margin-bottom:16px;padding-right:60px;letter-spacing:1px}
+.ccard .t .dot{width:10px;height:10px;border-radius:50%;flex:none;
+  background:linear-gradient(135deg,var(--gold),var(--amber));box-shadow:0 0 8px rgba(201,162,39,.4)}
+.ccard .land{color:var(--text-low);font-size:11px;margin-top:16px;border-top:1px dashed var(--line);padding-top:12px;line-height:1.8}
+.ccard .land b{color:var(--gold-dark);font-weight:600}
+
+/* ============ 通用原子 ============ */
+.icon{width:1em;height:1em;vertical-align:-.125em;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--text-low);display:inline-block;flex:none}
+.dot.on{background:var(--jade);animation:epic-breathe 2s ease-in-out infinite}
+.dot.busy{background:var(--gold);animation:epic-breathe 1.2s ease-in-out infinite}
+.dot.alert{background:var(--crimson);animation:epic-breathe .7s ease-in-out infinite}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border-radius:var(--radius-sm);
+  font-family:var(--font-epic);font-size:13px;font-weight:500;padding:0 18px;height:38px;white-space:nowrap;
+  transition:transform .25s var(--ease-spring),box-shadow .25s var(--ease-soft),background .25s,border-color .3s,color .3s;user-select:none;letter-spacing:1px}
+.btn:active{transform:scale(.96)}
+.btn.pri{background:linear-gradient(135deg,var(--gold),var(--amber));color:var(--on-gold)}
+.btn.pri:hover{box-shadow:var(--glow);filter:brightness(1.08)}
+.btn.sec{background:var(--bg-panel);border:1px solid var(--line);color:var(--text-hi)}
+.btn.sec:hover{border-color:var(--gold);color:var(--gold-dark)}
+.btn.txt{background:transparent;color:var(--gold-dark)}
+.btn.txt:hover{background:var(--gold-soft)}
+.btn.danger{background:var(--crimson);color:var(--white)}
+.btn.danger:hover{box-shadow:var(--shadow-danger)}
+.btn.pill{background:var(--bg-inset);color:var(--text-mid);border-radius:var(--radius-pill)}
+.btn.pill:hover{background:var(--gold-soft);color:var(--gold-dark)}
+.btn.gold{background:var(--gold);color:var(--on-gold)}
+.btn.gold:hover{box-shadow:var(--glow)}
+.btn.sm{height:32px;padding:0 12px;font-size:12px}
+.btn.lg{height:48px;padding:0 24px;font-size:15px}
+.btn.disabled{opacity:.5;cursor:not-allowed;pointer-events:none}
+.chip{font-size:12px;padding:3px 12px;border-radius:var(--radius-pill);background:var(--bg-inset);color:var(--text-mid);display:inline-flex;align-items:center;gap:4px}
+.chip.gold{background:var(--gold-soft);color:var(--gold-dark);border:1px solid var(--line)}
+.chip.amber{background:var(--amber-soft);color:var(--amber-dark);border:1px solid var(--line)}
+.chip.azure{background:var(--azure-soft);color:var(--azure-dark);border:1px solid var(--line)}
+.chip.jade{background:var(--jade-soft);color:var(--jade-dark);border:1px solid var(--line)}
+.chip.crimson{background:var(--crimson-soft);color:var(--crimson-dark);border:1px solid var(--line)}
+.input{width:100%;height:38px;padding:0 12px;border:1px solid var(--line);border-radius:var(--radius-sm);
+  background:var(--bg-panel);color:var(--text-hi);font-family:var(--font-body);font-size:13px;
+  transition:border-color .25s,box-shadow .25s;outline:none}
+.input:focus{border-color:var(--gold);box-shadow:0 0 0 3px var(--gold-soft)}
+.input::placeholder{color:var(--text-low)}
+textarea.input{height:auto;padding:10px 12px;resize:vertical;min-height:60px;line-height:1.6}
+</style>
+</head>
+<body>
+<div class="hero">
+  <h1>启明星 · 史诗典藏 <span class="ver">v3.0 明亮传说</span></h1>
+  <p>方向启明，人生推演 — 传说级个人系统组件库</p>
+  <div class="sub">47 组件 · 羊皮纸底 · 辉煌金 · 赤金橙 · 深邃蓝</div>
+</div>
+<div class="toolbar">
+  <button class="tb-btn" onclick="document.documentElement.dataset.theme=document.documentElement.dataset.theme==='dark'?'light':'dark'">切换明/暗</button>
+</div>
+<main>
+
+<!-- ============ A 区 · 应用壳 ============ -->
+<section>
+<div class="sec-head"><h2><svg class="icon sec-icon"><use href="#i-menu"/></svg>A · 应用壳</h2><span class="badge">4</span><span class="note">窗口标题栏 + 顶部水平导航 + 左侧信息面板 + 全局搜索</span></div>
+<div class="grid">
+
+<div class="ccard bp"><span class="num">A01</span><div class="t"><span class="dot"></span>窗口标题栏（Traffic Light）</div>
+<div style="height:36px;background:var(--bg-panel);border:1px solid var(--line);border-radius:var(--radius-md) var(--radius-md) 0 0;display:flex;align-items:center;padding:0 14px;gap:8px;border-bottom:none">
+<div style="display:flex;gap:7px"><span style="width:12px;height:12px;border-radius:50%;background:var(--crimson)"></span><span style="width:12px;height:12px;border-radius:50%;background:var(--amber)"></span><span style="width:12px;height:12px;border-radius:50%;background:var(--jade)"></span></div>
+<div style="flex:1;text-align:center;font-family:var(--font-epic);font-size:13px;color:var(--text-mid);letter-spacing:2px">Venustech System — 启明星</div></div>
+<div style="height:50px;background:var(--bg-parchment);border:1px solid var(--line);border-top:none;border-radius:0 0 var(--radius-md) var(--radius-md);display:grid;place-items:center;color:var(--text-low);font-size:11px;font-family:var(--font-serif)">内容区</div>
+<div class="land"><b>前端对应</b>：<code>layout/AppTitleBar.vue</code><br><b>规格</b>：高36px，Traffic Light红黄绿，史诗字体标题。</div></div>
+
+<div class="ccard bp bp-d1" style="grid-column:1/-1"><span class="num">A02</span><div class="t"><span class="dot"></span>顶部水平导航栏（TopNav）</div>
+<div style="background:var(--bg-panel);border:1px solid var(--line);border-radius:var(--radius-md);padding:0 16px;height:56px;display:flex;align-items:center;gap:16px;box-shadow:var(--shadow-card)">
+<div style="display:flex;align-items:center;gap:10px;flex:none">
+<div style="width:34px;height:34px;border-radius:var(--radius-sm);background:linear-gradient(135deg,var(--gold),var(--amber));display:grid;place-items:center;box-shadow:var(--glow)"><svg style="width:18px;height:18px;color:var(--on-gold)"><use href="#i-spark"/></svg></div>
+<div style="line-height:1.2"><div style="font-size:13px;font-weight:700;color:var(--text-hi);font-family:var(--font-epic);letter-spacing:1px">Venustech System</div><div style="font-size:10px;color:var(--text-low)">启明星 · Personal OS</div></div></div>
+<nav style="display:flex;gap:4px;flex:1;justify-content:center">
+<button style="display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:var(--radius-pill);background:var(--gold-soft);color:var(--gold-dark);font-size:13px;font-weight:600;border:none;cursor:pointer;font-family:var(--font-epic)"><svg style="width:14px;height:14px"><use href="#i-home"/></svg>首页</button>
+<button style="display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:var(--radius-pill);color:var(--text-mid);font-size:13px;border:none;background:transparent;cursor:pointer"><svg style="width:14px;height:14px"><use href="#i-calendar"/></svg>今天</button>
+<button style="display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:var(--radius-pill);color:var(--text-mid);font-size:13px;border:none;background:transparent;cursor:pointer"><svg style="width:14px;height:14px"><use href="#i-folder"/></svg>项目</button>
+<button style="display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:var(--radius-pill);color:var(--text-mid);font-size:13px;border:none;background:transparent;cursor:pointer"><svg style="width:14px;height:14px"><use href="#i-book"/></svg>学习</button>
+<button style="display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:var(--radius-pill);color:var(--text-mid);font-size:13px;border:none;background:transparent;cursor:pointer"><svg style="width:14px;height:14px"><use href="#i-send"/></svg>工作台</button>
+<button style="display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:var(--radius-pill);color:var(--text-mid);font-size:13px;border:none;background:transparent;cursor:pointer"><svg style="width:14px;height:14px"><use href="#i-refresh"/></svg>复盘</button></nav>
+<div style="display:flex;align-items:center;gap:10px;flex:none">
+<button style="display:flex;align-items:center;gap:8px;height:36px;padding:0 14px;border-radius:var(--radius-pill);background:var(--bg-inset);border:1px solid var(--line);color:var(--text-low);font-size:12px;cursor:pointer"><svg style="width:14px;height:14px"><use href="#i-search"/></svg>搜索...<kbd style="font-family:var(--font-mono);font-size:10px;background:var(--bg-panel);padding:2px 6px;border-radius:4px;border:1px solid var(--line)">⌘K</kbd></button>
+<button style="width:36px;height:36px;border-radius:50%;background:var(--bg-inset);border:1px solid var(--line);display:grid;place-items:center;color:var(--text-mid);cursor:pointer;position:relative"><svg style="width:16px;height:16px"><use href="#i-bell"/></svg><span style="position:absolute;top:6px;right:6px;width:8px;height:8px;border-radius:50%;background:var(--crimson);border:2px solid var(--bg-panel)"></span></button>
+<button style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--gold),var(--amber));border:none;display:grid;place-items:center;color:var(--on-gold);cursor:pointer"><svg style="width:16px;height:16px"><use href="#i-user"/></svg></button></div></div>
+<div class="land"><b>前端对应</b>：<code>layout/TopNav.vue</code><br><b>规格</b>：高56px，Logo+6标签水平导航+搜索+通知+头像。激活项gold-soft胶囊背景。<br><b>数据契约</b>：<code>NavItem{id,label,icon,route}</code>，通知<code>{id,type,title,content,created_at,is_read}</code></div></div>
+
+<div class="ccard bp bp-d2"><span class="num">A03</span><div class="t"><span class="dot"></span>左侧信息面板（LeftInfoPanel）</div>
+<div style="background:var(--bg-parchment);border:1px solid var(--line);border-radius:var(--radius-md);padding:14px;max-width:260px">
+<div style="background:linear-gradient(135deg,var(--gold-soft),var(--amber-soft));border-radius:var(--radius-md);padding:14px;margin-bottom:12px;position:relative;overflow:hidden">
+<div style="display:flex;justify-content:space-between;align-items:flex-start"><div><div style="font-size:15px;font-weight:700;color:var(--text-hi);font-family:var(--font-epic);letter-spacing:1px">2026年9月5日</div><div style="font-size:11px;color:var(--text-mid);margin-top:2px">星期六</div></div><svg style="width:24px;height:24px;color:var(--gold-dark)"><use href="#i-spark"/></svg></div>
+<div style="font-size:12px;color:var(--text-hi);margin-top:8px;font-family:var(--font-serif)">早上好，旅人！</div>
+<div style="font-size:10px;color:var(--text-low);margin-top:2px;font-style:italic">方向启明，人生推演</div></div>
+<div style="margin-bottom:12px"><div style="font-size:11px;font-weight:600;color:var(--text-hi);margin-bottom:6px;display:flex;align-items:center;gap:6px;font-family:var(--font-epic);letter-spacing:1px"><svg style="width:12px;height:12px"><use href="#i-chart"/></svg>今日状态</div>
+<div style="display:flex;flex-direction:column;gap:4px">
+<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:var(--bg-panel);border-radius:var(--radius-sm);font-size:11px"><svg style="width:12px;height:12px;color:var(--amber-dark)"><use href="#i-check"/></svg><span style="flex:1;color:var(--text-mid)">待办</span><span style="color:var(--text-hi);font-weight:600;font-family:var(--font-mono)">5项</span></div>
+<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:var(--bg-panel);border-radius:var(--radius-sm);font-size:11px"><svg style="width:12px;height:12px;color:var(--azure-dark)"><use href="#i-clock"/></svg><span style="flex:1;color:var(--text-mid)">进行中</span><span style="color:var(--text-hi);font-weight:600;font-family:var(--font-mono)">3项</span></div>
+<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:var(--bg-panel);border-radius:var(--radius-sm);font-size:11px"><svg style="width:12px;height:12px;color:var(--jade-dark)"><use href="#i-check"/></svg><span style="flex:1;color:var(--text-mid)">已完成</span><span style="color:var(--text-hi);font-weight:600;font-family:var(--font-mono)">8项</span></div></div></div>
+<div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><span style="font-size:11px;font-weight:600;color:var(--text-hi);display:flex;align-items:center;gap:6px;font-family:var(--font-epic)"><svg style="width:12px;height:12px"><use href="#i-check-square"/></svg>待办事项</span><button style="width:20px;height:20px;border-radius:50%;background:var(--gold-soft);border:none;display:grid;place-items:center;color:var(--gold-dark);cursor:pointer;font-size:12px">+</button></div>
+<div style="display:flex;flex-direction:column;gap:4px">
+<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:var(--bg-panel);border-radius:var(--radius-sm)"><span style="width:14px;height:14px;border-radius:3px;background:var(--jade);display:grid;place-items:center"><svg style="width:8px;height:8px;color:#fff"><use href="#i-check"/></svg></span><span style="flex:1;font-size:11px;color:var(--text-low);text-decoration:line-through">晨间复盘</span></div>
+<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:var(--bg-panel);border-radius:var(--radius-sm)"><span style="width:14px;height:14px;border-radius:3px;border:2px solid var(--line-strong)"></span><span style="flex:1;font-size:11px;color:var(--text-hi)">完善架构文档</span></div></div></div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding-top:10px;border-top:1px solid var(--line)"><span style="font-size:10px;color:var(--text-low);display:flex;align-items:center;gap:4px;font-family:var(--font-serif)"><svg style="width:10px;height:10px"><use href="#i-heart"/></svg>把生活过成作品</span><button style="width:24px;height:24px;border-radius:50%;background:var(--bg-inset);border:none;display:grid;place-items:center;color:var(--text-mid);cursor:pointer"><svg style="width:12px;height:12px"><use href="#i-setting"/></svg></button></div></div>
+<div class="land"><b>前端对应</b>：<code>layout/LeftInfoPanel.vue</code><br><b>规格</b>：日期卡+今日状态+待办+提醒，固定左侧260px宽。<br><b>数据契约</b>：<code>{date_str,weekday,greeting,stats{},quick_todos[],reminders[]}</code></div></div>
+
+<div class="ccard bp bp-d3"><span class="num">A04</span><div class="t"><span class="dot"></span>全局搜索面板（⌘K）</div>
+<div style="background:var(--bg-panel);border:1px solid var(--line-strong);border-radius:var(--radius-lg);box-shadow:var(--shadow-raise);overflow:hidden;max-width:380px">
+<div style="display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--line)"><svg style="width:18px;height:18px;color:var(--gold-dark)"><use href="#i-search"/></svg><input value="架构" style="flex:1;border:none;outline:none;font-size:14px;color:var(--text-hi);background:transparent;font-family:var(--font-serif)"><kbd style="font-family:var(--font-mono);font-size:10px;color:var(--text-low);background:var(--bg-inset);padding:3px 8px;border-radius:6px;border:1px solid var(--line)">ESC</kbd></div>
+<div style="padding:8px;max-height:200px;overflow-y:auto">
+<div style="font-size:10px;color:var(--text-low);padding:6px 10px;letter-spacing:1px;font-family:var(--font-epic)">任务</div>
+<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--gold-soft);border-radius:var(--radius-sm);cursor:pointer"><svg style="width:14px;height:14px;color:var(--amber-dark)"><use href="#i-check"/></svg><span style="font-size:12px;color:var(--text-hi)">完善<span style="background:var(--amber-soft);color:var(--amber-dark);padding:0 2px;border-radius:3px">架构</span>设计文档</span></div>
+<div style="font-size:10px;color:var(--text-low);padding:6px 10px;letter-spacing:1px;margin-top:4px;font-family:var(--font-epic)">文档</div>
+<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:var(--radius-sm);cursor:pointer"><svg style="width:14px;height:14px;color:var(--azure-dark)"><use href="#i-doc"/></svg><span style="font-size:12px;color:var(--text-hi)">技术<span style="background:var(--amber-soft);color:var(--amber-dark);padding:0 2px;border-radius:3px">架构</span> v2.0</span></div>
+<div style="font-size:10px;color:var(--text-low);padding:6px 10px;letter-spacing:1px;margin-top:4px;font-family:var(--font-epic)">操作</div>
+<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:var(--radius-sm);cursor:pointer"><svg style="width:14px;height:14px;color:var(--jade-dark)"><use href="#i-plus"/></svg><span style="font-size:12px;color:var(--text-hi)">新建<span style="background:var(--amber-soft);color:var(--amber-dark);padding:0 2px;border-radius:3px">架构</span>相关任务</span></div></div></div>
+<div class="land"><b>前端对应</b>：<code>layout/GlobalSearch.vue</code> + <code>layout/CommandPalette.vue</code><br><b>规格</b>：⌘K唤起，分组结果，关键词高亮，↑↓导航，Enter跳转。<br><b>数据契约</b>：<code>{id,type,title}[task|doc|conv|action]</code></div></div>
+
+</div></section>
+<!-- ============ B 区 · 首页 ============ -->
+<section>
+<div class="sec-head"><h2><svg class="icon sec-icon"><use href="#i-home"/></svg>B · 首页</h2><span class="badge">9</span><span class="note">温暖问候开场，焦点任务是视觉中心</span></div>
+<div class="grid">
+
+<div class="ccard bp"><span class="num">B01</span><div class="t"><span class="dot"></span>焦点任务卡</div>
+<div style="background:linear-gradient(135deg,var(--gold-soft),var(--amber-soft));border-radius:var(--radius-xl);padding:24px;border:1px solid var(--gold);box-shadow:var(--glow);position:relative;overflow:hidden">
+<div style="position:absolute;top:-20px;right:-20px;width:100px;height:100px;border-radius:50%;background:radial-gradient(circle,rgba(201,162,39,.2),transparent)"></div>
+<span style="display:inline-flex;align-items:center;gap:6px;font-family:var(--font-epic);font-size:12px;color:var(--gold-dark);background:var(--bg-panel);padding:4px 12px;border-radius:var(--radius-pill);border:1px solid var(--line);margin-bottom:14px"><svg style="width:12px;height:12px"><use href="#i-target"/></svg>今日焦点</span>
+<div style="font-family:var(--font-epic);font-size:20px;color:var(--text-hi);margin-bottom:6px;letter-spacing:1px">完善启明星系统技术架构</div>
+<div style="font-size:13px;color:var(--text-mid);margin-bottom:16px">下一步：完成渲染性能优化章节</div>
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+<div style="flex:1;height:6px;background:var(--bg-panel);border-radius:3px;overflow:hidden"><div style="width:67%;height:100%;background:linear-gradient(90deg,var(--gold),var(--amber))"></div></div>
+<span style="font-family:var(--font-mono);font-size:12px;color:var(--gold-dark);font-weight:600">6/9</span></div>
+<div style="display:flex;gap:8px"><button class="btn pri sm">继续工作</button><button class="btn sec sm">提交成果</button></div></div>
+<div class="land"><b>规格</b>：大圆角+金色辉光+渐变背景，焦点任务视觉中心。<br><b>动效</b>：金色呼吸3s，完成时星光闪烁。
+<b>前端对应</b>：<code>DashboardView.vue (FocusTaskCard)</code><br><b>数据契约</b>：<code>Task{id,title,excerpt,status,sub_tasks}</code></div></div>
+
+<div class="ccard bp bp-d1"><span class="num">B02</span><div class="t"><span class="dot"></span>今日统计卡组</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+<div style="padding:14px;background:var(--bg-inset);border-radius:var(--radius-md);border:1px solid var(--line)"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><div style="width:28px;height:28px;border-radius:8px;background:var(--gold-soft);display:grid;place-items:center"><svg style="width:14px;height:14px;color:var(--gold-dark)"><use href="#i-check"/></svg></div><span style="font-size:10px;color:var(--text-low)">今日待办</span></div><div style="font-family:var(--font-epic);font-size:26px;color:var(--text-hi)">12</div><div style="font-size:10px;color:var(--jade-dark);margin-top:2px">↑ 2 较昨日</div></div>
+<div style="padding:14px;background:var(--bg-inset);border-radius:var(--radius-md);border:1px solid var(--line)"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><div style="width:28px;height:28px;border-radius:8px;background:var(--jade-soft);display:grid;place-items:center"><svg style="width:14px;height:14px;color:var(--jade-dark)"><use href="#i-check"/></svg></div><span style="font-size:10px;color:var(--text-low)">已完成</span></div><div style="font-family:var(--font-epic);font-size:26px;color:var(--text-hi)">8</div><div style="font-size:10px;color:var(--jade-dark);margin-top:2px">↑ 3 较昨日</div></div>
+<div style="padding:14px;background:var(--bg-inset);border-radius:var(--radius-md);border:1px solid var(--line)"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><div style="width:28px;height:28px;border-radius:8px;background:var(--azure-soft);display:grid;place-items:center"><svg style="width:14px;height:14px;color:var(--azure-dark)"><use href="#i-doc"/></svg></div><span style="font-size:10px;color:var(--text-low)">新增文档</span></div><div style="font-family:var(--font-epic);font-size:26px;color:var(--text-hi)">3</div><div style="font-size:10px;color:var(--crimson-dark);margin-top:2px">↓ 1 较昨日</div></div>
+<div style="padding:14px;background:var(--bg-inset);border-radius:var(--radius-md);border:1px solid var(--line)"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><div style="width:28px;height:28px;border-radius:8px;background:var(--amber-soft);display:grid;place-items:center"><svg style="width:14px;height:14px;color:var(--amber-dark)"><use href="#i-refresh"/></svg></div><span style="font-size:10px;color:var(--text-low)">连续复盘</span></div><div style="font-family:var(--font-epic);font-size:26px;color:var(--text-hi)">6</div><div style="font-size:10px;color:var(--jade-dark);margin-top:2px">↑ 1 较昨日</div></div></div>
+<div class="land"><b>规格</b>：4宫格，图标语义色底圆，史诗字体大数字。<br><b>动效</b>：数字翻滚，hover上浮。
+<b>前端对应</b>：<code>DashboardView.vue (StatCards)</code></div></div>
+
+<div class="ccard bp bp-d2"><span class="num">B03</span><div class="t"><span class="dot"></span>快捷入口宫格</div>
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+<div style="text-align:center;padding:12px 6px;border-radius:var(--radius-md);cursor:pointer;transition:all .25s" onmouseover="this.style.background='var(--gold-soft)'" onmouseout="this.style.background='transparent'"><div style="width:36px;height:36px;margin:0 auto 6px;border-radius:10px;background:var(--gold-soft);display:grid;place-items:center"><svg style="width:18px;height:18px;color:var(--gold-dark)"><use href="#i-plus"/></svg></div><span style="font-size:11px;color:var(--text-mid)">新建任务</span></div>
+<div style="text-align:center;padding:12px 6px;border-radius:var(--radius-md);cursor:pointer"><div style="width:36px;height:36px;margin:0 auto 6px;border-radius:10px;background:var(--azure-soft);display:grid;place-items:center"><svg style="width:18px;height:18px;color:var(--azure-dark)"><use href="#i-doc"/></svg></div><span style="font-size:11px;color:var(--text-mid)">新建文档</span></div>
+<div style="text-align:center;padding:12px 6px;border-radius:var(--radius-md);cursor:pointer"><div style="width:36px;height:36px;margin:0 auto 6px;border-radius:10px;background:var(--amber-soft);display:grid;place-items:center"><svg style="width:18px;height:18px;color:var(--amber-dark)"><use href="#i-refresh"/></svg></div><span style="font-size:11px;color:var(--text-mid)">开始复盘</span></div>
+<div style="text-align:center;padding:12px 6px;border-radius:var(--radius-md);cursor:pointer"><div style="width:36px;height:36px;margin:0 auto 6px;border-radius:10px;background:var(--jade-soft);display:grid;place-items:center"><svg style="width:18px;height:18px;color:var(--jade-dark)"><use href="#i-send"/></svg></div><span style="font-size:11px;color:var(--text-mid)">打开对话</span></div>
+<div style="text-align:center;padding:12px 6px;border-radius:var(--radius-md);cursor:pointer"><div style="width:36px;height:36px;margin:0 auto 6px;border-radius:10px;background:var(--azure-soft);display:grid;place-items:center"><svg style="width:18px;height:18px;color:var(--azure-dark)"><use href="#i-cloud"/></svg></div><span style="font-size:11px;color:var(--text-mid)">导入数据</span></div>
+<div style="text-align:center;padding:12px 6px;border-radius:var(--radius-md);cursor:pointer"><div style="width:36px;height:36px;margin:0 auto 6px;border-radius:10px;background:var(--gold-soft);display:grid;place-items:center"><svg style="width:18px;height:18px;color:var(--gold-dark)"><use href="#i-search"/></svg></div><span style="font-size:11px;color:var(--text-mid)">搜索</span></div>
+<div style="text-align:center;padding:12px 6px;border-radius:var(--radius-md);cursor:pointer"><div style="width:36px;height:36px;margin:0 auto 6px;border-radius:10px;background:var(--gold-soft);display:grid;place-items:center"><svg style="width:18px;height:18px;color:var(--gold-dark)"><use href="#i-setting"/></svg></div><span style="font-size:11px;color:var(--text-mid)">设置</span></div>
+<div style="text-align:center;padding:12px 6px;border-radius:var(--radius-md);cursor:pointer"><div style="width:36px;height:36px;margin:0 auto 6px;border-radius:10px;background:var(--amber-soft);display:grid;place-items:center"><svg style="width:18px;height:18px;color:var(--amber-dark)"><use href="#i-spark"/></svg></div><span style="font-size:11px;color:var(--text-mid)">桌宠设置</span></div></div>
+<div class="land"><b>规格</b>：4×2网格，图标36px语义色底圆。<br><b>动效</b>：hover上浮+图标放大。
+<b>前端对应</b>：<code>DashboardView.vue (QuickActions)</code></div></div>
+
+<div class="ccard bp bp-d3"><span class="num">B04</span><div class="t"><span class="dot"></span>最近文档列表</div>
+<div style="border:1px solid var(--line);border-radius:var(--radius-md);overflow:hidden">
+<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--bg-inset)"><b style="font-family:var(--font-epic);font-size:13px;letter-spacing:1px">最近文档</b><a style="font-size:11px;color:var(--gold-dark);cursor:pointer">查看全部</a></div>
+<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line);cursor:pointer"><div style="width:32px;height:32px;border-radius:8px;background:var(--azure-soft);display:grid;place-items:center;flex:none"><svg style="width:16px;height:16px;color:var(--azure-dark)"><use href="#i-doc"/></svg></div><div style="flex:1;min-width:0"><div style="font-size:13px;color:var(--text-hi);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">启明星系统技术架构 v2.1</div><div style="font-size:10px;color:var(--text-low)">架构 · 12.4k字</div></div><time style="font-size:10px;color:var(--text-low);flex:none">10分钟前</time></div>
+<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line);cursor:pointer;background:var(--bg-inset)"><div style="width:32px;height:32px;border-radius:8px;background:var(--jade-soft);display:grid;place-items:center;flex:none"><svg style="width:16px;height:16px;color:var(--jade-dark)"><use href="#i-doc"/></svg></div><div style="flex:1;min-width:0"><div style="font-size:13px;color:var(--text-hi);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">个人知识库搭建方法论</div><div style="font-size:10px;color:var(--text-low)">知识 · 3.2k字</div></div><time style="font-size:10px;color:var(--text-low);flex:none">2小时前</time></div>
+<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer"><div style="width:32px;height:32px;border-radius:8px;background:var(--amber-soft);display:grid;place-items:center;flex:none"><svg style="width:16px;height:16px;color:var(--amber-dark)"><use href="#i-doc"/></svg></div><div style="flex:1;min-width:0"><div style="font-size:13px;color:var(--text-hi);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">第二分身 Prompt 合集</div><div style="font-size:10px;color:var(--text-low)">指令 · 1.8k字</div></div><time style="font-size:10px;color:var(--text-low);flex:none">昨天</time></div></div>
+<div class="land"><b>规格</b>：列表项高48，图标语义色，标题+摘要，时间右对齐。<br><b>契约</b>：<code>{ id,title,excerpt,updatedAt,folder }</code>。
+<b>前端对应</b>：<code>DashboardView.vue (RecentDocs)</code><br><b>数据契约</b>：<code>Document{id,title,excerpt,updated_at}</code></div></div>
+
+<div class="ccard bp bp-d4"><span class="num">B05</span><div class="t"><span class="dot"></span>灵感气泡卡</div>
+<div style="background:linear-gradient(135deg,var(--gold-soft),var(--amber-soft));border-radius:var(--radius-lg);padding:16px;border:1px solid var(--gold);display:flex;gap:12px;align-items:flex-start;position:relative;overflow:hidden">
+<div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,var(--gold),var(--amber));display:grid;place-items:center;flex:none;box-shadow:var(--glow);animation:epic-glow-pulse 3s ease-in-out infinite"><svg style="width:20px;height:20px;color:var(--on-gold)"><use href="#i-spark"/></svg></div>
+<div style="flex:1">
+<div style="font-size:13px;color:var(--text-hi);line-height:1.7;margin-bottom:10px">把本周复盘沉淀为一篇<span style="color:var(--gold-dark);font-weight:600;border-bottom:1px dashed var(--gold)">《复盘方法论》</span>文档，参考你的周复盘模板 v2</div>
+<div style="display:flex;gap:8px"><button class="btn gold sm">采纳</button><button class="btn pill sm">忽略</button></div></div></div>
+<div class="land"><b>规格</b>：金色灯泡发光，渐变背景。采纳→创建任务/文档。<br><b>动效</b>：入场金光闪烁，灯泡呼吸。
+<b>前端对应</b>：<code>DashboardView.vue (InspirationCard)</code></div></div>
+
+<div class="ccard bp bp-d5"><span class="num">B06</span><div class="t"><span class="dot"></span>本周进度环</div>
+<div style="display:flex;align-items:center;justify-content:center;gap:20px;padding:10px">
+<div style="width:120px;height:120px;border-radius:50%;background:conic-gradient(var(--gold) 0% 64%,var(--bg-inset) 64% 100%);display:grid;place-items:center;position:relative">
+<div style="width:92px;height:92px;border-radius:50%;background:var(--bg-panel);display:grid;place-items:center;text-align:center"><div style="font-family:var(--font-epic);font-size:24px;color:var(--gold-dark)">64%</div><div style="font-size:10px;color:var(--text-low)">本周完成率</div></div></div>
+<div style="flex:1"><div style="font-family:var(--font-epic);font-size:14px;color:var(--text-hi);margin-bottom:8px;letter-spacing:1px">本周进度</div>
+<div style="display:flex;flex-direction:column;gap:6px">
+<div style="display:flex;align-items:center;gap:8px"><span style="width:8px;height:8px;border-radius:50%;background:var(--jade)"></span><span style="font-size:11px;color:var(--text-mid);flex:1">已完成</span><span style="font-size:11px;color:var(--text-hi);font-family:var(--font-mono)">8</span></div>
+<div style="display:flex;align-items:center;gap:8px"><span style="width:8px;height:8px;border-radius:50%;background:var(--gold)"></span><span style="font-size:11px;color:var(--text-mid);flex:1">进行中</span><span style="font-size:11px;color:var(--text-hi);font-family:var(--font-mono)">3</span></div>
+<div style="display:flex;align-items:center;gap:8px"><span style="width:8px;height:8px;border-radius:50%;background:var(--line-strong)"></span><span style="font-size:11px;color:var(--text-mid);flex:1">待开始</span><span style="font-size:11px;color:var(--text-hi);font-family:var(--font-mono)">2</span></div></div></div></div>
+<div class="land"><b>规格</b>：环形进度+中心百分比+图例，金色主色。<br><b>动效</b>：环绘制600ms+数字翻滚。
+<b>前端对应</b>：<code>DashboardView.vue (WeekProgress)</code></div></div>
+
+<div class="ccard bp bp-d6"><span class="num">B07</span><div class="t"><span class="dot"></span>首页英雄区</div>
+<div style="background:linear-gradient(135deg,var(--gold-soft),transparent);border-radius:var(--radius-lg);padding:20px;display:flex;align-items:center;justify-content:space-between;position:relative;overflow:hidden;border:1px solid var(--line)">
+<div><h2 style="font-family:var(--font-epic);font-size:22px;color:var(--text-hi);letter-spacing:2px;margin-bottom:6px">早上好，旅人</h2><p style="font-size:13px;color:var(--text-mid);font-family:var(--font-serif)">今天是 9月5日，星期六，适合专注一件大事。</p></div>
+<div style="position:relative;width:80px;height:60px">
+<svg style="width:40px;height:40px;position:absolute;top:0;right:0;animation:epic-twinkle 3s ease-in-out infinite" viewBox="0 0 24 24"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8l-6.2 4.5 2.4-7.4L2 9.4h7.6z" fill="var(--gold)"/></svg>
+<svg style="width:24px;height:24px;position:absolute;bottom:5px;right:30px;animation:epic-twinkle 2s ease-in-out infinite .5s" viewBox="0 0 24 24"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8l-6.2 4.5 2.4-7.4L2 9.4h7.6z" fill="var(--amber)"/></svg>
+<svg style="width:16px;height:16px;position:absolute;top:20px;right:50px;animation:epic-twinkle 2.5s ease-in-out infinite 1s" viewBox="0 0 24 24"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8l-6.2 4.5 2.4-7.4L2 9.4h7.6z" fill="var(--azure)"/></svg></div></div>
+<div class="land"><b>规格</b>：史诗字体问候+日期副标题，右侧启明星星座装饰。<br><b>动效</b>：入场淡入，星星闪烁。
+<b>前端对应</b>：<code>DashboardView.vue (HeroSection)</code></div></div>
+
+<div class="ccard bp bp-d7"><span class="num">B08</span><div class="t"><span class="dot"></span>今日待办速览</div>
+<div style="border:1px solid var(--line);border-radius:var(--radius-md);overflow:hidden">
+<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--bg-inset)"><b style="font-family:var(--font-epic);font-size:13px;letter-spacing:1px">今日待办</b><span style="font-size:11px;color:var(--gold-dark);background:var(--gold-soft);padding:2px 8px;border-radius:var(--radius-pill)">5</span></div>
+<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line);cursor:pointer" onclick="this.querySelector('.ck').classList.toggle('on');this.querySelector('.tt').classList.toggle('done')"><span class="ck on" style="width:18px;height:18px;border-radius:50%;background:var(--jade);display:grid;place-items:center;flex:none"><svg style="width:10px;height:10px;color:#fff"><use href="#i-check"/></svg></span><span class="tt done" style="flex:1;font-size:13px;color:var(--text-low);text-decoration:line-through">完成技术架构渲染优化章节</span><span class="chip amber" style="font-size:10px">进行中</span></div>
+<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--bg-inset);cursor:pointer"><span class="ck" style="width:18px;height:18px;border-radius:50%;border:2px solid var(--line-strong);flex:none"></span><span class="tt" style="flex:1;font-size:13px">回复导师邮件</span><span class="chip jade" style="font-size:10px">待办</span></div>
+<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line);cursor:pointer"><span class="ck on" style="width:18px;height:18px;border-radius:50%;background:var(--jade);display:grid;place-items:center;flex:none"><svg style="width:10px;height:10px;color:#fff"><use href="#i-check"/></svg></span><span class="tt done" style="flex:1;font-size:13px;color:var(--text-low);text-decoration:line-through">晨间复盘</span><span class="chip jade" style="font-size:10px">已完成</span></div>
+<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;border-left:3px solid var(--crimson)"><span class="ck" style="width:18px;height:18px;border-radius:50%;border:2px solid var(--crimson);flex:none"></span><span class="tt" style="flex:1;font-size:13px;color:var(--crimson-dark)">网站报价确认</span><span class="chip crimson" style="font-size:10px">逾期</span></div></div>
+<div class="land"><b>规格</b>：最多5条，逾期红色左竖条。点击勾选可交互。<br><b>动效</b>：完成划线过渡，勾选回弹。
+<b>前端对应</b>：<code>DashboardView.vue (TodayTodos)</code><br><b>数据契约</b>：<code>QuickTodo{id,title,completed}</code></div></div>
+
+<div class="ccard bp bp-d8"><span class="num">B09</span><div class="t"><span class="dot"></span>连续打卡徽章</div>
+<div style="display:flex;align-items:center;gap:16px;padding:10px">
+<div style="width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,var(--gold),var(--amber));display:grid;place-items:center;box-shadow:var(--glow-strong);position:relative;animation:epic-glow-pulse 2s ease-in-out infinite"><svg style="width:28px;height:28px;color:var(--on-gold)"><use href="#i-flame"/></svg><span style="position:absolute;top:-4px;right:-4px;width:24px;height:24px;border-radius:50%;background:var(--bg-panel);border:2px solid var(--gold);display:grid;place-items:center;font-family:var(--font-epic);font-size:12px;color:var(--gold-dark)">12</span></div>
+<div><div style="font-family:var(--font-epic);font-size:16px;color:var(--text-hi);letter-spacing:1px">已连续复盘 <span style="color:var(--gold-dark)">12</span> 天</div><div style="font-size:11px;color:var(--text-low);margin-top:4px;line-height:1.6">再坚持3天达成"半月之星"成就</div></div></div>
+<div class="land"><b>规格</b>：金色渐变徽章+火焰+天数角标，成就进度提示。<br><b>动效</b>：心跳动画，达成时金光粒子爆发。
+<b>前端对应</b>：<code>DashboardView.vue (StreakBadge)</code></div></div>
+
+</div></section>
+
+<!-- ============ C 区 · 任务 ============ -->
+<section>
+<div class="sec-head"><h2><svg class="icon sec-icon"><use href="#i-check"/></svg>C · 任务</h2><span class="badge">5</span><span class="note">列表/看板，状态流转清晰</span></div>
+<div class="grid">
+
+<div class="ccard bp"><span class="num">C01</span><div class="t"><span class="dot"></span>任务卡</div>
+<div style="border-left:3px solid var(--gold);border-radius:0 var(--radius-md) var(--radius-md) 0;padding:14px 16px;background:var(--bg-panel);box-shadow:var(--glow);margin-left:-3px">
+<div style="display:flex;align-items:center;gap:10px">
+<span style="width:18px;height:18px;border-radius:50%;background:var(--jade);display:grid;place-items:center;flex:none"><svg style="width:10px;height:10px;color:#fff"><use href="#i-check"/></svg></span>
+<span style="font-family:var(--font-epic);font-size:15px;flex:1;letter-spacing:1px">完善启明星系统技术架构</span>
+<span style="font-size:10px;padding:2px 8px;border-radius:var(--radius-pill);background:var(--amber-soft);color:var(--amber-dark);font-family:var(--font-epic);display:flex;align-items:center;gap:4px"><span class="dot busy" style="width:6px;height:6px"></span>进行中</span>
+<svg style="width:18px;height:18px;color:var(--gold)"><use href="#i-star"/></svg></div>
+<div style="font-size:12px;color:var(--text-mid);margin:8px 0 0 28px;line-height:1.5">明确渲染性能优化方案，产出防卡顿专项章节</div>
+<div style="display:flex;align-items:center;gap:10px;margin:10px 0 0 28px;flex-wrap:wrap">
+<span style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-mid)"><span style="width:50px;height:5px;background:var(--bg-inset);border-radius:var(--radius-pill);overflow:hidden"><i style="display:block;width:64%;height:100%;background:linear-gradient(90deg,var(--gold),var(--amber))"></i></span>6/9</span>
+<span class="chip azure" style="font-size:10px">架构</span><span class="chip gold" style="font-size:10px">文档</span>
+<time style="font-size:11px;color:var(--crimson-dark);margin-left:auto">8/30 截止</time></div></div>
+<div class="land"><b>规格</b>：焦点任务=左3px金色条+发光+金星标。摘要2行截断。<br><b>契约</b>：<code>{ id,title,excerpt,status,priority,dueDate,tags,subTasks }</code>。
+<b>前端对应</b>：<code>TaskListView.vue (TaskCard)</code><br><b>数据契约</b>：<code>Task{id,title,excerpt,status,priority,due_date,tags,sub_tasks,project_id}</code></div></div>
+
+<div class="ccard bp bp-d1"><span class="num">C02</span><div class="t"><span class="dot"></span>任务列表行</div>
+<div style="border:1px solid var(--line);border-radius:var(--radius-md);overflow:hidden">
+<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer" onclick="this.querySelector('.ck').classList.toggle('on');this.querySelector('.tt').classList.toggle('done')"><span class="ck on" style="width:16px;height:16px;border-radius:50%;background:var(--jade);display:grid;place-items:center;flex:none"><svg style="width:8px;height:8px;color:#fff"><use href="#i-check"/></svg></span><span class="tt done" style="flex:1;font-size:13px;color:var(--text-low);text-decoration:line-through">晨间复盘</span><span class="chip jade" style="font-size:10px">完成</span><time style="font-size:10px;color:var(--text-low)">08:20</time></div>
+<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg-inset);cursor:pointer"><span class="ck" style="width:16px;height:16px;border-radius:50%;border:2px solid var(--line-strong);flex:none"></span><span class="tt" style="flex:1;font-size:13px">完善技术架构文档</span><span class="chip amber" style="font-size:10px">进行中</span><time style="font-size:10px;color:var(--text-low)">09:00</time></div>
+<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;border-left:3px solid var(--crimson)"><span class="ck" style="width:16px;height:16px;border-radius:50%;border:2px solid var(--crimson);flex:none"></span><span class="tt" style="flex:1;font-size:13px;color:var(--crimson-dark)">网站报价确认</span><span style="display:inline-flex;gap:2px"><i style="width:3px;height:10px;background:var(--crimson);border-radius:1px"></i><i style="width:3px;height:10px;background:var(--crimson);border-radius:1px"></i><i style="width:3px;height:10px;background:var(--crimson);border-radius:1px"></i></span><time style="font-size:10px;color:var(--crimson-dark)">逾期</time></div></div>
+<div class="land"><b>规格</b>：高44，交替行。点击勾选可交互。适合高密度列表。
+<b>前端对应</b>：<code>TaskListView.vue (TaskRow)</code><br><b>数据契约</b>：<code>Task{id,title,status,due_date}</code></div></div>
+
+<div class="ccard bp bp-d2"><span class="num">C03</span><div class="t"><span class="dot"></span>看板列</div>
+<div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:4px">
+<div style="min-width:120px;flex:1;background:var(--bg-inset);border-radius:var(--radius-md);padding:8px">
+<div style="display:flex;align-items:center;gap:6px;font-family:var(--font-epic);font-size:12px;margin-bottom:8px;padding:0 4px;letter-spacing:1px"><span class="dot"></span>待办<span style="margin-left:auto;font-size:10px;color:var(--text-low)">3</span></div>
+<div style="background:var(--bg-panel);border-radius:8px;padding:8px;margin-bottom:6px;box-shadow:0 2px 6px rgba(0,0,0,.05)"><div style="font-size:11px;font-weight:600">读书计划</div><span class="chip azure" style="font-size:9px;margin-top:4px">等待</span></div>
+<div style="background:var(--bg-panel);border-radius:8px;padding:8px;margin-bottom:6px;box-shadow:0 2px 6px rgba(0,0,0,.05)"><div style="font-size:11px;font-weight:600">回复邮件</div></div></div>
+<div style="min-width:120px;flex:1;background:var(--gold-soft);border-radius:var(--radius-md);padding:8px;border:1px dashed var(--gold)">
+<div style="display:flex;align-items:center;gap:6px;font-family:var(--font-epic);font-size:12px;margin-bottom:8px;padding:0 4px;color:var(--gold-dark);letter-spacing:1px"><span class="dot busy"></span>进行中<span style="margin-left:auto;font-size:10px">2</span></div>
+<div style="background:var(--bg-panel);border-radius:8px;padding:8px;margin-bottom:6px;box-shadow:var(--glow)"><div style="font-size:11px;font-weight:600">架构文档</div><span class="chip amber" style="font-size:9px;margin-top:4px">67%</span></div></div>
+<div style="min-width:120px;flex:1;background:var(--jade-soft);border-radius:var(--radius-md);padding:8px">
+<div style="display:flex;align-items:center;gap:6px;font-family:var(--font-epic);font-size:12px;margin-bottom:8px;padding:0 4px;color:var(--jade-dark);letter-spacing:1px"><span class="dot on"></span>已完成<span style="margin-left:auto;font-size:10px">4</span></div>
+<div style="background:var(--bg-panel);border-radius:8px;padding:8px;margin-bottom:6px;opacity:.6"><div style="font-size:11px;font-weight:600;text-decoration:line-through">晨间复盘</div></div></div></div>
+<div class="land"><b>规格</b>：3列，列头=状态+计数，拖拽目标列金色虚线高亮。<br><b>动效</b>：拖拽卡放大+发光，放置弹入。
+<b>前端对应</b>：<code>TaskListView.vue (KanbanColumn)</code></div></div>
+
+<div class="ccard bp bp-d3"><span class="num">C05</span><div class="t"><span class="dot"></span>子任务列表</div>
+<div style="display:flex;flex-direction:column;gap:2px">
+<div style="display:flex;align-items:center;gap:10px;padding:7px 6px;border-radius:8px"><span style="width:14px;height:14px;border-radius:50%;background:var(--jade);display:grid;place-items:center;flex:none"><svg style="width:8px;height:8px;color:#fff"><use href="#i-check"/></svg></span><span style="flex:1;font-size:12px;color:var(--text-low);text-decoration:line-through">收集技术架构参考</span></div>
+<div style="display:flex;align-items:center;gap:10px;padding:7px 6px;border-radius:8px"><span style="width:14px;height:14px;border-radius:50%;background:var(--jade);display:grid;place-items:center;flex:none"><svg style="width:8px;height:8px;color:#fff"><use href="#i-check"/></svg></span><span style="flex:1;font-size:12px;color:var(--text-low);text-decoration:line-through">绘制进程架构图</span></div>
+<div style="display:flex;align-items:center;gap:10px;padding:7px 6px;border-radius:8px;background:var(--bg-inset)"><span style="width:14px;height:14px;border-radius:50%;border:2px solid var(--line-strong);flex:none"></span><span style="flex:1;font-size:12px">完成渲染性能优化章节</span><svg style="width:12px;height:12px;color:var(--text-low);cursor:pointer"><use href="#i-trash"/></svg></div>
+<div style="display:flex;align-items:center;gap:8px;padding:7px 6px;color:var(--text-low);font-size:12px;cursor:pointer;border-top:1px dashed var(--line);margin-top:4px;padding-top:10px"><svg style="width:12px;height:12px"><use href="#i-plus"/></svg>添加子任务</div></div>
+<div class="land"><b>规格</b>：嵌套任务详情，Enter添加，Backspace空行删除，拖拽排序。
+<b>前端对应</b>：<code>TaskDetailDrawer (SubTaskList)</code><br><b>数据契约</b>：<code>SubTask{id,title,completed,task_id}</code></div></div>
+
+<div class="ccard bp bp-d4"><span class="num">C07</span><div class="t"><span class="dot"></span>任务筛选器栏</div>
+<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+<div style="display:flex;gap:4px"><button class="btn pill sm" style="background:var(--gold-soft);color:var(--gold-dark);border-color:var(--line-strong)">全部</button><button class="btn pill sm">进行中</button><button class="btn pill sm">已完成</button><button class="btn pill sm">已过期</button></div>
+<div style="flex:1"></div>
+<div style="display:flex;gap:6px;align-items:center"><input class="input" placeholder="搜索任务..." style="height:32px;width:140px"><button class="btn sec sm"><svg style="width:13px;height:13px"><use href="#i-filter"/></svg>筛选</button><button class="btn sec sm"><svg style="width:13px;height:13px"><use href="#i-sort"/></svg>排序</button></div></div>
+<div class="land"><b>规格</b>：状态标签筛选+搜索框+筛选/排序按钮，紧凑布局。
+<b>前端对应</b>：<code>TaskListView.vue (TaskFilter)</code></div></div>
+
+</div></section>
+
+<!-- ============ D 区 · 知识库 ============ -->
+<section>
+<div class="sec-head"><h2><svg class="icon sec-icon"><use href="#i-doc"/></svg>D · 知识库</h2><span class="badge">4</span><span class="note">文档管理与编辑</span></div>
+<div class="grid">
+
+<div class="ccard bp"><span class="num">D01</span><div class="t"><span class="dot"></span>文档卡</div>
+<div style="background:var(--bg-inset);border-radius:var(--radius-md);padding:16px;border:1px solid var(--line);cursor:pointer;transition:all .3s" onmouseover="this.style.borderColor='var(--gold)';this.style.boxShadow='var(--glow)'" onmouseout="this.style.borderColor='var(--line)';this.style.boxShadow='none'">
+<div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px"><div style="width:36px;height:36px;border-radius:var(--radius-sm);background:var(--gold-soft);display:grid;place-items:center;flex:none"><svg style="width:18px;height:18px;color:var(--gold-dark)"><use href="#i-doc"/></svg></div><div style="flex:1"><div style="font-family:var(--font-epic);font-size:14px;color:var(--text-hi);margin-bottom:2px;letter-spacing:1px">架构设计v3.0</div><div style="font-size:10px;color:var(--text-low)">技术文档 · 2026-09-01</div></div></div>
+<div style="font-size:12px;color:var(--text-mid);line-height:1.6;margin-bottom:12px">本文档详细描述了启明星系统的后端架构设计，包括数据层、服务层、API层的划分...</div>
+<div style="display:flex;align-items:center;justify-content:space-between"><div style="display:flex;gap:6px"><span class="chip gold" style="font-size:10px;padding:2px 8px">架构</span><span class="chip azure" style="font-size:10px;padding:2px 8px">后端</span></div><span style="font-size:10px;color:var(--text-low)">2.4k 字</span></div></div>
+<div class="land"><b>规格</b>：图标+标题+摘要+标签+字数，卡片式文档展示。
+<b>前端对应</b>：<code>DocumentExplorerView.vue (DocumentCard)</code><br><b>数据契约</b>：<code>Document{id,title,excerpt,tags,word_count,updated_at}</code></div></div>
+
+<div class="ccard bp bp-d1"><span class="num">D03</span><div class="t"><span class="dot"></span>文件夹树</div>
+<div style="background:var(--bg-inset);border-radius:var(--radius-md);padding:14px;border:1px solid var(--line)">
+<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;cursor:pointer;color:var(--gold-dark)"><svg style="width:14px;height:14px"><use href="#i-folder"/></svg><span style="font-size:12px;font-family:var(--font-epic);letter-spacing:1px">知识库</span></div>
+<div style="padding-left:20px">
+<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;cursor:pointer;color:var(--text-hi)"><svg style="width:14px;height:14px;color:var(--gold)"><use href="#i-folder"/></svg><span style="font-size:12px">技术文档</span></div>
+<div style="padding-left:20px">
+<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;cursor:pointer;color:var(--text-mid)"><svg style="width:12px;height:12px;color:var(--text-low)"><use href="#i-doc"/></svg><span style="font-size:11px">架构设计</span></div>
+<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;cursor:pointer;color:var(--text-mid)"><svg style="width:12px;height:12px;color:var(--text-low)"><use href="#i-doc"/></svg><span style="font-size:11px">API文档</span></div></div>
+<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;cursor:pointer;color:var(--text-hi)"><svg style="width:14px;height:14px;color:var(--azure)"><use href="#i-folder"/></svg><span style="font-size:12px">学习笔记</span></div>
+<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;cursor:pointer;color:var(--text-hi)"><svg style="width:14px;height:14px;color:var(--amber)"><use href="#i-folder"/></svg><span style="font-size:12px">创作素材</span></div></div></div>
+<div class="land"><b>规格</b>：树形层级+文件夹/文档图标+缩进，典藏式文件树。
+<b>前端对应</b>：<code>DocumentExplorerView.vue (FolderTree)</code><br><b>数据契约</b>：<code>Folder{id,name,parent_id,children[]}</code></div></div>
+
+<div class="ccard bp bp-d2"><span class="num">D04</span><div class="t"><span class="dot"></span>文档编辑器</div>
+<div style="background:var(--bg-inset);border-radius:var(--radius-md);border:1px solid var(--line);overflow:hidden">
+<div style="padding:8px 12px;border-bottom:1px solid var(--line);display:flex;gap:4px">
+<button class="btn txt sm" style="height:28px;padding:0 8px;font-weight:600">B</button>
+<button class="btn txt sm" style="height:28px;padding:0 8px;font-style:italic">I</button>
+<button class="btn txt sm" style="height:28px;padding:0 8px;text-decoration:underline">U</button>
+<div style="width:1px;background:var(--line);margin:4px 6px"></div>
+<button class="btn txt sm" style="height:28px;padding:0 8px"><svg style="width:13px;height:13px"><use href="#i-list"/></svg></button>
+<button class="btn txt sm" style="height:28px;padding:0 8px"><svg style="width:13px;height:13px"><use href="#i-check"/></svg></button>
+<button class="btn txt sm" style="height:28px;padding:0 8px"><svg style="width:13px;height:13px"><use href="#i-link"/></svg></button></div>
+<div style="padding:16px;min-height:100px">
+<div style="font-family:var(--font-epic);font-size:18px;color:var(--text-hi);margin-bottom:10px;letter-spacing:1px">文档标题</div>
+<div style="font-size:13px;color:var(--text-mid);line-height:1.8;font-family:var(--font-serif)">这是文档正文内容。支持<strong style="color:var(--text-hi)">加粗</strong>、<em style="color:var(--text-hi)">斜体</em>、<span style="color:var(--gold-dark)">高亮</span>等格式。知识库支持 Markdown 语法，本地存储，加密保护。</div></div></div>
+<div class="land"><b>规格</b>：工具栏+编辑区，宋体正文+史诗标题，典藏编辑器。
+<b>前端对应</b>：<code>DocumentEditor.vue</code><br><b>数据契约</b>：<code>Document{id,title,content,updated_at}</code></div></div>
+
+<div class="ccard bp bp-d3"><span class="num">D05</span><div class="t"><span class="dot"></span>标签输入器</div>
+<div style="background:var(--bg-inset);border-radius:var(--radius-md);padding:12px;border:1px solid var(--line);min-height:80px">
+<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">
+<span class="chip gold" style="font-size:11px">架构 <span style="margin-left:4px;cursor:pointer;opacity:.6">×</span></span>
+<span class="chip azure" style="font-size:11px">后端 <span style="margin-left:4px;cursor:pointer;opacity:.6">×</span></span>
+<span class="chip amber" style="font-size:11px">优化 <span style="margin-left:4px;cursor:pointer;opacity:.6">×</span></span>
+<input placeholder="输入标签后回车..." style="border:none;outline:none;background:transparent;font-size:12px;color:var(--text-hi);flex:1;min-width:100px;font-family:var(--font-body)"></div></div>
+<div class="land"><b>规格</b>：标签可删除，回车添加，支持自动补全建议。
+<b>前端对应</b>：<code>BaseTag.vue / DocumentEditor</code></div></div>
+
+</div></section>
+
+<!-- ============ E 区 · 第二分身 ============ -->
+<section>
+<div class="sec-head"><h2><svg class="icon sec-icon"><use href="#i-send"/></svg>E · 第二分身</h2><span class="badge">4</span><span class="note">本地运行，思维沉淀</span></div>
+<div class="grid">
+
+<div class="ccard bp" style="grid-column:1/-1"><span class="num">E01</span><div class="t"><span class="dot"></span>对话消息流</div>
+<div style="background:var(--bg-inset);border-radius:var(--radius-md);border:1px solid var(--line);padding:16px;min-height:180px;display:flex;flex-direction:column;gap:12px">
+<div style="display:flex;gap:10px;max-width:80%"><div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--gold),var(--amber));display:grid;place-items:center;font-family:var(--font-epic);font-size:13px;color:var(--on-gold);flex:none">星</div><div style="background:var(--bg-panel);padding:10px 14px;border-radius:0 var(--radius-md) var(--radius-md) var(--radius-md);border:1px solid var(--line)"><div style="font-size:12px;color:var(--text-hi);line-height:1.7">你好，旅人。我已沉淀你的思维模式，有什么可以帮你的？</div></div></div>
+<div style="display:flex;gap:10px;max-width:80%;margin-left:auto;flex-direction:row-reverse"><div style="width:32px;height:32px;border-radius:50%;background:var(--azure);display:grid;place-items:center;font-family:var(--font-epic);font-size:13px;color:#fff;flex:none">旅</div><div style="background:var(--gold-soft);padding:10px 14px;border-radius:var(--radius-md) 0 var(--radius-md) var(--radius-md);border:1px solid var(--line-strong)"><div style="font-size:12px;color:var(--text-hi);line-height:1.7">帮我分析一下这个项目的架构</div></div></div>
+<div style="display:flex;gap:10px;max-width:80%"><div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--gold),var(--amber));display:grid;place-items:center;font-family:var(--font-epic);font-size:13px;color:var(--on-gold);flex:none">星</div><div style="background:var(--bg-panel);padding:10px 14px;border-radius:0 var(--radius-md) var(--radius-md) var(--radius-md);border:1px solid var(--line)"><div style="font-size:12px;color:var(--text-hi);line-height:1.7">基于你的项目文档，我分析出以下架构要点：1. 采用分层架构... 2. 数据层使用SQLite... <span style="color:var(--gold-dark);cursor:pointer;border-bottom:1px dashed var(--gold)">查看完整分析</span></div></div></div></div>
+<div class="land"><b>规格</b>：分身/用户消息左右分布，引用文档可点击。<br><b>契约</b>：<code>{ role,content,refs,timestamp }</code>。
+<b>前端对应</b>：<code>ConversationView.vue (MessageList)</code><br><b>数据契约</b>：<code>Message{role,content,refs[],timestamp}</code></div></div>
+
+<div class="ccard bp bp-d1"><span class="num">E02</span><div class="t"><span class="dot"></span>消息输入框</div>
+<div style="background:var(--bg-inset);border-radius:var(--radius-md);border:1px solid var(--line);padding:10px">
+<div style="display:flex;gap:8px;align-items:flex-end">
+<div style="flex:1"><textarea class="input" placeholder="输入消息，Shift+Enter换行..." style="min-height:40px;resize:none;border:none;background:transparent;padding:8px 0"></textarea></div>
+<button class="btn pri sm"><svg style="width:14px;height:14px"><use href="#i-send"/></svg>发送</button></div>
+<div style="display:flex;gap:6px;margin-top:8px;padding-top:8px;border-top:1px solid var(--line)">
+<button class="btn txt sm" style="height:26px;padding:0 8px;font-size:11px"><svg style="width:12px;height:12px"><use href="#i-doc"/></svg>引用文档</button>
+<button class="btn txt sm" style="height:26px;padding:0 8px;font-size:11px"><svg style="width:12px;height:12px"><use href="#i-voice"/></svg>语音</button>
+<button class="btn txt sm" style="height:26px;padding:0 8px;font-size:11px"><svg style="width:12px;height:12px"><use href="#i-image"/></svg>图片</button>
+<span style="flex:1"></span>
+<span style="font-size:10px;color:var(--text-low);align-self:center">本地运行 · 数据不上传</span></div></div>
+<div class="land"><b>规格</b>：多行输入+快捷附件+本地运行标识，Enter发送。
+<b>前端对应</b>：<code>ConversationView.vue (MessageInput)</code><br><b>数据契约</b>：<code>Message{content,refs[]}</code></div></div>
+
+<div class="ccard bp bp-d2"><span class="num">E03</span><div class="t"><span class="dot"></span>引用文档卡片</div>
+<div style="background:var(--bg-inset);border-radius:var(--radius-md);padding:12px;border:1px solid var(--line);border-left:3px solid var(--gold)">
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><svg style="width:14px;height:14px;color:var(--gold-dark)"><use href="#i-doc"/></svg><span style="font-size:11px;color:var(--gold-dark);font-family:var(--font-epic);letter-spacing:1px">引用文档</span></div>
+<div style="font-size:13px;color:var(--text-hi);font-weight:600;margin-bottom:4px">启明星系统技术架构 v2.1</div>
+<div style="font-size:11px;color:var(--text-mid);line-height:1.6;margin-bottom:8px">...采用分层架构设计，数据层使用SQLite+StaticPool，服务层包含事件总线...</div>
+<div style="display:flex;align-items:center;justify-content:space-between"><span style="font-size:10px;color:var(--text-low)">技术文档 · 12.4k字</span><button class="btn txt sm" style="height:24px;padding:0 8px;font-size:11px">查看原文</button></div></div>
+<div class="land"><b>规格</b>：左侧金色条+文档标题+摘要+查看原文，引用展示。
+<b>前端对应</b>：<code>ConversationView.vue (RefDocCard)</code><br><b>数据契约</b>：<code>Document{id,title,excerpt}</code></div></div>
+
+<div class="ccard bp bp-d3"><span class="num">E05</span><div class="t"><span class="dot"></span>分身状态指示</div>
+<div style="background:var(--bg-inset);border-radius:var(--radius-md);padding:16px;border:1px solid var(--line)">
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px"><div style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,var(--gold),var(--amber));display:grid;place-items:center;box-shadow:var(--glow)"><svg style="width:22px;height:22px;color:var(--on-gold)"><use href="#i-user"/></svg></div><div><div style="font-family:var(--font-epic);font-size:14px;color:var(--text-hi);letter-spacing:1px">启明星 · 第二分身</div><div style="font-size:11px;color:var(--jade-dark);display:flex;align-items:center;gap:4px"><span class="dot on" style="width:6px;height:6px"></span>在线 · 本地运行</div></div></div>
+<div style="display:flex;flex-direction:column;gap:8px">
+<div><div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="font-size:10px;color:var(--text-mid)">语言风格</span><span style="font-size:10px;color:var(--gold-dark);font-family:var(--font-mono)">78%</span></div><div style="height:4px;background:var(--bg-panel);border-radius:2px;overflow:hidden"><div style="width:78%;height:100%;background:linear-gradient(90deg,var(--gold),var(--amber))"></div></div></div>
+<div><div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="font-size:10px;color:var(--text-mid)">思维模式</span><span style="font-size:10px;color:var(--gold-dark);font-family:var(--font-mono)">65%</span></div><div style="height:4px;background:var(--bg-panel);border-radius:2px;overflow:hidden"><div style="width:65%;height:100%;background:linear-gradient(90deg,var(--azure),var(--azure-light))"></div></div></div>
+<div><div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="font-size:10px;color:var(--text-mid)">知识领域</span><span style="font-size:10px;color:var(--gold-dark);font-family:var(--font-mono)">52%</span></div><div style="height:4px;background:var(--bg-panel);border-radius:2px;overflow:hidden"><div style="width:52%;height:100%;background:linear-gradient(90deg,var(--jade),var(--jade-light))"></div></div></div></div></div>
+<div class="land"><b>规格</b>：分身头像+三维沉淀进度条，分身学习可视化。
+<b>前端对应</b>：<code>ConversationView.vue (AvatarStatus)</code></div></div>
+
+</div></section>
+
+<!-- ============ F 区 · 复盘 ============ -->
+<section>
+<div class="sec-head"><h2><svg class="icon sec-icon"><use href="#i-refresh"/></svg>F · 复盘</h2><span class="badge">3</span><span class="note">结构化反思与成长</span></div>
+<div class="grid">
+
+<div class="ccard bp"><span class="num">F01</span><div class="t"><span class="dot"></span>复盘编辑器</div>
+<div style="background:var(--bg-inset);border-radius:var(--radius-md);padding:18px;border:1px solid var(--line)">
+<div style="text-align:center;margin-bottom:16px"><div style="font-family:var(--font-epic);font-size:20px;color:var(--text-hi);letter-spacing:2px">每日省思</div><div style="font-size:12px;color:var(--text-low);margin-top:4px">2026年9月5日 · 星期六</div></div>
+<div style="margin-bottom:12px"><label style="font-size:11px;color:var(--text-low);display:block;margin-bottom:6px;letter-spacing:1px">今日成就</label><textarea class="input" placeholder="今天完成了什么？" style="min-height:50px"></textarea></div>
+<div style="margin-bottom:12px"><label style="font-size:11px;color:var(--text-low);display:block;margin-bottom:6px;letter-spacing:1px">不足之处</label><textarea class="input" placeholder="有什么可以改进？" style="min-height:50px"></textarea></div>
+<div style="margin-bottom:14px"><label style="font-size:11px;color:var(--text-low);display:block;margin-bottom:6px;letter-spacing:1px">明日计划</label><textarea class="input" placeholder="明天要做什么？" style="min-height:50px"></textarea></div>
+<div style="display:flex;align-items:center;justify-content:space-between"><div style="display:flex;gap:6px"><span class="chip gold" style="font-size:10px;padding:2px 8px">心情：😊</span><span class="chip azure" style="font-size:10px;padding:2px 8px">效率：85%</span></div><button class="btn pri sm">保存复盘</button></div></div>
+<div class="land"><b>规格</b>：成就/不足/计划三段式+心情标签，每日复盘表单。
+<b>前端对应</b>：<code>ReviewView.vue (ReviewEditor)</code><br><b>数据契约</b>：<code>Review{id,date,achievements,shortcomings,plans,mood,energy}</code></div></div>
+
+<div class="ccard bp bp-d1"><span class="num">F02</span><div class="t"><span class="dot"></span>反思问题卡</div>
+<div style="background:linear-gradient(135deg,var(--gold-soft),var(--amber-soft));border-radius:var(--radius-lg);padding:18px;border:1px solid var(--gold);position:relative;overflow:hidden">
+<div style="position:absolute;top:-10px;right:-10px;width:60px;height:60px;border-radius:50%;background:radial-gradient(circle,rgba(201,162,39,.15),transparent)"></div>
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--gold),var(--amber));display:grid;place-items:center"><svg style="width:16px;height:16px;color:var(--on-gold)"><use href="#i-help"/></svg></div><span style="font-family:var(--font-epic);font-size:14px;color:var(--text-hi);letter-spacing:1px">今日反思</span></div>
+<div style="font-size:14px;color:var(--text-hi);line-height:1.8;margin-bottom:14px;font-family:var(--font-serif)">"如果今天重新来过，你会做出什么不同的选择？"</div>
+<div style="display:flex;gap:8px"><button class="btn sec sm">写下来</button><button class="btn txt sm">换一个问题</button></div></div>
+<div class="land"><b>规格</b>：金色渐变背景+引导性问题，每日反思引导。
+<b>前端对应</b>：<code>ReviewView.vue (ReflectionCard)</code></div></div>
+
+<div class="ccard bp bp-d2"><span class="num">F03</span><div class="t"><span class="dot"></span>情绪记录</div>
+<div style="background:var(--bg-inset);border-radius:var(--radius-md);padding:16px;border:1px solid var(--line)">
+<div style="font-family:var(--font-epic);font-size:14px;color:var(--text-hi);margin-bottom:12px;letter-spacing:1px">今日情绪</div>
+<div style="display:flex;justify-content:space-around;margin-bottom:14px">
+<div style="text-align:center;cursor:pointer;padding:8px;border-radius:var(--radius-md);background:var(--gold-soft);border:1px solid var(--gold)"><div style="font-size:28px">😊</div><div style="font-size:10px;color:var(--gold-dark);margin-top:4px">愉悦</div></div>
+<div style="text-align:center;cursor:pointer;padding:8px;border-radius:var(--radius-md)"><div style="font-size:28px">😐</div><div style="font-size:10px;color:var(--text-low);margin-top:4px">平静</div></div>
+<div style="text-align:center;cursor:pointer;padding:8px;border-radius:var(--radius-md)"><div style="font-size:28px">😔</div><div style="font-size:10px;color:var(--text-low);margin-top:4px">低落</div></div>
+<div style="text-align:center;cursor:pointer;padding:8px;border-radius:var(--radius-md)"><div style="font-size:28px">😤</div><div style="font-size:10px;color:var(--text-low);margin-top:4px">焦虑</div></div>
+<div style="text-align:center;cursor:pointer;padding:8px;border-radius:var(--radius-md)"><div style="font-size:28px">🔥</div><div style="font-size:10px;color:var(--text-low);margin-top:4px">充满干劲</div></div></div>
+<div style="padding:10px;background:var(--bg-panel);border-radius:var(--radius-sm);border:1px solid var(--line)"><div style="font-size:11px;color:var(--text-low);margin-bottom:4px">情绪备注</div><div style="font-size:12px;color:var(--text-mid)">今天完成了重要的架构优化，很有成就感。</div></div></div>
+<div class="land"><b>规格</b>：5种情绪选择+选中高亮+备注，情绪追踪。
+<b>前端对应</b>：<code>ReviewView.vue (MoodRecorder)</code><br><b>数据契约</b>：<code>Review{id,date,mood,energy}</code></div></div>
+
+</div></section>
+
+<!-- ============ G 区 · 桌宠 ============ -->
+<section>
+<div class="sec-head"><h2><svg class="icon sec-icon"><use href="#i-spark"/></svg>G · 桌宠</h2><span class="badge">3</span><span class="note">陪伴与互动</span></div>
+<div class="grid">
+
+<div class="ccard bp"><span class="num">G01</span><div class="t"><span class="dot"></span>桌宠角色</div>
+<div style="background:linear-gradient(180deg,var(--gold-soft),transparent);border-radius:var(--radius-lg);padding:24px;display:flex;flex-direction:column;align-items:center;border:1px solid var(--line)">
+<div style="width:100px;height:100px;border-radius:50%;background:linear-gradient(135deg,var(--gold),var(--amber));display:grid;place-items:center;box-shadow:var(--glow-strong);position:relative;animation:epic-glow-pulse 2s ease-in-out infinite">
+<svg style="width:50px;height:50px;color:var(--on-gold)" viewBox="0 0 24 24"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8l-6.2 4.5 2.4-7.4L2 9.4h7.6z" fill="currentColor"/></svg>
+<span style="position:absolute;top:-5px;right:-5px;width:28px;height:28px;border-radius:50%;background:var(--bg-panel);border:2px solid var(--gold);display:grid;place-items:center;font-size:14px">✨</span></div>
+<div style="font-family:var(--font-epic);font-size:16px;color:var(--text-hi);margin-top:14px;letter-spacing:2px">启明星</div>
+<div style="font-size:11px;color:var(--text-low);margin-top:4px">你的第二分身</div>
+<div style="display:flex;gap:6px;margin-top:12px"><button class="btn pill sm" style="height:28px;padding:0 12px;font-size:11px">抚摸</button><button class="btn pill sm" style="height:28px;padding:0 12px;font-size:11px">对话</button><button class="btn pill sm" style="height:28px;padding:0 12px;font-size:11px">换装</button></div></div>
+<div class="land"><b>规格</b>：金色渐变圆形角色+发光+互动按钮，桌宠主形象。<br><b>动效</b>：呼吸发光，点击时星光粒子。
+<b>前端对应</b>：<code>DesktopPet.vue</code></div></div>
+
+<div class="ccard bp bp-d1"><span class="num">G02</span><div class="t"><span class="dot"></span>桌宠对话气泡</div>
+<div style="display:flex;align-items:flex-start;gap:10px;padding:10px">
+<div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,var(--gold),var(--amber));display:grid;place-items:center;flex:none;box-shadow:var(--glow)"><svg style="width:20px;height:20px;color:var(--on-gold)" viewBox="0 0 24 24"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8l-6.2 4.5 2.4-7.4L2 9.4h7.6z" fill="currentColor"/></svg></div>
+<div style="background:var(--bg-panel);padding:12px 16px;border-radius:0 var(--radius-md) var(--radius-md) var(--radius-md);border:1px solid var(--line);position:relative;max-width:260px">
+<div style="font-size:12px;color:var(--text-hi);line-height:1.7;font-family:var(--font-serif)">旅人，你已经连续工作2小时了，要不要休息一下？我为你准备了一杯热茶。</div>
+<div style="display:flex;gap:6px;margin-top:10px"><button class="btn pri sm" style="height:26px;padding:0 10px;font-size:11px">好的</button><button class="btn sec sm" style="height:26px;padding:0 10px;font-size:11px">再等一会</button></div></div></div>
+<div class="land"><b>规格</b>：桌宠头像+气泡+快捷回复，主动提醒交互。
+<b>前端对应</b>：<code>DesktopPet.vue (PetBubble)</code></div></div>
+
+<div class="ccard bp bp-d2"><span class="num">G03</span><div class="t"><span class="dot"></span>桌宠悬浮模式</div>
+<div style="background:var(--bg-inset);border-radius:var(--radius-md);padding:16px;border:1px solid var(--line);min-height:120px;position:relative;overflow:hidden">
+<div style="position:absolute;bottom:12px;right:12px;display:flex;align-items:center;gap:8px">
+<div style="background:var(--bg-panel);padding:6px 12px;border-radius:var(--radius-pill);border:1px solid var(--line);box-shadow:var(--shadow-raise);font-size:11px;color:var(--text-mid)">需要帮助吗？</div>
+<div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--gold),var(--amber));display:grid;place-items:center;box-shadow:var(--glow);cursor:pointer"><svg style="width:18px;height:18px;color:var(--on-gold)" viewBox="0 0 24 24"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8l-6.2 4.5 2.4-7.4L2 9.4h7.6z" fill="currentColor"/></svg></div></div>
+<div style="font-size:11px;color:var(--text-low);position:absolute;top:12px;left:12px">悬浮模式：桌宠固定在屏幕右下角，可拖拽移动</div></div>
+<div class="land"><b>规格</b>：右下角悬浮球+提示气泡，可拖拽，点击展开对话。
+<b>前端对应</b>：<code>DesktopPet.vue (PetFloating)</code></div></div>
+
+</div></section>
+
+<!-- ============ H 区 · 设置 ============ -->
+<section>
+<div class="sec-head"><h2><svg class="icon sec-icon"><use href="#i-setting"/></svg>H · 设置</h2><span class="badge">5</span><span class="note">个性化与系统配置</span></div>
+<div class="grid">
+
+<div class="ccard bp"><span class="num">H01</span><div class="t"><span class="dot"></span>设置导航分组</div>
+<div style="background:var(--bg-inset);border-radius:var(--radius-md);padding:12px;border:1px solid var(--line)">
+<div style="font-size:10px;color:var(--text-low);padding:6px 10px;letter-spacing:2px;margin-bottom:4px">个人</div>
+<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--gold-soft);border-radius:var(--radius-sm);color:var(--gold-dark);font-size:13px;cursor:pointer;margin-bottom:2px"><svg style="width:14px;height:14px"><use href="#i-user"/></svg>个人资料</div>
+<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:var(--radius-sm);color:var(--text-mid);font-size:13px;cursor:pointer;margin-bottom:2px"><svg style="width:14px;height:14px"><use href="#i-lock"/></svg>隐私与安全</div>
+<div style="font-size:10px;color:var(--text-low);padding:6px 10px;letter-spacing:2px;margin:8px 0 4px">系统</div>
+<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:var(--radius-sm);color:var(--text-mid);font-size:13px;cursor:pointer;margin-bottom:2px"><svg style="width:14px;height:14px"><use href="#i-palette"/></svg>外观主题</div>
+<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:var(--radius-sm);color:var(--text-mid);font-size:13px;cursor:pointer;margin-bottom:2px"><svg style="width:14px;height:14px"><use href="#i-cpu"/></svg>AI模型</div>
+<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:var(--radius-sm);color:var(--text-mid);font-size:13px;cursor:pointer"><svg style="width:14px;height:14px"><use href="#i-cloud"/></svg>数据管理</div></div>
+<div class="land"><b>规格</b>：分组导航+图标+激活项金色背景，设置侧边栏。
+<b>前端对应</b>：<code>SettingsView.vue (SettingsNav)</code></div></div>
+
+<div class="ccard bp bp-d1"><span class="num">H02</span><div class="t"><span class="dot"></span>AI模型配置</div>
+<div style="background:var(--bg-inset);border-radius:var(--radius-md);padding:16px;border:1px solid var(--line)">
+<div style="font-family:var(--font-epic);font-size:14px;color:var(--text-hi);margin-bottom:14px;letter-spacing:1px">AI 模型配置</div>
+<div style="margin-bottom:12px"><label style="font-size:11px;color:var(--text-low);display:block;margin-bottom:6px">弱AI（本地）</label><div style="display:flex;gap:8px"><select class="input" style="height:34px;flex:1"><option>LM Studio - Llama 3.2 3B</option><option>Ollama - Qwen2.5 7B</option></select><span class="chip jade" style="font-size:10px;align-self:center">已连接</span></div></div>
+<div style="margin-bottom:12px"><label style="font-size:11px;color:var(--text-low);display:block;margin-bottom:6px">强AI（云端API）</label><div style="display:flex;gap:8px"><select class="input" style="height:34px;flex:1"><option>DeepSeek - deepseek-chat</option><option>OpenAI - gpt-4o</option><option>Claude - claude-3.5-sonnet</option></select></div></div>
+<div><label style="font-size:11px;color:var(--text-low);display:block;margin-bottom:6px">API Key</label><div style="display:flex;gap:8px"><input class="input" type="password" placeholder="sk-..." style="height:34px;flex:1"><button class="btn sec sm">测试</button></div></div></div>
+<div class="land"><b>规格</b>：弱AI本地模型+强AI云端API+Key管理，双轨配置。
+<b>前端对应</b>：<code>SettingsView.vue (AIConfig)</code><br><b>数据契约</b>：<code>AIConfig{provider,model,api_key,base_url}</code></div></div>
+
+<div class="ccard bp bp-d2"><span class="num">H03</span><div class="t"><span class="dot"></span>开关设置项</div>
+<div style="background:var(--bg-inset);border-radius:var(--radius-md);border:1px solid var(--line);overflow:hidden">
+<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--line)"><div><div style="font-size:13px;color:var(--text-hi)">桌宠悬浮</div><div style="font-size:10px;color:var(--text-low);margin-top:2px">桌面右下角显示桌宠</div></div><label style="position:relative;display:inline-block;width:40px;height:22px"><input type="checkbox" checked style="opacity:0;width:0;height:0"><span style="position:absolute;cursor:pointer;inset:0;background:var(--gold);border-radius:11px;transition:.3s"><span style="position:absolute;height:16px;width:16px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.3s;transform:translateX(18px)"></span></span></label></div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--line)"><div><div style="font-size:13px;color:var(--text-hi)">自动备份</div><div style="font-size:10px;color:var(--text-low);margin-top:2px">每日凌晨自动备份数据</div></div><label style="position:relative;display:inline-block;width:40px;height:22px"><input type="checkbox" checked style="opacity:0;width:0;height:0"><span style="position:absolute;cursor:pointer;inset:0;background:var(--gold);border-radius:11px;transition:.3s"><span style="position:absolute;height:16px;width:16px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.3s;transform:translateX(18px)"></span></span></label></div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px"><div><div style="font-size:13px;color:var(--text-hi)">声音反馈</div><div style="font-size:10px;color:var(--text-low);margin-top:2px">操作时播放提示音</div></div><label style="position:relative;display:inline-block;width:40px;height:22px"><input type="checkbox" style="opacity:0;width:0;height:0"><span style="position:absolute;cursor:pointer;inset:0;background:var(--line-strong);border-radius:11px;transition:.3s"><span style="position:absolute;height:16px;width:16px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.3s"></span></span></label></div></div>
+<div class="land"><b>规格</b>：标题+描述+金色开关，设置项列表。
+<b>前端对应</b>：<code>BaseSwitch.vue</code></div></div>
+
+<div class="ccard bp bp-d3"><span class="num">H04</span><div class="t"><span class="dot"></span>数据导出导入</div>
+<div style="background:var(--bg-inset);border-radius:var(--radius-md);padding:16px;border:1px solid var(--line)">
+<div style="font-family:var(--font-epic);font-size:14px;color:var(--text-hi);margin-bottom:14px;letter-spacing:1px">数据管理</div>
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--bg-panel);border-radius:var(--radius-sm);border:1px solid var(--line)"><div style="display:flex;align-items:center;gap:10px"><svg style="width:16px;height:16px;color:var(--gold-dark)"><use href="#i-download"/></svg><span style="font-size:12px;color:var(--text-hi)">导出全部数据</span></div><button class="btn pri sm">导出</button></div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--bg-panel);border-radius:var(--radius-sm);border:1px solid var(--line)"><div style="display:flex;align-items:center;gap:10px"><svg style="width:16px;height:16px;color:var(--azure-dark)"><use href="#i-upload"/></svg><span style="font-size:12px;color:var(--text-hi)">导入备份文件</span></div><button class="btn sec sm">选择文件</button></div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--bg-panel);border-radius:var(--radius-sm);border:1px solid var(--line)"><div style="display:flex;align-items:center;gap:10px"><svg style="width:16px;height:16px;color:var(--crimson-dark)"><use href="#i-trash"/></svg><span style="font-size:12px;color:var(--crimson-dark)">清空所有数据</span></div><button class="btn danger sm">清空</button></div></div>
+<div style="margin-top:12px;padding:8px 12px;background:var(--gold-soft);border-radius:var(--radius-sm);font-size:11px;color:var(--gold-dark)">数据存储：本地加密 · 无数据量限制</div></div>
+<div class="land"><b>规格</b>：导出/导入/清空三操作+存储状态，数据安全管理。
+<b>前端对应</b>：<code>SettingsView.vue (DataManagement)</code><br><b>数据契约</b>：<code>Backup{file_name,size,created_at}</code></div></div>
+
+<div class="ccard bp bp-d4"><span class="num">H05</span><div class="t"><span class="dot"></span>内置主题切换器</div>
+<div style="background:var(--bg-inset);border-radius:var(--radius-md);padding:16px;border:1px solid var(--line)">
+<div style="font-family:var(--font-epic);font-size:14px;color:var(--text-hi);margin-bottom:14px;letter-spacing:1px">选择主题</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+<div style="padding:12px;border-radius:var(--radius-md);border:2px solid var(--gold);background:var(--bg-panel);cursor:pointer;box-shadow:var(--glow)"><div style="height:40px;border-radius:6px;background:linear-gradient(135deg,#FFF5E6,#FFE4C4);margin-bottom:8px"></div><div style="font-size:12px;color:var(--text-hi);text-align:center;font-family:var(--font-epic)">奶油糖果</div></div>
+<div style="padding:12px;border-radius:var(--radius-md);border:1px solid var(--line);background:var(--bg-panel);cursor:pointer"><div style="height:40px;border-radius:6px;background:linear-gradient(135deg,#F5F0E8,#E8DCC8);margin-bottom:8px"></div><div style="font-size:12px;color:var(--text-mid);text-align:center">国风雅集</div></div>
+<div style="padding:12px;border-radius:var(--radius-md);border:1px solid var(--line);background:var(--bg-panel);cursor:pointer"><div style="height:40px;border-radius:6px;background:linear-gradient(135deg,#0A1628,#1A3A5C);margin-bottom:8px"></div><div style="font-size:12px;color:var(--text-mid);text-align:center">深渊档案</div></div>
+<div style="padding:12px;border-radius:var(--radius-md);border:1px solid var(--line);background:var(--bg-panel);cursor:pointer"><div style="height:40px;border-radius:6px;background:linear-gradient(135deg,#FAF6EB,#F0E6D0);margin-bottom:8px"></div><div style="font-size:12px;color:var(--text-mid);text-align:center">史诗典藏</div></div></div></div>
+<div class="land"><b>规格</b>：4主题预览卡+选中金色边框，主题切换器。
+<b>前端对应</b>：<code>SettingsView.vue (ThemeSwitcher) / useTheme.ts</code></div></div>
+
+</div></section>
+
+<!-- ============ I 区 · 基础组件 ============ -->
+<section>
+<div class="sec-head"><h2><svg class="icon sec-icon"><use href="#i-grid"/></svg>I · 基础组件</h2><span class="badge">6</span><span class="note">按钮/输入/反馈</span></div>
+<div class="grid">
+
+<div class="ccard bp"><span class="num">I01</span><div class="t"><span class="dot"></span>按钮体系</div>
+<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
+<button class="btn pri">主要按钮</button>
+<button class="btn sec">次要按钮</button>
+<button class="btn gold">金色按钮</button>
+<button class="btn danger">危险按钮</button>
+<button class="btn txt">文字按钮</button>
+<button class="btn pill">胶囊按钮</button>
+<button class="btn pri sm">小按钮</button>
+<button class="btn pri" disabled style="opacity:.5;cursor:not-allowed">禁用</button>
+<button class="btn pri"><svg style="width:14px;height:14px"><use href="#i-plus"/></svg>带图标</button></div>
+<div class="land"><b>规格</b>：主/次/金/危险/文字/胶囊6型+sm/md/lg三尺寸，金色为主色。
+<b>前端对应</b>：<code>BaseButton.vue</code></div></div>
+
+<div class="ccard bp bp-d1"><span class="num">I02</span><div class="t"><span class="dot"></span>输入框体系</div>
+<div style="display:flex;flex-direction:column;gap:10px">
+<input class="input" placeholder="默认输入框">
+<input class="input" placeholder="聚焦状态" style="border-color:var(--gold);box-shadow:0 0 0 3px var(--gold-soft)">
+<input class="input" value="已有内容" style="border-color:var(--line-strong)">
+<div style="display:flex;gap:8px"><input class="input" placeholder="带前缀" style="padding-left:36px"><svg style="width:14px;height:14px;color:var(--text-low);position:absolute;margin-left:12px;margin-top:10px"><use href="#i-search"/></svg></div>
+<textarea class="input" placeholder="多行文本域" style="min-height:60px;resize:vertical"></textarea>
+<div style="display:flex;gap:8px"><input class="input" placeholder="搜索..." style="border-radius:var(--radius-pill);padding-left:36px"><svg style="width:14px;height:14px;color:var(--text-low);position:absolute;margin-left:12px;margin-top:10px"><use href="#i-search"/></svg></div></div>
+<div class="land"><b>规格</b>：默认/聚焦/已有/带图标/多行/搜索6态，聚焦金色光晕。
+<b>前端对应</b>：<code>BaseInput.vue</code></div></div>
+
+<div class="ccard bp bp-d2"><span class="num">I03</span><div class="t"><span class="dot"></span>模态弹窗</div>
+<div style="background:rgba(0,0,0,.3);border-radius:var(--radius-md);padding:20px;display:grid;place-items:center;min-height:160px">
+<div style="background:var(--bg-panel);border-radius:var(--radius-lg);padding:24px;max-width:320px;width:100%;box-shadow:var(--shadow-raise);border:1px solid var(--line-strong);position:relative;overflow:hidden">
+<div style="position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--gold),var(--amber))"></div>
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px"><div style="width:36px;height:36px;border-radius:50%;background:var(--gold-soft);display:grid;place-items:center"><svg style="width:18px;height:18px;color:var(--gold-dark)"><use href="#i-help"/></svg></div><h3 style="font-family:var(--font-epic);font-size:16px;color:var(--text-hi);letter-spacing:1px">确认操作</h3></div>
+<p style="font-size:13px;color:var(--text-mid);line-height:1.7;margin-bottom:18px">确定要删除这条记录吗？此操作不可撤销。</p>
+<div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn sec sm">取消</button><button class="btn danger sm">确认删除</button></div></div></div>
+<div class="land"><b>规格</b>：遮罩+卡片+顶部金色装饰条+标题+内容+操作按钮。
+<b>前端对应</b>：<code>BaseModal.vue / BaseConfirm.vue</code></div></div>
+
+<div class="ccard bp bp-d3"><span class="num">I04</span><div class="t"><span class="dot"></span>Toast通知</div>
+<div style="display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--bg-panel);border-radius:var(--radius-md);border:1px solid var(--line);box-shadow:var(--shadow-raise);border-left:3px solid var(--jade)"><svg style="width:16px;height:16px;color:var(--jade-dark)"><use href="#i-check"/></svg><span style="font-size:12px;color:var(--text-hi)">保存成功</span></div>
+<div style="display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--bg-panel);border-radius:var(--radius-md);border:1px solid var(--line);box-shadow:var(--shadow-raise);border-left:3px solid var(--gold)"><svg style="width:16px;height:16px;color:var(--gold-dark)"><use href="#i-info"/></svg><span style="font-size:12px;color:var(--text-hi)">数据已同步到本地</span></div>
+<div style="display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--bg-panel);border-radius:var(--radius-md);border:1px solid var(--line);box-shadow:var(--shadow-raise);border-left:3px solid var(--crimson)"><svg style="width:16px;height:16px;color:var(--crimson-dark)"><use href="#i-warning"/></svg><span style="font-size:12px;color:var(--text-hi)">网络连接失败，已切换离线模式</span></div></div>
+<div class="land"><b>规格</b>：成功/信息/警告三色左边条+图标，右上角滑入。
+<b>前端对应</b>：<code>BaseToast.vue / ToastItem.vue</code></div></div>
+
+<div class="ccard bp bp-d4"><span class="num">I05</span><div class="t"><span class="dot"></span>空状态</div>
+<div style="background:var(--bg-inset);border-radius:var(--radius-md);padding:32px 20px;text-align:center;border:1px dashed var(--line-strong)">
+<div style="width:64px;height:64px;margin:0 auto 14px;border-radius:50%;background:var(--gold-soft);display:grid;place-items:center"><svg style="width:32px;height:32px;color:var(--gold-dark)"><use href="#i-doc"/></svg></div>
+<div style="font-family:var(--font-epic);font-size:16px;color:var(--text-hi);margin-bottom:6px;letter-spacing:1px">还没有文档</div>
+<div style="font-size:12px;color:var(--text-low);margin-bottom:16px;line-height:1.6">创建你的第一篇文档，开始构建知识库</div>
+<button class="btn pri sm"><svg style="width:13px;height:13px"><use href="#i-plus"/></svg>新建文档</button></div>
+<div class="land"><b>规格</b>：图标+标题+描述+行动按钮，空状态引导。
+<b>前端对应</b>：<code>BaseEmpty.vue</code></div></div>
+
+<div class="ccard bp bp-d5"><span class="num">I06</span><div class="t"><span class="dot"></span>骨架屏加载</div>
+<div style="background:var(--bg-inset);border-radius:var(--radius-md);padding:16px;border:1px solid var(--line)">
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px"><div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(90deg,var(--bg-panel),var(--line),var(--bg-panel));background-size:200% 100%;animation:shimmer 1.5s infinite"></div><div style="flex:1"><div style="height:12px;width:60%;background:linear-gradient(90deg,var(--bg-panel),var(--line),var(--bg-panel));background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:4px;margin-bottom:6px"></div><div style="height:10px;width:40%;background:linear-gradient(90deg,var(--bg-panel),var(--line),var(--bg-panel));background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:4px"></div></div></div>
+<div style="height:14px;width:100%;background:linear-gradient(90deg,var(--bg-panel),var(--line),var(--bg-panel));background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:4px;margin-bottom:8px"></div>
+<div style="height:14px;width:85%;background:linear-gradient(90deg,var(--bg-panel),var(--line),var(--bg-panel));background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:4px;margin-bottom:8px"></div>
+<div style="height:14px;width:70%;background:linear-gradient(90deg,var(--bg-panel),var(--line),var(--bg-panel));background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:4px"></div></div>
+<div class="land"><b>规格</b>：shimmer动画占位，头像+标题+内容行，加载状态。
+<b>前端对应</b>：<code>BaseSkeleton.vue</code></div></div>
+
+</div></section>
+
+<!-- ============ J 区 · 数据可视化 ============ -->
+<section>
+<div class="sec-head"><h2><svg class="icon sec-icon"><use href="#i-chart"/></svg>J · 数据可视化</h2><span class="badge">4</span><span class="note">统计与图表</span></div>
+<div class="grid">
+
+<div class="ccard bp"><span class="num">J01</span><div class="t"><span class="dot"></span>统计卡</div>
+<div style="background:linear-gradient(135deg,var(--gold-soft),transparent);border-radius:var(--radius-lg);padding:18px;border:1px solid var(--line);position:relative;overflow:hidden">
+<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px"><div style="width:40px;height:40px;border-radius:var(--radius-md);background:linear-gradient(135deg,var(--gold),var(--amber));display:grid;place-items:center;box-shadow:var(--glow)"><svg style="width:20px;height:20px;color:var(--on-gold)"><use href="#i-check"/></svg></div><span style="font-size:10px;padding:3px 8px;border-radius:var(--radius-pill);background:var(--jade-soft);color:var(--jade-dark)">↑ 12%</span></div>
+<div style="font-family:var(--font-epic);font-size:32px;color:var(--text-hi);letter-spacing:1px">1,248</div>
+<div style="font-size:12px;color:var(--text-low);margin-top:4px">累计完成任务</div>
+<div style="margin-top:12px;height:4px;background:var(--bg-panel);border-radius:2px;overflow:hidden"><div style="width:72%;height:100%;background:linear-gradient(90deg,var(--gold),var(--amber))"></div></div></div>
+<div class="land"><b>规格</b>：图标+趋势+大数字+标题+进度条，统计展示。
+<b>前端对应</b>：<code>DashboardView.vue (StatCard)</code><br><b>数据契约</b>：<code>Stat{label,value,trend}</code></div></div>
+
+<div class="ccard bp bp-d1"><span class="num">J02</span><div class="t"><span class="dot"></span>趋势折线图</div>
+<div style="background:var(--bg-inset);border-radius:var(--radius-md);padding:16px;border:1px solid var(--line)">
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><span style="font-family:var(--font-epic);font-size:13px;color:var(--text-hi);letter-spacing:1px">近7日活跃度</span><span style="font-size:10px;color:var(--text-low)">单位：次</span></div>
+<svg viewBox="0 0 280 100" style="width:100%;height:100px">
+<defs><linearGradient id="epicArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--gold)" stop-opacity=".3"/><stop offset="100%" stop-color="var(--gold)" stop-opacity="0"/></linearGradient></defs>
+<path d="M0,70 L40,55 L80,60 L120,35 L160,45 L200,20 L240,30 L280,15 L280,100 L0,100 Z" fill="url(#epicArea)"/>
+<path d="M0,70 L40,55 L80,60 L120,35 L160,45 L200,20 L240,30 L280,15" fill="none" stroke="var(--gold)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="120" cy="35" r="4" fill="var(--bg-panel)" stroke="var(--gold)" stroke-width="2"/><circle cx="200" cy="20" r="4" fill="var(--bg-panel)" stroke="var(--gold)" stroke-width="2"/><circle cx="280" cy="15" r="5" fill="var(--gold)"/>
+<text x="0" y="95" font-size="8" fill="var(--text-low)">周一</text><text x="80" y="95" font-size="8" fill="var(--text-low)">周三</text><text x="160" y="95" font-size="8" fill="var(--text-low)">周五</text><text x="240" y="95" font-size="8" fill="var(--text-low)">周日</text></svg></div>
+<div class="land"><b>规格</b>：金色折线+渐变填充+数据点，趋势可视化。
+<b>前端对应</b>：<code>DashboardView.vue (TrendChart)</code><br><b>数据契约</b>：<code>TimeSeries{date,value}[]</code></div></div>
+
+<div class="ccard bp bp-d2"><span class="num">J03</span><div class="t"><span class="dot"></span>任务分布柱状图</div>
+<div style="background:var(--bg-inset);border-radius:var(--radius-md);padding:16px;border:1px solid var(--line)">
+<div style="font-family:var(--font-epic);font-size:13px;color:var(--text-hi);margin-bottom:14px;letter-spacing:1px">任务状态分布</div>
+<div style="display:flex;align-items:flex-end;justify-content:space-around;height:90px;gap:8px">
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px"><div style="width:100%;max-width:32px;height:50px;background:linear-gradient(180deg,var(--gold),var(--amber));border-radius:4px 4px 0 0"></div><span style="font-size:10px;color:var(--text-low)">待办</span><span style="font-size:11px;color:var(--text-hi);font-family:var(--font-mono)">12</span></div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px"><div style="width:100%;max-width:32px;height:70px;background:linear-gradient(180deg,var(--azure),var(--azure-light));border-radius:4px 4px 0 0"></div><span style="font-size:10px;color:var(--text-low)">进行中</span><span style="font-size:11px;color:var(--text-hi);font-family:var(--font-mono)">18</span></div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px"><div style="width:100%;max-width:32px;height:90px;background:linear-gradient(180deg,var(--jade),var(--jade-light));border-radius:4px 4px 0 0"></div><span style="font-size:10px;color:var(--text-low)">已完成</span><span style="font-size:11px;color:var(--text-hi);font-family:var(--font-mono)">24</span></div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px"><div style="width:100%;max-width:32px;height:25px;background:linear-gradient(180deg,var(--crimson),var(--crimson-light));border-radius:4px 4px 0 0"></div><span style="font-size:10px;color:var(--text-low)">逾期</span><span style="font-size:11px;color:var(--text-hi);font-family:var(--font-mono)">5</span></div></div></div>
+<div class="land"><b>规格</b>：4状态柱状图+数值，任务分布可视化。
+<b>前端对应</b>：<code>DashboardView.vue (TaskDistribution)</code><br><b>数据契约</b>：<code>Distribution{status,count}[]</code></div></div>
+
+<div class="ccard bp bp-d3"><span class="num">J04</span><div class="t"><span class="dot"></span>复盘热力日历</div>
+<div style="background:var(--bg-inset);border-radius:var(--radius-md);padding:16px;border:1px solid var(--line)">
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><span style="font-family:var(--font-epic);font-size:13px;color:var(--text-hi);letter-spacing:1px">2026年9月</span><span style="font-size:10px;color:var(--text-low)">连续 12 天</span></div>
+<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px">
+<div style="aspect-ratio:1;border-radius:4px;background:var(--bg-panel)"></div>
+<div style="aspect-ratio:1;border-radius:4px;background:var(--gold-soft)"></div>
+<div style="aspect-ratio:1;border-radius:4px;background:var(--gold)"></div>
+<div style="aspect-ratio:1;border-radius:4px;background:var(--amber)"></div>
+<div style="aspect-ratio:1;border-radius:4px;background:var(--gold)"></div>
+<div style="aspect-ratio:1;border-radius:4px;background:var(--gold-soft)"></div>
+<div style="aspect-ratio:1;border-radius:4px;background:var(--bg-panel)"></div>
+<div style="aspect-ratio:1;border-radius:4px;background:var(--amber)"></div>
+<div style="aspect-ratio:1;border-radius:4px;background:var(--gold)"></div>
+<div style="aspect-ratio:1;border-radius:4px;background:var(--gold-soft)"></div>
+<div style="aspect-ratio:1;border-radius:4px;background:var(--gold)"></div>
+<div style="aspect-ratio:1;border-radius:4px;background:var(--amber)"></div>
+<div style="aspect-ratio:1;border-radius:4px;background:var(--gold)"></div>
+<div style="aspect-ratio:1;border-radius:4px;background:var(--gold-soft)"></div>
+<div style="aspect-ratio:1;border-radius:4px;background:var(--gold)"></div>
+<div style="aspect-ratio:1;border-radius:4px;background:var(--amber)"></div>
+<div style="aspect-ratio:1;border-radius:4px;background:var(--gold-soft)"></div>
+<div style="aspect-ratio:1;border-radius:4px;background:var(--bg-panel)"></div>
+<div style="aspect-ratio:1;border-radius:4px;background:var(--gold-soft)"></div>
+<div style="aspect-ratio:1;border-radius:4px;background:var(--gold)"></div>
+<div style="aspect-ratio:1;border-radius:4px;background:var(--amber)"></div></div>
+<div style="display:flex;align-items:center;gap:6px;margin-top:12px;justify-content:flex-end"><span style="font-size:10px;color:var(--text-low)">少</span><div style="width:12px;height:12px;border-radius:3px;background:var(--bg-panel)"></div><div style="width:12px;height:12px;border-radius:3px;background:var(--gold-soft)"></div><div style="width:12px;height:12px;border-radius:3px;background:var(--gold)"></div><div style="width:12px;height:12px;border-radius:3px;background:var(--amber)"></div><span style="font-size:10px;color:var(--text-low)">多</span></div></div>
+<div class="land"><b>规格</b>：7列热力格+4级色阶+图例，复盘频率可视化。
+<b>前端对应</b>：<code>ReviewView.vue (HeatmapCalendar)</code><br><b>数据契约</b>：<code>Heatmap{date,count}[]</code></div></div>
+
+</div></section>
+
+<footer style="text-align:center;padding:40px 20px;color:var(--text-low);font-size:12px;border-top:1px solid var(--line);margin-top:40px">
+<div style="font-family:var(--font-epic);font-size:16px;color:var(--gold-dark);letter-spacing:3px;margin-bottom:8px">启明星 · 史诗典藏</div>
+<div style="margin-bottom:4px">方向启明，人生推演 — 明亮传说史诗风格 UI 组件库</div>
+<div style="font-size:11px">47 组件 · 10 分区 · 明暗双模式 · v3.0</div>
+</footer>
+
+<!-- ============ K 区 · 项目管理 ============ -->
+<section>
+<div class="sec-head"><h2><svg class="icon sec-icon"><use href="#i-folder"/></svg>K · 项目管理</h2><span class="badge">5</span><span class="note">项目卡片 + 列表视图 + 详情面板 + 创建表单 + 进度统计</span></div>
+<div class="grid">
+
+<div class="ccard bp"><span class="num">K01</span><div class="t"><span class="dot"></span>项目卡片（ProjectCard）</div>
+<div style="background:var(--bg-panel);border:1px solid var(--line);border-radius:var(--radius-lg);padding:16px;max-width:280px;position:relative;overflow:hidden;box-shadow:var(--shadow-card)">
+<div style="position:absolute;top:0;left:0;width:4px;height:100%;background:var(--gold)"></div>
+<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;padding-left:8px">
+<div style="font-size:14px;font-weight:700;color:var(--text-hi);font-family:var(--font-epic);letter-spacing:1px">启明星系统</div>
+<span style="font-size:10px;padding:3px 8px;border-radius:var(--radius-pill);background:var(--jade-soft);color:var(--jade-dark);font-weight:600;font-family:var(--font-epic)">进行中</span></div>
+<div style="font-size:11px;color:var(--text-mid);margin-bottom:12px;padding-left:8px;font-family:var(--font-serif)">个人知识管理与人生推演系统</div>
+<div style="margin-bottom:10px;padding-left:8px"><div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-low);margin-bottom:4px"><span>整体进度</span><span style="font-weight:600;color:var(--text-hi);font-family:var(--font-mono)">67%</span></div><div style="height:6px;background:var(--bg-inset);border-radius:3px;overflow:hidden"><div style="width:67%;height:100%;background:linear-gradient(90deg,var(--gold),var(--amber));border-radius:3px"></div></div></div>
+<div style="display:flex;gap:12px;padding-left:8px"><span style="font-size:10px;color:var(--text-low);display:flex;align-items:center;gap:3px"><svg style="width:10px;height:10px"><use href="#i-check"/></svg>12任务</span><span style="font-size:10px;color:var(--text-low);display:flex;align-items:center;gap:3px"><svg style="width:10px;height:10px"><use href="#i-doc"/></svg>8文档</span><span style="font-size:10px;color:var(--text-low);display:flex;align-items:center;gap:3px"><svg style="width:10px;height:10px"><use href="#i-calendar"/></svg>9/30</span></div></div>
+<div class="land"><b>前端对应</b>：<code>ProjectListView.vue (ProjectCard)</code><br><b>数据契约</b>：<code>Project{id,name,description,color,status,progress,task_count,doc_count,due_date}</code></div></div>
+
+<div class="ccard bp bp-d1" style="grid-column:1/-1"><span class="num">K02</span><div class="t"><span class="dot"></span>项目列表视图（ProjectList）</div>
+<div style="background:var(--bg-parchment);border:1px solid var(--line);border-radius:var(--radius-lg);padding:16px">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><div style="font-size:14px;font-weight:700;color:var(--text-hi);font-family:var(--font-epic);letter-spacing:1px">我的项目</div><div style="display:flex;gap:8px"><button style="padding:5px 12px;border-radius:var(--radius-pill);background:var(--gold-soft);color:var(--gold-dark);font-size:11px;font-weight:600;border:none;cursor:pointer;font-family:var(--font-epic)">全部</button><button style="padding:5px 12px;border-radius:var(--radius-pill);background:var(--bg-panel);color:var(--text-mid);font-size:11px;border:1px solid var(--line);cursor:pointer">进行中</button><button style="padding:5px 12px;border-radius:var(--radius-pill);background:var(--bg-panel);color:var(--text-mid);font-size:11px;border:1px solid var(--line);cursor:pointer">已归档</button><button style="padding:5px 12px;border-radius:var(--radius-pill);background:var(--gold);color:var(--on-gold);font-size:11px;font-weight:600;border:none;cursor:pointer;font-family:var(--font-epic)">+ 新建</button></div></div>
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+<div style="background:var(--bg-panel);border:1px solid var(--line);border-radius:var(--radius-md);padding:14px;border-left:3px solid var(--gold)"><div style="font-size:13px;font-weight:600;color:var(--text-hi);margin-bottom:4px;font-family:var(--font-epic)">启明星系统</div><div style="font-size:10px;color:var(--text-low);margin-bottom:8px">67% · 12任务</div><div style="height:4px;background:var(--bg-inset);border-radius:2px"><div style="width:67%;height:100%;background:var(--gold);border-radius:2px"></div></div></div>
+<div style="background:var(--bg-panel);border:1px solid var(--line);border-radius:var(--radius-md);padding:14px;border-left:3px solid var(--jade)"><div style="font-size:13px;font-weight:600;color:var(--text-hi);margin-bottom:4px;font-family:var(--font-epic)">海灵传说</div><div style="font-size:10px;color:var(--text-low);margin-bottom:8px">45% · 8任务</div><div style="height:4px;background:var(--bg-inset);border-radius:2px"><div style="width:45%;height:100%;background:var(--jade);border-radius:2px"></div></div></div>
+<div style="background:var(--bg-panel);border:1px solid var(--line);border-radius:var(--radius-md);padding:14px;border-left:3px solid var(--amber)"><div style="font-size:13px;font-weight:600;color:var(--text-hi);margin-bottom:4px;font-family:var(--font-epic)">数学竞赛</div><div style="font-size:10px;color:var(--text-low);margin-bottom:8px">80% · 5任务</div><div style="height:4px;background:var(--bg-inset);border-radius:2px"><div style="width:80%;height:100%;background:var(--amber);border-radius:2px"></div></div></div></div></div>
+<div class="land"><b>前端对应</b>：<code>ProjectListView.vue</code><br><b>数据契约</b>：<code>Project[] + Filter{status}</code></div></div>
+
+<div class="ccard bp bp-d2"><span class="num">K03</span><div class="t"><span class="dot"></span>项目详情面板（ProjectDetail）</div>
+<div style="background:var(--bg-panel);border:1px solid var(--line);border-radius:var(--radius-lg);padding:18px;max-width:320px;box-shadow:var(--shadow-card)">
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px"><div style="width:40px;height:40px;border-radius:var(--radius-md);background:linear-gradient(135deg,var(--gold),var(--amber));display:grid;place-items:center;box-shadow:var(--glow)"><svg style="width:20px;height:20px;color:var(--on-gold)"><use href="#i-folder"/></svg></div><div><div style="font-size:15px;font-weight:700;color:var(--text-hi);font-family:var(--font-epic);letter-spacing:1px">启明星系统</div><div style="font-size:10px;color:var(--text-low)">创建于 2026-06-15</div></div></div>
+<div style="font-size:12px;color:var(--text-mid);margin-bottom:14px;line-height:1.6;font-family:var(--font-serif)">个人知识管理与人生推演系统，整合任务、文档、对话、复盘四大模块。</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px"><div style="background:var(--bg-inset);border-radius:var(--radius-sm);padding:8px;text-align:center"><div style="font-size:16px;font-weight:700;color:var(--gold-dark)">12</div><div style="font-size:9px;color:var(--text-low)">关联任务</div></div><div style="background:var(--bg-inset);border-radius:var(--radius-sm);padding:8px;text-align:center"><div style="font-size:16px;font-weight:700;color:var(--jade-dark)">8</div><div style="font-size:9px;color:var(--text-low)">关联文档</div></div></div>
+<div style="margin-bottom:14px"><div style="font-size:11px;font-weight:600;color:var(--text-hi);margin-bottom:6px;font-family:var(--font-epic)">最近任务</div><div style="display:flex;flex-direction:column;gap:4px"><div style="display:flex;align-items:center;gap:6px;font-size:11px"><span style="width:12px;height:12px;border-radius:3px;background:var(--jade);display:grid;place-items:center"><svg style="width:7px;height:7px;color:#fff"><use href="#i-check"/></svg></span><span style="color:var(--text-low);text-decoration:line-through">需求文档</span></div><div style="display:flex;align-items:center;gap:6px;font-size:11px"><span style="width:12px;height:12px;border-radius:3px;border:2px solid var(--line-strong)"></span><span style="color:var(--text-hi)">UI组件V3.0</span></div></div></div>
+<div style="display:flex;gap:8px"><button style="flex:1;padding:8px;border-radius:var(--radius-sm);background:var(--gold);color:var(--on-gold);font-size:11px;font-weight:600;border:none;cursor:pointer;font-family:var(--font-epic)">进入项目</button><button style="padding:8px 12px;border-radius:var(--radius-sm);background:var(--bg-inset);color:var(--text-mid);font-size:11px;border:1px solid var(--line);cursor:pointer"><svg style="width:12px;height:12px"><use href="#i-setting"/></svg></button></div></div>
+<div class="land"><b>前端对应</b>：<code>ProjectDetailDrawer.vue</code><br><b>数据契约</b>：<code>Project + tasks[] + docs[]</code></div></div>
+
+<div class="ccard bp bp-d3"><span class="num">K04</span><div class="t"><span class="dot"></span>项目创建表单（ProjectForm）</div>
+<div style="background:var(--bg-panel);border:1px solid var(--line);border-radius:var(--radius-lg);padding:18px;max-width:320px">
+<div style="font-size:14px;font-weight:700;color:var(--text-hi);margin-bottom:14px;font-family:var(--font-epic);letter-spacing:1px">新建项目</div>
+<div style="margin-bottom:12px"><label style="font-size:11px;color:var(--text-mid);display:block;margin-bottom:4px">项目名称</label><input value="启明星系统" style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:var(--radius-sm);font-size:12px;color:var(--text-hi);background:var(--bg-parchment);box-sizing:border-box;font-family:var(--font-serif)"></div>
+<div style="margin-bottom:12px"><label style="font-size:11px;color:var(--text-mid);display:block;margin-bottom:4px">项目描述</label><textarea style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:var(--radius-sm);font-size:12px;color:var(--text-hi);background:var(--bg-parchment);height:60px;resize:none;box-sizing:border-box;font-family:var(--font-serif)">个人知识管理系统</textarea></div>
+<div style="margin-bottom:12px"><label style="font-size:11px;color:var(--text-mid);display:block;margin-bottom:6px">主题颜色</label><div style="display:flex;gap:8px"><span style="width:24px;height:24px;border-radius:50%;background:var(--gold);border:2px solid var(--text-hi);cursor:pointer"></span><span style="width:24px;height:24px;border-radius:50%;background:var(--jade);border:2px solid transparent;cursor:pointer"></span><span style="width:24px;height:24px;border-radius:50%;background:var(--amber);border:2px solid transparent;cursor:pointer"></span><span style="width:24px;height:24px;border-radius:50%;background:var(--azure);border:2px solid transparent;cursor:pointer"></span><span style="width:24px;height:24px;border-radius:50%;background:var(--crimson);border:2px solid transparent;cursor:pointer"></span></div></div>
+<div style="margin-bottom:14px"><label style="font-size:11px;color:var(--text-mid);display:block;margin-bottom:4px">截止日期</label><input type="date" value="2026-09-30" style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:var(--radius-sm);font-size:12px;color:var(--text-hi);background:var(--bg-parchment);box-sizing:border-box"></div>
+<div style="display:flex;gap:8px"><button style="flex:1;padding:10px;border-radius:var(--radius-sm);background:var(--bg-inset);color:var(--text-mid);font-size:12px;border:1px solid var(--line);cursor:pointer">取消</button><button style="flex:1;padding:10px;border-radius:var(--radius-sm);background:var(--gold);color:var(--on-gold);font-size:12px;font-weight:600;border:none;cursor:pointer;font-family:var(--font-epic)">创建</button></div></div>
+<div class="land"><b>前端对应</b>：<code>ProjectCreateModal.vue</code><br><b>数据契约</b>：<code>{name,description,color,status,due_date}</code></div></div>
+
+<div class="ccard bp bp-d4" style="grid-column:1/-1"><span class="num">K05</span><div class="t"><span class="dot"></span>项目进度统计（ProjectStats）</div>
+<div style="background:var(--bg-panel);border:1px solid var(--line);border-radius:var(--radius-lg);padding:18px;display:flex;gap:24px;align-items:center;box-shadow:var(--shadow-card)">
+<div style="position:relative;width:100px;height:100px;flex:none"><svg viewBox="0 0 100 100" style="width:100%;height:100%;transform:rotate(-90deg)"><circle cx="50" cy="50" r="42" fill="none" stroke="var(--bg-inset)" stroke-width="8"/><circle cx="50" cy="50" r="42" fill="none" stroke="url(#gradEpic)" stroke-width="8" stroke-linecap="round" stroke-dasharray="264" stroke-dashoffset="87"/></svg><defs><linearGradient id="gradEpic" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="var(--gold)"/><stop offset="100%" stop-color="var(--amber)"/></linearGradient></defs><div style="position:absolute;inset:0;display:grid;place-items:center"><div style="text-align:center"><div style="font-size:22px;font-weight:700;color:var(--text-hi);font-family:var(--font-epic)">67%</div><div style="font-size:9px;color:var(--text-low)">完成度</div></div></div></div>
+<div style="flex:1;display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+<div style="text-align:center"><div style="font-size:20px;font-weight:700;color:var(--gold-dark)">12</div><div style="font-size:10px;color:var(--text-low)">总任务</div></div>
+<div style="text-align:center"><div style="font-size:20px;font-weight:700;color:var(--jade-dark)">8</div><div style="font-size:10px;color:var(--text-low)">已完成</div></div>
+<div style="text-align:center"><div style="font-size:20px;font-weight:700;color:var(--amber-dark)">3</div><div style="font-size:10px;color:var(--text-low)">进行中</div></div>
+<div style="text-align:center"><div style="font-size:20px;font-weight:700;color:var(--crimson-dark)">1</div><div style="font-size:10px;color:var(--text-low)">已逾期</div></div></div>
+<div style="flex:1"><div style="font-size:11px;font-weight:600;color:var(--text-hi);margin-bottom:8px;font-family:var(--font-epic)">本周趋势</div><div style="display:flex;align-items:flex-end;gap:4px;height:50px"><div style="flex:1;background:var(--gold-soft);border-radius:3px 3px 0 0;height:40%"></div><div style="flex:1;background:var(--gold-soft);border-radius:3px 3px 0 0;height:60%"></div><div style="flex:1;background:var(--gold);border-radius:3px 3px 0 0;height:80%"></div><div style="flex:1;background:var(--gold-soft);border-radius:3px 3px 0 0;height:50%"></div><div style="flex:1;background:var(--gold-soft);border-radius:3px 3px 0 0;height:70%"></div><div style="flex:1;background:var(--amber);border-radius:3px 3px 0 0;height:90%"></div><div style="flex:1;background:var(--gold-soft);border-radius:3px 3px 0 0;height:55%"></div></div></div></div>
+<div class="land"><b>前端对应</b>：<code>ProjectStats.vue</code><br><b>数据契约</b>：<code>{total,completed,in_progress,overdue,weekly_trend[]}</code></div></div>
+
+</div></section>
+</main>
+<script>
+const root=document.documentElement;
+function setTheme(t){root.setAttribute('data-theme',t);const b=document.getElementById('themeBtn');if(b)b.textContent=t==='dark'?'☀ 明亮模式':'🌙 暗夜模式';}
+document.getElementById('themeBtn')?.addEventListener('click',()=>{setTheme(root.getAttribute('data-theme')==='dark'?'light':'dark');});
+</script>
+</body></html>
+</main>
+</body>
+</html>
