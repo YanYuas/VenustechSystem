@@ -844,6 +844,37 @@ def main() -> int:
               not _tok.startswith("plain:") and _dec(_tok) == "sk-smoke-secret-001",
               _tok[:24])
 
+        # ---------- mod-platform P1：审计日志 ----------
+        # 解锁后做一次真实加解密 → 应留下审计记录
+        client.post("/api/v1/vault/unlock", json={"master_password": "new master password 9"})
+        r = client.post("/api/v1/security/encrypt", json={"data": "audit-probe"})
+        _tok2 = r.json()["data"]["encrypted"]
+        client.post("/api/v1/security/decrypt", json={"token": _tok2})
+        r = client.get("/api/v1/security/audit?limit=20")
+        _items = r.json()["data"]["items"]
+        check("audit logs record security actions",
+              any(i["action"] == "security.encrypt" for i in _items)
+              and any(i["action"] == "security.decrypt" for i in _items), str(_items)[:200])
+        check("audit log entries are ordered desc",
+              len(_items) >= 2 and (_items[0]["created_at"] or "") >= (_items[-1]["created_at"] or ""),
+              str([i["created_at"] for i in _items[:3]]))
+        client.post("/api/v1/vault/lock")
+
+        # ---------- mod-platform P1：插件错误隔离 ----------
+        from app.core.plugin_manager import safe_call as _safe_call
+        def _boom():
+            raise RuntimeError("plugin exploded")
+        check("plugin exception is isolated",
+              _safe_call("probe", _boom, default="ok") == "ok", "exception leaked")
+        import time as _t
+        def _hang():
+            _t.sleep(5)
+            return "late"
+        _t0 = _t.time()
+        _r = _safe_call("probe", _hang, timeout=1, default="timeout")
+        check("plugin timeout is isolated",
+              _r == "timeout" and (_t.time() - _t0) < 3, f"{_r} in {_t.time() - _t0:.1f}s")
+
         r = client.get("/api/v1/plugins/aihot/items", params={"window": "99h"})
         d = r.json().get("data", {})
         check("aihot rejects bad window (graceful envelope)",

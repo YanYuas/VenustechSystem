@@ -4,6 +4,8 @@
 # ============================================================
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
+
 import importlib
 import importlib.util
 import logging
@@ -58,6 +60,36 @@ def validate_permissions(perms: list[str]) -> tuple[bool, str]:
         if pname not in ALLOWED_PERMISSIONS:
             return False, f"未知权限: {pname}（允许: {sorted(ALLOWED_PERMISSIONS)}）"
     return True, ""
+
+
+def safe_call(plugin_id: str, fn: Any, *args: Any, timeout: float | None = None,
+              default: Any = None) -> Any:
+    """调用插件方法并隔离失败（P1 F3.4）。
+
+    - 任何异常都被吞掉并记录，绝不让插件错误冒泡到宿主请求
+    - timeout 不为 None 时在线程中执行并限时，超时返回 default
+      （单进程内无法强杀线程，仅保证调用方不被无限阻塞）
+    """
+    if fn is None:
+        return default
+    try:
+        if timeout is None:
+            return fn(*args)
+        # 注意：不能用 `with`（退出时会 join 线程，等于没超时）。
+        # 超时后立刻返回，线程任其跑完（Python 无法强杀），
+        # 保证的是**调用方不被无限阻塞**。
+        pool = ThreadPoolExecutor(max_workers=1)
+        try:
+            fut = pool.submit(fn, *args)
+            return fut.result(timeout=timeout)
+        finally:
+            pool.shutdown(wait=False, cancel_futures=True)
+    except FuturesTimeout:
+        logger.error("插件调用超时: %s (%ss)", plugin_id, timeout)
+        return default
+    except Exception:
+        logger.exception("插件调用异常已隔离: %s", plugin_id)
+        return default
 
 
 class PluginManager:
@@ -149,7 +181,8 @@ class PluginManager:
 
                 # 调用插件的 initialize 函数
                 if hasattr(module, "initialize") and cls._context:
-                    module.initialize(cls._context)
+                    safe_call(plugin_id, getattr(module, "initialize"), cls._context,
+                              timeout=10)
 
                 cls._instances[plugin_id] = module
                 logger.info("插件加载成功: %s v%s", info.name, info.version)
@@ -180,11 +213,8 @@ class PluginManager:
         if plugin_id in cls._instances:
             instance = cls._instances[plugin_id]
             if hasattr(instance, "shutdown"):
-                try:
-                    instance.shutdown()
-                except Exception:
-                    # 插件清理失败不应阻断卸载，但必须留痕（否则插件资源泄漏无从排查）
-                    logger.warning("插件 shutdown() 失败: %s", plugin_id, exc_info=True)
+                # 卸载清理同样隔离（超时 5s），失败不阻断卸载
+                safe_call(plugin_id, getattr(instance, "shutdown"), timeout=5)
             del cls._instances[plugin_id]
             logger.info("插件已卸载: %s", plugin_id)
             return True

@@ -116,3 +116,43 @@ def require_unlocked(user_id: str) -> None:
 
     if user_id not in _session_keys:
         raise ValidationException("保险箱未解锁：请先在保险箱页解锁后再操作")
+
+
+# ---------- 审计日志 ----------
+
+def audit(db: Session, user_id: str, action: str, *, target: str | None = None,
+          ok: bool = True, detail: str | None = None, ip: str | None = None) -> None:
+    """写一条审计记录。审计本身永不抛异常（不能因为记日志打断业务）。"""
+    from app.models.audit import AUDIT_ACTIONS, AuditLog
+
+    if action not in AUDIT_ACTIONS:
+        action = "plugin.error"  # 未登记动作降级归类，绝不静默丢弃
+    try:
+        db.add(AuditLog(
+            user_id=user_id, action=action, target=(target or "")[:200] or None,
+            ok=ok, detail=(detail or "")[:1000] or None, ip=ip,
+        ))
+        db.commit()
+    except Exception:
+        db.rollback()
+
+
+def list_audit(db: Session, user_id: str, limit: int = 50) -> list[dict]:
+    from sqlalchemy import select
+
+    from app.models.audit import AuditLog
+
+    rows = db.scalars(
+        select(AuditLog)
+        .where(AuditLog.user_id == user_id, AuditLog.deleted_at.is_(None))
+        .order_by(AuditLog.created_at.desc())
+        .limit(min(limit, 200))
+    ).all()
+    return [
+        {
+            "id": r.id, "action": r.action, "target": r.target, "ok": r.ok,
+            "detail": r.detail, "ip": r.ip,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        }
+        for r in rows
+    ]

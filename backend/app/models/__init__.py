@@ -24,3 +24,4 @@ from app.models.growth import GrowthState, GrowthEvent, SkillStat
 from app.models.identity import Identity
 from app.models.workspace import WorkspaceFile, WorkspaceRoot
 from app.models.vault import VaultConfig, VaultItem
+from app.models.audit import AuditLog, AUDIT_ACTIONS
