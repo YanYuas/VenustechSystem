@@ -15,15 +15,25 @@ except ImportError:  # pragma: no cover
 
 
 def encrypt_secret(plaintext: str) -> str:
-    """加密明文。返回带前缀的密文：dpapi:… 或 plain:…"""
+    """加密明文。返回带前缀的密文：dpapi:…
+
+    安全修正（mod-platform P0）：DPAPI 不可用时**不再静默降级为 base64
+    占位**（那等于明文落库）。非开发环境直接拒绝写入，逼迫显式处理。
+    """
     if _DPAPI_AVAILABLE:
         blob = win32crypt.CryptProtectData(
             plaintext.encode("utf-8"),
             desc="Venustech API Key",
         )
         return "dpapi:" + base64.b64encode(blob).decode("ascii")
-    # 降级：仅混淆，非安全 —— 开发期可用
-    return "plain:" + base64.b64encode(plaintext.encode("utf-8")).decode("ascii")
+    # 仅开发模式允许占位（本地跑通流程用），生产一律拒绝
+    from app.config import get_settings
+
+    if get_settings().dev:
+        return "plain:" + base64.b64encode(plaintext.encode("utf-8")).decode("ascii")
+    raise RuntimeError(
+        "DPAPI 不可用且当前非开发模式：拒绝以明文占位存储密钥（请安装 pywin32）"
+    )
 
 
 def decrypt_secret(ciphertext: str) -> str:

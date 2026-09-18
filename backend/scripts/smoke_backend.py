@@ -747,6 +747,53 @@ def main() -> int:
         # 用户不匹配的包拒绝导入（防串包）
         check("sync package user binding", pkg["user_id"] is not None, str(pkg["user_id"]))
 
+        # ---------- mod-platform P0：同步删除传导 ----------
+        from app.core.sync import SyncEngine as _SyncEngine
+        from app.models.user import User as _SyncUser
+        _sdb2 = _Session()
+        _uid2 = _sdb2.query(_SyncUser.id).first()[0]
+
+        def _sync_engine():
+            return _SyncEngine(_Session(), _uid2)
+
+        # 默认关闭（安全）：远端包缺行时绝不动本地
+        _ops_default = _sync_engine().diff(pkg["tables"])
+        check("sync delete propagation off by default",
+              all(o["op"] != "delete" for o in _ops_default), str(_ops_default)[:160])
+
+        # 自造一条任务 → 导包 → 从远端快照里摘掉它 → 应落墓碑（软删不硬删）
+        # 两条：keep 留在远端包里（证明"对端掌握这张表"），del 被摘掉
+        r = client.post("/api/v1/tasks", json={"title": "P0 删除传导-保留"})
+        _keep_id = r.json()["data"]["id"]
+        r = client.post("/api/v1/tasks", json={"title": "P0 删除传导-删除"})
+        _del_id = r.json()["data"]["id"]
+        r = client.post("/api/v1/sync/export", json={"dir": str(SMOKE_DIR)})
+        _pkg2 = json.loads(Path(r.json()["data"]["path"]).read_text(encoding="utf-8"))
+        _remote2 = dict(_pkg2["tables"])
+        _remote2["tasks"] = {k: v for k, v in _remote2["tasks"].items() if k != _del_id}
+        _ops2 = _sync_engine().diff(_remote2, propagate_deletes=True)
+        check("sync delete propagation emits delete op",
+              any(o["op"] == "delete" and o["row"]["id"] == _del_id for o in _ops2),
+              str(_ops2)[:200])
+        _st = _sync_engine().apply(_ops2)
+        _tombstoned = _sdb2.execute(_text(
+            "SELECT COUNT(*) FROM tasks WHERE id = :i AND deleted_at IS NOT NULL"
+        ), {"i": _del_id}).scalar()
+        check("sync delete propagation tombstones local row",
+              int(_st.get("delete", 0)) >= 1 and int(_tombstoned) == 1, str(_st)[:160])
+
+        # 对端"不掌握"某张表（空 dict）→ 绝不删（防御裁剪包）
+        _remote3 = dict(_pkg2["tables"])
+        _remote3["tasks"] = {}
+        _ops_empty = _sync_engine().diff(_remote3, propagate_deletes=True)
+        _sdb2.close()
+
+        # ---------- mod-platform P0：加解密端点需解锁 ----------
+        client.post("/api/v1/vault/lock")  # 先确保处于锁定态
+        r = client.post("/api/v1/security/encrypt", json={"data": "hello"})
+        check("security encrypt requires unlock", r.json().get("code") != 0, r.text[:160])
+        r = client.post("/api/v1/security/key/rotate", json={})
+        check("security rotate requires unlock", r.json().get("code") != 0, r.text[:160])
         # ==================== S6-6 AI HOT 插件（插件架构首次真实检验） ====================
         # 插件发现/加载 + 路由挂载 + 离线降级。外网可用性不假设：
         # 端点要么 live 要么 cache 要么诚实 ok=False，HTTP 一律 200。

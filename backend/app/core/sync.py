@@ -140,13 +140,21 @@ class SyncEngine:
         keys = set(a) | set(b)
         return all(a.get(k) == b.get(k) for k in keys)
 
-    def diff(self, remote: dict[str, dict[str, dict[str, Any]]]) -> list[dict[str, Any]]:
-        """远端快照 vs 本地快照 → 需要应用到本地的行（只增不删：远端没有的行不动本地）。
+    def diff(
+        self,
+        remote: dict[str, dict[str, dict[str, Any]]],
+        propagate_deletes: bool = False,
+    ) -> list[dict[str, Any]]:
+        """远端快照 vs 本地快照 → 需要应用到本地的行。
 
-        三态：
+        四态：
           remote-only            → 插入
           both & 不同 & 远端较新 → 更新（LWW）
           both & 不同 & 本地较新 → 跳过（导出方向会让远端追上）
+          local-only & 开启删除传导 → 墓碑删除（软删，保留 deleted_at）
+
+        删除传导**默认关闭**：远端包若只含部分表/部分数据（例如手工裁剪的
+        包），开启会把本地数据误删。仅当对端是"权威全量"时才显式开启。
         """
         local = self.snapshot()
         ops: list[dict[str, Any]] = []
@@ -163,6 +171,18 @@ class SyncEngine:
                     winner = self._newer(rrow, lrow)
                     if winner is rrow:
                         ops.append({"table": table, "row": rrow, "op": "update"})
+        # 删除传导：本地有而远端没有 → 对端已删，本地落墓碑（软删）
+        if propagate_deletes:
+            for table, lrows in local.items():
+                if policy_of(table) is SyncPolicy.DERIVED_SKIP:
+                    continue
+                rrows = remote.get(table)
+                if not rrows:
+                    continue  # 对端没给这张表 = 不掌握情况，绝不动本地
+                for lid in lrows:
+                    if lid not in rrows:
+                        ops.append({"table": table, "row": {"id": lid}, "op": "delete"})
+
         return ops
 
     def resolve_conflict(self, local_row: dict[str, Any], remote_row: dict[str, Any]) -> dict[str, Any]:
@@ -173,11 +193,27 @@ class SyncEngine:
 
     def apply(self, ops: list[dict[str, Any]]) -> dict[str, int]:
         """把 diff 结果写入本地库。upsert = 删旧行 + 插新行（SQLite 单事务）。"""
-        stats = {"insert": 0, "update": 0, "skipped": 0}
+        stats = {"insert": 0, "update": 0, "delete": 0, "skipped": 0}
+        now = utcnow()
         for oprec in ops:
             table = oprec["table"]
             tbl = Base.metadata.tables[table]
             row = self._decode_row(table, oprec["row"])
+
+            # 删除传导：写墓碑而非硬删（保留同步所需的 deleted_at）
+            if oprec["op"] == "delete":
+                if "deleted_at" not in tbl.c:
+                    stats["skipped"] += 1
+                    continue
+                res = self.db.execute(
+                    tbl.update()
+                    .where(tbl.c.id == row["id"])
+                    .where(tbl.c.deleted_at.is_(None))
+                    .values(deleted_at=now, updated_at=now)
+                )
+                stats["delete"] += int(res.rowcount or 0)
+                continue
+
             existing = self.db.execute(
                 select(tbl.c.id).where(tbl.c.id == row["id"])
             ).scalar()
