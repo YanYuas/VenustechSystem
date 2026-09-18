@@ -185,6 +185,29 @@ class SyncEngine:
 
         return ops
 
+    def preview(self, remote: dict[str, dict[str, dict[str, Any]]],
+                propagate_deletes: bool = False, sample: int = 8) -> dict[str, Any]:
+        """导入前预览：只算不改库。返回摘要 + 样例，供人确认后再 apply。"""
+        ops = self.diff(remote, propagate_deletes=propagate_deletes)
+        by_table: dict[str, dict[str, int]] = {}
+        by_op: dict[str, int] = {"insert": 0, "update": 0, "delete": 0}
+        for o in ops:
+            t = by_table.setdefault(o["table"], {"insert": 0, "update": 0, "delete": 0})
+            t[o["op"]] = t.get(o["op"], 0) + 1
+            by_op[o["op"]] = by_op.get(o["op"], 0) + 1
+        samples = [
+            {"table": o["table"], "op": o["op"], "id": o["row"].get("id"),
+             "title": (o["row"].get("title") or o["row"].get("name") or o["row"].get("key") or "")}
+            for o in ops[:sample]
+        ]
+        return {
+            "total": len(ops),
+            "by_op": by_op,
+            "by_table": by_table,
+            "samples": samples,
+            "propagate_deletes": propagate_deletes,
+        }
+
     def resolve_conflict(self, local_row: dict[str, Any], remote_row: dict[str, Any]) -> dict[str, Any]:
         """冲突解决预留接口。当前默认 LWW；将来可替换为字段级合并。"""
         return self._newer(remote_row, local_row)

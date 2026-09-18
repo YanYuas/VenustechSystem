@@ -39,6 +39,27 @@ class PluginContext:
     logger: logging.Logger
 
 
+# ---------- 插件权限模型（mod-platform P1） ----------
+# 白名单式：声明里出现未知权限 → 拒绝加载（fail-closed，不静默放行）
+ALLOWED_PERMISSIONS = {
+    "network",     # 允许对外 HTTP（插件须自证固定 base URL，见 aihot）
+    "db_read",     # 只读业务库
+    "files",       # 读写自己的数据目录（data_dir/plugins/<id>/）
+}
+# 高危权限：声明即拒绝（单进程内无法真正隔离 exec）
+DENIED_PERMISSIONS = {"exec", "db_write", "subprocess"}
+
+
+def validate_permissions(perms: list[str]) -> tuple[bool, str]:
+    """校验插件声明的权限。返回 (是否允许, 原因)。"""
+    for pname in perms:
+        if pname in DENIED_PERMISSIONS:
+            return False, f"高危权限被拒绝: {pname}"
+        if pname not in ALLOWED_PERMISSIONS:
+            return False, f"未知权限: {pname}（允许: {sorted(ALLOWED_PERMISSIONS)}）"
+    return True, ""
+
+
 class PluginManager:
     """插件管理器：发现、加载、启用/禁用插件"""
 
@@ -107,6 +128,12 @@ class PluginManager:
             logger.info("插件已禁用，跳过加载: %s", plugin_id)
             return False
 
+        # 权限门禁（P1）：声明不合法 → 拒绝加载，fail-closed
+        ok, reason = validate_permissions(info.permissions)
+        if not ok:
+            logger.error("插件权限校验未通过，拒绝加载: %s (%s)", plugin_id, reason)
+            return False
+
         try:
             entry_path = Path(info.path) / info.entry_point
             if not entry_path.exists():
@@ -138,6 +165,14 @@ class PluginManager:
         for plugin_id in cls._plugins:
             results[plugin_id] = cls.load(plugin_id)
         return results
+
+    @classmethod
+    def has_permission(cls, plugin_id: str, permission: str) -> bool:
+        """运行时权限校验：插件实际调用敏感能力前必须先过这一关。"""
+        info = cls._plugins.get(plugin_id)
+        if info is None:
+            return False
+        return permission in info.permissions and permission in ALLOWED_PERMISSIONS
 
     @classmethod
     def unload(cls, plugin_id: str) -> bool:

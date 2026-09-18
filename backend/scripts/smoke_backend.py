@@ -788,6 +788,17 @@ def main() -> int:
         _ops_empty = _sync_engine().diff(_remote3, propagate_deletes=True)
         _sdb2.close()
 
+        # ---------- mod-platform P1：同步预览（只算不改库） ----------
+        r = client.post("/api/v1/sync/preview", json={"path": pkg_path})
+        _pv = r.json()["data"]
+        check("sync preview returns summary",
+              r.json().get("code") == 0 and isinstance(_pv.get("total"), int)
+              and "by_op" in _pv and "samples" in _pv, str(_pv)[:200])
+        # 预览不得改库：连续两次预览结果一致
+        _pv2 = client.post("/api/v1/sync/preview", json={"path": pkg_path}).json()["data"]
+        check("sync preview is read-only",
+              _pv["total"] == _pv2["total"], f"{_pv['total']} vs {_pv2['total']}")
+
         # ---------- mod-platform P0：加解密端点需解锁 ----------
         client.post("/api/v1/vault/lock")  # 先确保处于锁定态
         r = client.post("/api/v1/security/encrypt", json={"data": "hello"})
@@ -802,6 +813,26 @@ def main() -> int:
         aihot = next((p for p in d["plugins"] if p["id"] == "aihot"), None)
         check("aihot plugin discovered+loaded",
               aihot is not None and aihot["loaded"] is True, str(d)[:200])
+
+        # ---------- mod-platform P1：插件权限真正执行 ----------
+        from app.core.plugin_manager import (
+            plugin_manager as _pm, validate_permissions as _vp,
+        )
+        check("plugin permission declared (aihot network)",
+              _pm.has_permission("aihot", "network") is True, str(_pm.get_status())[:160])
+        check("plugin unknown permission rejected",
+              _vp(["teleport"])[0] is False, str(_vp(["teleport"])))
+        check("plugin high-risk permission rejected",
+              _vp(["exec"])[0] is False, str(_vp(["exec"])))
+        # 声明高危权限的插件 → 拒绝加载（fail-closed）
+        from app.core.plugin_manager import PluginInfo as _PI
+        _evil = _PI(id="evil-probe", name="evil", version="0", path="", entry_point="main.py",
+                    permissions=["exec"])
+        _pm._plugins["evil-probe"] = _evil
+        check("plugin with exec permission refused to load",
+              _pm.load("evil-probe") is False, "evil plugin loaded unexpectedly")
+        _pm._plugins.pop("evil-probe", None)
+        check("plugin valid permission passes", _vp(["network", "files"])[0] is True, "should pass")
 
         r = client.get("/api/v1/plugins/aihot/items", params={"window": "99h"})
         d = r.json().get("data", {})

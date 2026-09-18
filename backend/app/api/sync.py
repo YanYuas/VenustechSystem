@@ -7,6 +7,8 @@
 # ============================================================
 from __future__ import annotations
 
+import json
+
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -65,6 +67,19 @@ def export(data: ExportRequest, db: Session = Depends(get_db), user: User = Depe
     except ValueError as e:
         raise ValidationException(str(e))
     return success({"path": str(path)})
+
+
+@router.post("/preview", summary="预览导入将发生的变化（只算不改库）")
+def preview_sync(data: ImportRequest, db: Session = Depends(get_db),
+                 user: User = Depends(get_current_user)):
+    from app.core.sync import SyncEngine
+    path = Path(data.path)
+    if not path.exists():
+        raise ValidationException(f"文件不存在: {path}")
+    pkg = json.loads(Path(path).read_text(encoding="utf-8"))
+    if pkg.get("user_id") and pkg["user_id"] != user.id:
+        raise ValidationException("同步包属于其他用户，拒绝导入")
+    return success(SyncEngine(db, user.id).preview(pkg.get("tables", {})))
 
 
 @router.post("/import", summary="导入同步包（diff + LWW）")
