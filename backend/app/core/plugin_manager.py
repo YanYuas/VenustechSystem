@@ -10,7 +10,7 @@ import importlib
 import importlib.util
 import logging
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass, replace, field
 from pathlib import Path
 from typing import Any, Callable
 
@@ -34,11 +34,22 @@ class PluginInfo:
 
 @dataclass
 class PluginContext:
-    """插件运行上下文（注入给插件的API）"""
+    """插件运行上下文（注入给插件的API）
+
+    plugin_id 用于权限自检：插件调用 mount_router 等受限能力时，
+    由上下文反查自身权限（PRD 8.3：未声明权限 → PermissionError）。
+    """
     event_bus: Any  # EventBus
     config: dict[str, Any]
     data_dir: Path
     logger: logging.Logger
+    plugin_id: str = ""
+    router: Any = None  # mount_router 注册的路由（宿主统一挂载）
+
+    def mount_router(self, router: Any) -> None:
+        """插件注册自己的 HTTP 路由（需 route:mount 权限）。"""
+        require_permission(self.plugin_id, "route:mount")
+        self.router = router
 
 
 # ---------- 插件权限模型（mod-platform P1） ----------
@@ -47,6 +58,7 @@ ALLOWED_PERMISSIONS = {
     "network",     # 允许对外 HTTP（插件须自证固定 base URL，见 aihot）
     "db_read",     # 只读业务库
     "files",       # 读写自己的数据目录（data_dir/plugins/<id>/）
+    "route:mount", # 允许注册自己的 HTTP 路由（PRD 8.3）
 }
 # 高危权限：声明即拒绝（单进程内无法真正隔离 exec）
 DENIED_PERMISSIONS = {"exec", "db_write", "subprocess"}
@@ -90,6 +102,18 @@ def safe_call(plugin_id: str, fn: Any, *args: Any, timeout: float | None = None,
     except Exception:
         logger.exception("插件调用异常已隔离: %s", plugin_id)
         return default
+
+
+def require_permission(plugin_id: str, permission: str) -> None:
+    """越权即抛 PermissionError（PRD 8.3 F3.1 的硬要求）。
+
+    与 has_permission 的区别：has_permission 用于"能判断"，本函数用于
+    "必须授权"——插件调用受限能力时走这条路径。
+    """
+    if not PluginManager.has_permission(plugin_id, permission):
+        raise PermissionError(
+            f"插件 {plugin_id or '<unknown>'} 未声明权限 {permission}，调用被拒绝"
+        )
 
 
 class PluginManager:
@@ -181,8 +205,9 @@ class PluginManager:
 
                 # 调用插件的 initialize 函数
                 if hasattr(module, "initialize") and cls._context:
-                    safe_call(plugin_id, getattr(module, "initialize"), cls._context,
-                              timeout=10)
+                    # 每个插件拿到带自身 id 的上下文副本（权限自检用）
+                    ctx = replace(cls._context, plugin_id=plugin_id)
+                    safe_call(plugin_id, getattr(module, "initialize"), ctx, timeout=10)
 
                 cls._instances[plugin_id] = module
                 logger.info("插件加载成功: %s v%s", info.name, info.version)

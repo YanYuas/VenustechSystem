@@ -788,6 +788,28 @@ def main() -> int:
         _ops_empty = _sync_engine().diff(_remote3, propagate_deletes=True)
         _sdb2.close()
 
+        # ---------- mod-platform 验收 8.1：增量同步（F2.1） ----------
+        r = client.post("/api/v1/sync/export", json={"dir": str(SMOKE_DIR)})
+        _full = r.json()["data"]
+        check("sync export reports row_count", isinstance(_full.get("row_count"), int)
+              and _full["row_count"] > 0, str(_full)[:160])
+        # 制造一处变更后做增量导出
+        client.post("/api/v1/tasks", json={"title": "增量同步探测任务"})
+        r = client.post("/api/v1/sync/export", json={"dir": str(SMOKE_DIR), "incremental": True})
+        _inc = r.json()["data"]
+        _pkg_inc = json.loads(Path(_inc["path"]).read_text(encoding="utf-8"))
+        check("sync incremental export is much smaller",
+              _inc["incremental"] is True and _inc["row_count"] * 10 <= _full["row_count"],
+              f"inc={_inc['row_count']} full={_full['row_count']}")
+        check("sync incremental package carries tombstones",
+              all("updated_at" in row for t, rows in _pkg_inc["tables"].items() for row in rows.values()),
+              "rows must carry updated_at for delete propagation")
+        check("sync cursor not exported",
+              not any(k.startswith("sync.") for k, _ in
+                      [(row["key"], 0) for t, rows in _pkg_inc["tables"].items()
+                       if t == "settings" for row in rows.values()]),
+              "sync.* cursor leaked into package")
+
         # ---------- mod-platform P1：同步预览（只算不改库） ----------
         r = client.post("/api/v1/sync/preview", json={"path": pkg_path})
         _pv = r.json()["data"]
@@ -833,6 +855,80 @@ def main() -> int:
               _pm.load("evil-probe") is False, "evil plugin loaded unexpectedly")
         _pm._plugins.pop("evil-probe", None)
         check("plugin valid permission passes", _vp(["network", "files"])[0] is True, "should pass")
+
+        # PRD 8.3：未声明权限时越权调用必须抛 PermissionError
+        from app.core.plugin_manager import require_permission as _req
+        _raised = False
+        try:
+            _req("aihot", "db_write")
+        except PermissionError:
+            _raised = True
+        check("plugin unauthorized call raises PermissionError", _raised, "no raise")
+        _ok_call = True
+        try:
+            _req("aihot", "network")
+        except PermissionError:
+            _ok_call = False
+        check("plugin authorized call passes", _ok_call, "unexpected raise")
+        # 上下文级守卫：mount_router 需 route:mount 权限
+        from app.core.plugin_manager import PluginContext as _PC
+        _ctx = _PC(event_bus=None, config={}, data_dir=SMOKE_DIR, logger=None,
+                   plugin_id="aihot")
+        _raised2 = False
+        try:
+            _ctx.mount_router(object())
+        except PermissionError:
+            _raised2 = True
+        check("plugin mount_router requires permission", _raised2, "no raise")
+
+        # PRD 8.4：全量 snapshot 在万行级 < 500ms
+        import time as _time2
+        import sqlalchemy as _sa
+        from app.core.sync import SyncEngine as _SE2
+        from app.database import Base as _B2
+        from app.database import SessionLocal as _S3
+        from sqlalchemy import text as _t2
+        from app.models.base import utcnow as _now2
+
+        _perf_db = _S3()
+        _uid3 = _perf_db.query(_SyncUser.id).first()[0]
+        _tbl = _B2.metadata.tables["tasks"]
+        _nowp = _now2()
+        # 从表结构自动补全所有非空且无默认值的列（避免逐个漏列）
+        def _fill(col):
+            if isinstance(col.type, (_sa.Boolean,)):
+                return False
+            if isinstance(col.type, (_sa.Integer, _sa.Float, _sa.Numeric)):
+                return 0
+            if isinstance(col.type, (_sa.DateTime, _sa.Date)):
+                return _nowp
+            return ""
+
+        # 注意：Python 侧 default 在 Core INSERT 里不生效，故只要"非空且无
+        # server_default"就必须显式赋值（否则 NOT NULL 失败）
+        _extra_cols = [c.name for c in _tbl.columns
+                       if not c.nullable and c.server_default is None
+                       and c.name not in ("id", "user_id", "title")]
+        _bulk = []
+        for _i in range(10000):
+            _row = {"id": f"perf-{_i}", "user_id": _uid3, "title": f"性能探测 {_i}"}
+            for _c in _extra_cols:
+                _row[_c] = _fill(_tbl.columns[_c])
+            _bulk.append(_row)
+        _cols = ", ".join(_bulk[0].keys())
+        _vals = ", ".join(f":{k}" for k in _bulk[0])
+        _perf_db.execute(_t2("DELETE FROM tasks WHERE id LIKE 'perf-%'"))
+        _perf_db.execute(_t2(f"INSERT INTO tasks ({_cols}) VALUES ({_vals})"), _bulk)
+        _perf_db.commit()
+        _t0 = _time2.perf_counter()
+        _snap = _SE2(_perf_db, _uid3).snapshot()
+        _elapsed = (_time2.perf_counter() - _t0) * 1000
+        _rows = sum(len(v) for v in _snap.values())
+        _perf_db.execute(_t2("DELETE FROM tasks WHERE id LIKE 'perf-%'"))
+        _perf_db.commit()
+        _perf_db.close()
+        check("snapshot 10000-row scale under 500ms",
+              _rows >= 10000 and _elapsed < 500, f"{_rows} rows in {_elapsed:.0f}ms")
 
         # ---------- mod-platform P1：敏感信息加密不得落明文 ----------
         from app.core.encryption import get_encryption as _get_enc

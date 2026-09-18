@@ -62,7 +62,7 @@ ENCRYPTED_ONLY_COLUMNS: dict[str, set[str]] = {
 }
 
 # filtered：这些前缀的 settings 键是设备相关配置，不跨机同步
-SETTINGS_EXCLUDED_PREFIXES = ("workspace.",)
+SETTINGS_EXCLUDED_PREFIXES = ("workspace.", "sync.")  # sync.* 为设备本地游标，不跨端
 
 
 def policy_of(table: str) -> SyncPolicy:
@@ -98,14 +98,21 @@ class SyncEngine:
 
     # ---------- snapshot（canon） ----------
 
-    def snapshot(self) -> dict[str, dict[str, dict[str, Any]]]:
-        """当前用户的全部可同步数据，规范成 JSON 安全的 {表: {id: 行}}。"""
+    def snapshot(self, since: Any = None) -> dict[str, dict[str, dict[str, Any]]]:
+        """当前用户的可同步数据，规范成 {表: {id: 行}}。
+
+        since 不为 None 时只取 updated_at > since 的行（增量导出，F2.1）。
+        墓碑行（deleted_at 非空）同样带 updated_at，因此删除也会随增量
+        包传导出去 —— 这是增量模式下删除不丢的关键。
+        """
         snap: dict[str, dict[str, dict[str, Any]]] = {}
         for name in self.synced_tables():
             tbl = Base.metadata.tables[name]
             q = select(tbl)
             if "user_id" in tbl.c:
                 q = q.where(tbl.c.user_id == self.user_id)
+            if since is not None and "updated_at" in tbl.c:
+                q = q.where(tbl.c.updated_at > since)
             rows: dict[str, dict[str, Any]] = {}
             for mapping in self.db.execute(q).mappings():
                 row = self._canon_row(name, dict(mapping))
@@ -276,22 +283,69 @@ class SyncEngine:
 
     # ---------- 本地适配器（P0）：JSON 同步包 ----------
 
-    def export_to(self, directory: Path) -> Path:
-        """导出同步包到本地目录（云适配器未来实现同一契约）。"""
+    def export_to(self, directory: Path, incremental: bool = False) -> Path:
+        """导出同步包到本地目录（云适配器未来实现同一契约）。
+
+        incremental=True 时只导出上次导出后变更的行（F2.1），包体积可达
+        首次的 10% 以下；删除行因带 updated_at 同样随包传导。
+        """
         directory = Path(directory).resolve()
         if not directory.is_dir():
             raise ValueError(f"目录不存在: {directory}")
         stamp = utcnow().strftime("%Y%m%d-%H%M%S")
-        path = directory / f"qimingxing-sync-{stamp}.json"
+        since = self._export_cursor() if incremental else None
+        snapshot = self.snapshot(since=since)
+        exported_at = utcnow()
+        suffix = "-inc" if incremental and since is not None else ""
+        path = directory / f"qimingxing-sync-{stamp}{suffix}.json"
         payload = {
             "version": SYNC_PACKAGE_VERSION,
-            "exported_at": utcnow().isoformat(),
+            "exported_at": exported_at.isoformat(),
             "user_id": self.user_id,
+            "incremental": bool(incremental and since is not None),
+            "since": since.isoformat() if since else None,
+            "row_count": sum(len(v) for v in snapshot.values()),
             "policy": self.policy_report(),
-            "tables": self.snapshot(),
+            "tables": snapshot,
         }
         path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+        # 游标推进：**全量导出同样推进**（全量 = 截至此刻的全部数据，
+        # 下次增量应从此刻继续）。否则首次增量会退化成全量导出。
+        self._set_export_cursor(exported_at)
         return path
+
+    # ---------- 增量游标（设备本地，不跨端同步） ----------
+
+    def _export_cursor(self):
+        from app.models.settings import Setting
+
+        row = self.db.scalars(
+            select(Setting).where(
+                Setting.user_id == self.user_id, Setting.key == "sync.last_export_at"
+            )
+        ).first()
+        if row is None or not (row.value or "").strip():
+            return None
+        try:
+            return datetime.fromisoformat(row.value)
+        except ValueError:
+            return None
+
+    def _set_export_cursor(self, when) -> None:
+        from app.models.settings import Setting
+
+        row = self.db.scalars(
+            select(Setting).where(
+                Setting.user_id == self.user_id, Setting.key == "sync.last_export_at"
+            )
+        ).first()
+        if row is None:
+            self.db.add(Setting(user_id=self.user_id, key="sync.last_export_at",
+                                value=when.isoformat()))
+        else:
+            row.value = when.isoformat()
+            row.updated_at = when
+        self.db.commit()
 
     @staticmethod
     def load_package(path: Path) -> dict[str, Any]:

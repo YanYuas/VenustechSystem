@@ -29,6 +29,7 @@ router = APIRouter(prefix="/sync", tags=["sync"])
 
 class ExportRequest(BaseModel):
     dir: str | None = Field(None, max_length=500)  # 缺省 → {data_dir}/exports
+    incremental: bool = False  # True：只导出上次导出后变更的行（F2.1）
 
 
 class ImportRequest(BaseModel):
@@ -63,10 +64,15 @@ def packages(user: User = Depends(get_current_user)):
 def export(data: ExportRequest, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     try:
         target = Path(data.dir) if data.dir else _default_export_dir()
-        path = SyncEngine(db, user.id).export_to(target)
+        path = SyncEngine(db, user.id).export_to(target, incremental=data.incremental)
     except ValueError as e:
         raise ValidationException(str(e))
-    return success({"path": str(path)})
+    pkg = json.loads(path.read_text(encoding="utf-8"))
+    return success({
+        "path": str(path),
+        "incremental": pkg.get("incremental", False),
+        "row_count": pkg.get("row_count"),
+    })
 
 
 @router.post("/preview", summary="预览导入将发生的变化（只算不改库）")
