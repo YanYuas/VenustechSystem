@@ -7,6 +7,45 @@
 
 ## [Unreleased]
 
+### Added — 模块化深度开发 · mod-platform（2026-09-18）
+
+**P0 安全债（四条真实缺陷）**
+- **密钥轮换不再丢数据**：`SecurityService.rotate_key` 先解密全部密文
+  → 换 key → 用新密钥重加密写回；失败整体回滚。覆盖 vault_items 与
+  settings 中的密文（原实现只换 key_file，历史密文全部作废）
+- **加解密端点门禁**：`/security/encrypt|decrypt|key/rotate` 要求保险箱
+  已解锁（此前任何能触达 API 的调用都可批量解密用户密钥）
+- **同步删除传导**：`diff(propagate_deletes=)` 默认关闭；本地有而远端无
+  → 落墓碑软删（保留 deleted_at）。对端未给出某张表时绝不删（防裁剪包
+  误删本地数据）
+- **禁止明文降级**：加密后端三级 —— DPAPI → Fernet（真加密）→ 仅 dev
+  的 plain 占位 → 生产拒绝写入
+
+**P0 回归修复（自查发现）**
+- `init_encryption` 全项目无调用点 → `get_encryption()` 恒为 None，
+  Fernet 回退形同虚设、生产保存 API Key 直接抛错。已在 lifespan 启动时
+  统一初始化
+- `decrypt_secret` 支持 `fernet:` 前缀，保留 `plain:` 历史兼容读取
+
+**P1 基础设施**
+- **插件权限真正执行**（F3.1）：白名单 network/db_read/files；未知权限拒绝
+  加载（fail-closed）；exec/db_write/subprocess 声明即拒绝；
+  `has_permission()` 运行时校验
+- **同步冲突预览**（F2.4）：`SyncEngine.preview()` + `POST /sync/preview`
+  —— 只算不改库，导入前可见 total/by_op/by_table/samples
+- **安全审计日志**（F5.4）：新增 `audit_logs` 表（迁移 0019，幂等守卫）+
+  14 种动作白名单 + 加解密/轮换埋点（成败均记）+ `GET /security/audit`；
+  `audit()` 自身永不抛异常
+- **插件错误隔离**（F3.4）：`safe_call()` 异常全捕获留痕 + 可超时
+  （initialize 10s / shutdown 5s）；超时用非阻塞关闭避免 join 线程
+
+**验证**：后端冒烟 150 → **168 通过 0 失败**（+18 断言）；架构守护与
+vue-tsc 全绿。
+
+**已知未做（按需再启）**：同步增量（F2.1，数据量小无痛点）、字段级
+合并（O5）、配置双写统一（O4）、规则引擎可配置（O6）、备份自动化
+（O7）、插件前端注册（O8）、设置搜索与变更历史（O9）
+
 ### Added — 三期 S6-3b/S6-6：同步引擎 / AI HOT 插件（2026-09-16）
 
 **S6-3b diff-sync 引擎**（4f18dd3）
