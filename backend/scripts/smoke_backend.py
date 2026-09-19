@@ -1217,6 +1217,66 @@ def main() -> int:
               _m2.decrypt(_m2.encrypt("after").decode()) == "after", "new cipher broken")
 
 
+        # ---------- 验收 8.2：导入 1000 行中途失败 → 无部分写入（故障注入） ----------
+        from app.database import SessionLocal as _S5
+        from app.models.task import Task as _T5
+        from sqlalchemy import text as _t5
+
+        _inj_db = _S5()
+        _uid5 = _inj_db.query(_SyncUser.id).first()[0]
+        _before_cnt = _inj_db.execute(
+            _t5("SELECT COUNT(*) FROM tasks WHERE user_id = :u"), {"u": _uid5}
+        ).scalar()
+        # 构造 1000 条 insert op（走真实 apply 路径）
+        _ops_big = [
+            {"table": "tasks", "op": "insert",
+             "row": {"id": f"txn-{i}", "user_id": _uid5, "title": f"事务探测 {i}",
+                     "status": "pending", "priority": "medium", "is_focus": 0,
+                     "sort_order": 0, "created_at": "2026-09-19 00:00:00",
+                     "updated_at": "2026-09-19 00:00:00"}}
+            for i in range(1000)
+        ]
+        _inj_engine = _SE2(_inj_db, _uid5)
+        _orig_decode = _inj_engine._decode_row
+        _state = {"n": 0}
+
+        def _failing_decode(table, row):
+            _state["n"] += 1
+            if _state["n"] > 500:  # 第 501 行注入故障
+                raise RuntimeError("injected failure mid-apply")
+            return _orig_decode(table, row)
+
+        _inj_engine._decode_row = _failing_decode  # type: ignore[assignment]
+        _raised = False
+        try:
+            _inj_engine.apply(_ops_big)
+        except RuntimeError:
+            _raised = True
+        _inj_db.rollback()
+        _mid_cnt = _inj_db.execute(
+            _t5("SELECT COUNT(*) FROM tasks WHERE id LIKE 'txn-%'")
+        ).scalar()
+        _after_cnt = _inj_db.execute(
+            _t5("SELECT COUNT(*) FROM tasks WHERE user_id = :u"), {"u": _uid5}
+        ).scalar()
+        check("import failure injected at row 501", _raised and _state["n"] > 500,
+              f"raised={_raised} calls={_state['n']}")
+        check("failed import leaves zero partial rows (rollback 100%)",
+              int(_mid_cnt) == 0 and int(_after_cnt) == int(_before_cnt),
+              f"partial={_mid_cnt} before={_before_cnt} after={_after_cnt}")
+        # 恢复 + 正向验证：同一批数据完整导入应全部落库
+        _inj_engine._decode_row = _orig_decode  # type: ignore[assignment]
+        _stats_ok = _inj_engine.apply(_ops_big)
+        _ok_cnt = _inj_db.execute(
+            _t5("SELECT COUNT(*) FROM tasks WHERE id LIKE 'txn-%'")
+        ).scalar()
+        check("intact import commits all 1000 rows",
+              _stats_ok.get("insert", 0) == 1000 and int(_ok_cnt) == 1000,
+              f"{_stats_ok} rows={_ok_cnt}")
+        _inj_db.execute(_t5("DELETE FROM tasks WHERE id LIKE 'txn-%'"))
+        _inj_db.commit()
+        _inj_db.close()
+
         # ---------- 考察修复：新表不得跨端同步（本地痕迹） ----------
         from app.core.sync import policy_of as _policy_of, SyncPolicy as _SP
         check("audit_logs excluded from sync",
@@ -1288,6 +1348,29 @@ def main() -> int:
         check("audit logs record security actions",
               any(i["action"] == "security.encrypt" for i in _items)
               and any(i["action"] == "security.decrypt" for i in _items), str(_items)[:200])
+        # ---------- 考察修正：审计保留策略 + 多代密钥环 ----------
+        from app.services.security_service import AUDIT_KEEP as _AK
+        check("audit retention limit configured", isinstance(_AK, int) and _AK >= 100,
+              str(_AK))
+        from app.models.audit import AuditLog as _AL
+        _al_cnt = _bk_db.query(_AL).filter(_AL.user_id == _bk_uid).count() if False else None
+        # 多代密钥：连续三次轮换后，三代密文都可解密
+        import tempfile as _tf2
+        import pathlib as _pl2
+        from app.core.encryption import EncryptionManager as _EM2
+        _d3 = _pl2.Path(_tf2.mkdtemp())
+        _mm = _EM2(_d3)
+        _toks = [_mm.encrypt("gen1").decode()]
+        _mm.rotate_key()
+        _toks.append(_mm.encrypt("gen2").decode())
+        _mm.rotate_key()
+        _toks.append(_mm.encrypt("gen3").decode())
+        _m3 = _EM2(_d3)
+        check("multi-generation keyring decrypts all generations",
+              [_m3.decrypt(t) for t in _toks] == ["gen1", "gen2", "gen3"]
+              and _m3.get_status().get("previous_key_count", 0) >= 2,
+              str(_m3.get_status())[:160])
+
         check("audit log entries are ordered desc",
               len(_items) >= 2 and (_items[0]["created_at"] or "") >= (_items[-1]["created_at"] or ""),
               str([i["created_at"] for i in _items[:3]]))

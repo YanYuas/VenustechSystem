@@ -136,9 +136,16 @@ def require_unlocked(user_id: str) -> None:
 
 # ---------- 审计日志 ----------
 
+# 审计日志保留上限（考察修正：原来无上限，长期会持续膨胀）
+AUDIT_KEEP = 1000
+
+
 def audit(db: Session, user_id: str, action: str, *, target: str | None = None,
           ok: bool = True, detail: str | None = None, ip: str | None = None) -> None:
-    """写一条审计记录。审计本身永不抛异常（不能因为记日志打断业务）。"""
+    """写一条审计记录。审计本身永不抛异常（不能因为记日志打断业务）。
+
+    写入后按 AUDIT_KEEP 修剪最旧记录（与 settings_history 的 200 条策略同思路）。
+    """
     from app.models.audit import AUDIT_ACTIONS, AuditLog
 
     if action not in AUDIT_ACTIONS:
@@ -149,6 +156,27 @@ def audit(db: Session, user_id: str, action: str, *, target: str | None = None,
             ok=ok, detail=(detail or "")[:1000] or None, ip=ip,
         ))
         db.commit()
+    except Exception:
+        db.rollback()
+        return
+
+    # 修剪：只保留最近 AUDIT_KEEP 条（失败不影响业务，仅记日志）
+    try:
+        from sqlalchemy import delete, func, select
+
+        total = db.scalar(
+            select(func.count()).select_from(AuditLog).where(AuditLog.user_id == user_id)
+        ) or 0
+        if total > AUDIT_KEEP:
+            stale = db.scalars(
+                select(AuditLog.id)
+                .where(AuditLog.user_id == user_id)
+                .order_by(AuditLog.created_at.asc())
+                .limit(total - AUDIT_KEEP)
+            ).all()
+            if stale:
+                db.execute(delete(AuditLog).where(AuditLog.id.in_(list(stale))))
+                db.commit()
     except Exception:
         db.rollback()
 

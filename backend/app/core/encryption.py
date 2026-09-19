@@ -25,6 +25,8 @@ class EncryptionManager:
 
     # PBKDF2 迭代次数（OWASP 2023+ 建议的下限之上）
     PBKDF2_ITERATIONS = 200_000
+    # 历史密钥保留代数（考察修正：原来只有一代，连续轮换会丢更早的密钥）
+    KEEP_PREVIOUS = 5
 
     def __init__(self, data_dir: Path, master_key: str | None = None):
         self.data_dir = data_dir
@@ -40,7 +42,10 @@ class EncryptionManager:
         # 没来得及重加密"造成的静默数据丢失。
         self._keyring_file = data_dir / ".encryption_keys.json"
         self._fernet: Fernet | None = None
-        self._previous_fernet: Fernet | None = None
+        # 历史密钥列表（考察修正）：原来只保留一代 previous，连续轮换两次
+        # 就会丢弃更早的密钥，导致用旧密钥加密的密文永久解不开。
+        # 现改为保留多代（KEEP_PREVIOUS 代），解密时依次尝试。
+        self._previous_fernets: list[Fernet] = []
         self._master_key = master_key
         self._initialize()
 
@@ -92,15 +97,25 @@ class EncryptionManager:
                 pass
 
         self._fernet = Fernet(key)
-        # 密钥环里的 previous 用于解密历史密文（轮换中断场景）
+        # 密钥环里的历史密钥用于解密历史密文（轮换中断 / 多代轮换场景）
+        self._previous_fernets = []
         try:
             if self._keyring_file.exists():
                 ring = json.loads(self._keyring_file.read_text(encoding="utf-8"))
-                prev = ring.get("previous")
-                if prev:
-                    self._previous_fernet = Fernet(prev.encode("utf-8"))
+                for prev in (ring.get("previous_keys") or []):
+                    try:
+                        self._previous_fernets.append(Fernet(prev.encode("utf-8")))
+                    except Exception:
+                        continue
+                # 兼容旧格式（单代 previous）
+                prev1 = ring.get("previous")
+                if prev1:
+                    try:
+                        self._previous_fernets.append(Fernet(prev1.encode("utf-8")))
+                    except Exception:
+                        pass
         except Exception:
-            self._previous_fernet = None
+            self._previous_fernets = []
         # 密钥环里的 previous 用于解密历史密文（轮换中断场景）
         try:
             if self._keyring_file.exists():
@@ -133,12 +148,12 @@ class EncryptionManager:
         try:
             return self._fernet.decrypt(token).decode("utf-8")
         except InvalidToken:
-            # PRD 8.2：轮换中断后旧密文用 previous 密钥仍可解密
-            if self._previous_fernet is not None:
+            # PRD 8.2：轮换中断后旧密文用历史密钥仍可解密（多代依次尝试）
+            for prev in self._previous_fernets:
                 try:
-                    return self._previous_fernet.decrypt(token).decode("utf-8")
+                    return prev.decrypt(token).decode("utf-8")
                 except InvalidToken:
-                    pass
+                    continue
             raise ValueError("解密失败：密钥不匹配或数据已损坏")
 
     def encrypt_json(self, obj: Any) -> bytes:
@@ -181,12 +196,28 @@ class EncryptionManager:
         # 保留旧密钥为 previous（供历史密文解密），再落新密钥
         old_key = self._key_file.read_bytes() if self._key_file.exists() else None
         self._key_file.write_bytes(new_key)
+        # 历史密钥：当前生效中的 -> 入历史列表，保留最近 KEEP_PREVIOUS 代
+        new_hist = ([old_key.decode() if isinstance(old_key, bytes) else old_key]
+                    if old_key else [])
+        for f in ([self._fernet] if self._fernet else []):
+            # no-op：占位说明历史来自 keyring，避免误用运行期对象
+            pass
+        try:
+            if self._keyring_file.exists():
+                ring = json.loads(self._keyring_file.read_text(encoding="utf-8"))
+                hist = [k for k in (ring.get("previous_keys") or [])]
+                cur = ring.get("current")
+                if cur and cur not in hist:
+                    hist.insert(0, cur)
+                new_hist = (new_hist + hist)[:self.KEEP_PREVIOUS]
+        except Exception:
+            pass
         try:
             self._keyring_file.write_text(
                 json.dumps({
-                    "current": new_key.decode() if isinstance(new_key, bytes) else str(new_key),
-                    "previous": (old_key.decode()
-                                 if isinstance(old_key, bytes) else old_key),
+                    "current": (new_key.decode()
+                                if isinstance(new_key, bytes) else str(new_key)),
+                    "previous_keys": new_hist,
                 }), encoding="utf-8"
             )
             try:
@@ -195,7 +226,12 @@ class EncryptionManager:
                 pass
         except OSError:
             pass
-        self._previous_fernet = Fernet(old_key) if old_key else None
+        self._previous_fernets = []
+        for k in new_hist:
+            try:
+                self._previous_fernets.append(Fernet(k.encode("utf-8")))
+            except Exception:
+                continue
         self._fernet = Fernet(new_key)
 
     def get_status(self) -> dict:
@@ -207,7 +243,8 @@ class EncryptionManager:
             "key_file": str(self._key_file),
             "key_exists": self._key_file.exists(),
             "has_custom_key": self._master_key is not None,
-            "has_previous_key": self._previous_fernet is not None,
+            "has_previous_key": bool(self._previous_fernets),
+            "previous_key_count": len(self._previous_fernets),
         }
 
 
