@@ -10,11 +10,13 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useOfflineQueueStore, OFFLINE_QUEUE_EVENT } from '@/stores/offlineQueue'
 import { toast } from '@/composables/useToast'
+import { backendUnreachable } from '@/api/connectivity'
 import AppIcon from '@/components/common/AppIcon.vue'
 import BaseButton from '@/components/common/BaseButton.vue'
 
 const store = useOfflineQueueStore()
 const panelOpen = ref(false)
+const offlineHelpOpen = ref(false)
 
 const badgeCount = computed(() => store.pending)
 const hasFailed = computed(() => store.failed > 0)
@@ -65,6 +67,19 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="offline-queue">
+    <!-- 后端不可达的持久标记：没有它，用户只能靠 8 秒一次的 toast 猜测
+         为什么所有页面都空着。点击展开队列面板（内含恢复说明）。 -->
+    <button
+      v-if="backendUnreachable"
+      class="offline-queue__offline"
+      type="button"
+      title="连不上后端服务，点击查看说明"
+      @click="offlineHelpOpen = true"
+    >
+      <AppIcon name="alert" :size="12" />
+      <span>未连接</span>
+    </button>
+
     <button
       v-if="store.hasPending || store.flushing"
       class="offline-queue__badge"
@@ -76,6 +91,33 @@ onBeforeUnmount(() => {
       <AppIcon v-if="store.flushing" name="spin" :size="12" class="spin" />
       <template v-else>{{ badgeCount > 99 ? '99+' : badgeCount }}</template>
     </button>
+
+    <Teleport to="body">
+      <Transition name="qsheet">
+        <div v-if="offlineHelpOpen" class="offline-queue__mask" @click.self="offlineHelpOpen = false">
+          <section class="offline-queue__sheet">
+            <header class="offline-queue__head">
+              <h3 class="offline-queue__title">连不上后端服务</h3>
+              <button class="offline-queue__close" type="button" @click="offlineHelpOpen = false">
+                <AppIcon name="close" :size="16" />
+              </button>
+            </header>
+            <p class="offline-queue__empty" style="text-align: left">
+              页面里的数据都来自电脑上的服务，现在连不上它。按顺序检查：
+            </p>
+            <ol class="offline-queue__help">
+              <li>电脑端是否已启动服务（双击「启动移动服务.bat」，或运行 node server.js）</li>
+              <li>电脑是否睡眠 / 休眠了（服务会随之停止）</li>
+              <li>手机端：设置页里的「服务器地址」是否指向电脑（局域网 IP 或 Tailscale 地址），「访问令牌」是否已填</li>
+              <li>手机与电脑是否在同一网络（或 Tailscale 已连接）</li>
+            </ol>
+            <p class="offline-queue__empty" style="text-align: left">
+              恢复连接后本提示会自动消失；离线期间记的待办会在联网后自动同步。
+            </p>
+          </section>
+        </div>
+      </Transition>
+    </Teleport>
 
     <Teleport to="body">
       <Transition name="qsheet">
@@ -257,5 +299,39 @@ onBeforeUnmount(() => {
 .qsheet-enter-from,
 .qsheet-leave-to {
   opacity: 0;
+}
+
+/* 后端不可达标记：比角标更醒目（危险色底），常驻直到恢复 */
+.offline-queue__offline {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 var(--space-2);
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--straw-soft);
+  color: var(--strawberry);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--strawberry);
+    color: var(--on-primary);
+  }
+}
+
+/* 排查指引列表 */
+.offline-queue__help {
+  margin: var(--space-2) 0 var(--space-3);
+  padding-left: 1.2em;
+  color: var(--text-mid);
+  font-size: var(--text-sm);
+  line-height: 1.9;
+
+  li {
+    margin-bottom: 2px;
+  }
 }
 </style>

@@ -5,6 +5,7 @@
 // ============================================================
 import { reactive } from 'vue'
 import type { ToastItem, ToastType } from '@/types/common'
+import { CONNECTIVITY_TOAST_TITLE, isBackendUnreachable } from '@/api/connectivity'
 
 const DEFAULT_DURATION: Record<ToastType, number> = {
   info: 3000,
@@ -55,6 +56,14 @@ export const toast = {
     return push({ type: 'warning', title, message, duration })
   },
   error(title: string, message?: string, duration?: number) {
+    // 后端不可达期间，各组件各自的「加载失败」都是同一原因的次生提示
+    // （真正的原因已由 http 层统一提示过一次）。全项目 92 处 catch 里的
+    // error 提示散布 20+ 文件，与其逐个改，不如在提示层收敛。
+    // 只抑制 error 级别：本地校验类提示走 warning/info，不受影响。
+    if (isBackendUnreachable() && title !== CONNECTIVITY_TOAST_TITLE) {
+      console.warn('[toast 已抑制 · 后端不可达]', title, message ?? '')
+      return 0
+    }
     return push({ type: 'error', title, message, duration })
   },
   remove,

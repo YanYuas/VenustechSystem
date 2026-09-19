@@ -36,3 +36,5 @@ backend/.ck.txt
 backend/.ck2.txt
 build_out.txt
 frontend/.tq.mjs
+frontend/.tc.mjs
+.tc.mjs
