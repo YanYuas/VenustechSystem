@@ -78,14 +78,17 @@ def main() -> int:
                   [PYTHON, "tests/test_architecture.py"], BACKEND)
     results.append(("架构守护", ok, st))
 
-    ok, st = _run("2/3 后端冒烟（端到端 + 迁移 + 回归断言）",
+    ok, st = _run("2/4 后端冒烟（端到端 + 迁移 + 回归断言）",
                   [PYTHON, "scripts/smoke_backend.py"], BACKEND)
     results.append(("后端冒烟", ok, st))
+
+    ok, st = _run("3/4 版本一致性（F1.4）", [PYTHON, "scripts/check_versions.py"], ROOT)
+    results.append(("版本一致性", ok, st))
 
     if args.skip_frontend:
         results.append(("前端类型检查", True, "skipped"))
     else:
-        ok, st = _run("3/3 前端类型检查（vue-tsc）",
+        ok, st = _run("4/4 前端类型检查（vue-tsc）",
                       [str(VUE_TSC), "--noEmit"], FRONTEND)
         results.append(("前端类型检查", ok, st))
 

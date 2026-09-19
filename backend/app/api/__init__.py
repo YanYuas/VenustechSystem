@@ -38,6 +38,7 @@ from app.api import (
     vault,
     sync,
     assistant,
+    rules,
 )
 
 api_router = APIRouter(prefix="/api/v1")
@@ -80,3 +81,4 @@ api_router.include_router(report.router)
 api_router.include_router(vault.router)
 api_router.include_router(sync.router)
 api_router.include_router(assistant.router)
+api_router.include_router(rules.router)

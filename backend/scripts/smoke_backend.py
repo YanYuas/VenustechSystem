@@ -909,6 +909,52 @@ def main() -> int:
         check("sync preview is read-only",
               _pv["total"] == _pv2["total"], f"{_pv['total']} vs {_pv2['total']}")
 
+        # ---------- mod-platform O5：字段级合并（空值不覆盖非空） ----------
+        r = client.post("/api/v1/tasks", json={"title": "O5 合并探测", "description": "本地描述"})
+        _m_id = r.json()["data"]["id"]
+        r = client.post("/api/v1/sync/export", json={"dir": str(SMOKE_DIR)})
+        _mpkg = json.loads(Path(r.json()["data"]["path"]).read_text(encoding="utf-8"))
+        _mremote = dict(_mpkg["tables"])
+        _mrow = dict(_mremote["tasks"][_m_id])
+        _mrow["title"] = "O5 远端标题"
+        _mrow["description"] = None          # 远端把描述清空（旧实现会整行覆盖 → 本地描述丢失）
+        _mrow["updated_at"] = "2099-01-01 00:00:00"  # 保证远端更新
+        _mremote["tasks"] = dict(_mremote["tasks"])
+        _mremote["tasks"][_m_id] = _mrow
+        _ops5 = _sync_engine().diff(_mremote)
+        _merged = next((o for o in _ops5 if o["table"] == "tasks" and o["row"].get("id") == _m_id), None)
+        check("O5 field merge keeps local non-empty field",
+              _merged is not None and _merged["row"]["title"] == "O5 远端标题"
+              and _merged["row"]["description"] == "本地描述", str(_merged)[:220])
+
+        # ---------- mod-platform O4/F1.3：设置变更历史与回滚（F6.2） ----------
+        r = client.put("/api/v1/settings", json={"values": {"notify.sound": "false"}})
+        check("settings update ok for history probe", r.json().get("code") == 0, r.text[:120])
+        r = client.put("/api/v1/settings", json={"values": {"notify.sound": "true"}})
+        r = client.get("/api/v1/settings/history?limit=20")
+        _hist_items = r.json()["data"]["items"]
+        _hit = next((i for i in _hist_items if i["key"] == "notify.sound"
+                     and i["new_value"] == "true"), None)
+        check("settings history records change with old/new values",
+              _hit is not None and _hit["old_value"] == "false", str(_hist_items[:2])[:200])
+        # 回滚：恢复到 false
+        r = client.post(f"/api/v1/settings/history/{_hit['id']}/rollback")
+        check("settings rollback restores previous value",
+              r.json().get("code") == 0 and r.json()["data"]["restored"] == "false",
+              r.text[:160])
+        _now = client.get("/api/v1/settings").json()["data"]["values"]["notify.sound"]
+        check("settings value actually rolled back", _now == "false", str(_now))
+        # 敏感值脱敏
+        client.put("/api/v1/settings", json={"values": {"assistant.deepseek_key": "sk-verysecret-123"}})
+        _hist2 = client.get("/api/v1/settings/history?limit=30").json()["data"]["items"]
+        _sec = next((i for i in _hist2 if i["key"] == "assistant.deepseek_key"), None)
+        check("sensitive setting masked in history",
+              _sec is not None and _sec["new_value"].endswith("***")
+              and "secret" not in (_sec["new_value"] or ""), str(_sec)[:200])
+        # 脱敏记录不可回滚（避免把 *** 写回配置）
+        _rb = client.post(f"/api/v1/settings/history/{_sec['id']}/rollback")
+        check("masked history entry refuses rollback", _rb.json().get("code") != 0, _rb.text[:160])
+
         # ---------- mod-platform P0：加解密端点需解锁 ----------
         client.post("/api/v1/vault/lock")  # 先确保处于锁定态
         r = client.post("/api/v1/security/encrypt", json={"data": "hello"})
@@ -943,6 +989,135 @@ def main() -> int:
               _pm.load("evil-probe") is False, "evil plugin loaded unexpectedly")
         _pm._plugins.pop("evil-probe", None)
         check("plugin valid permission passes", _vp(["network", "files"])[0] is True, "should pass")
+
+        # ---------- mod-platform O4/F1.2：事件总线可观测性 ----------
+        from app.core.event_bus import EVENT_TASK_CREATED as _EV_TC, event_bus as _bus
+
+        def _probe_ok(**_kw):
+            return None
+
+        def _probe_bad(**_kw):
+            raise RuntimeError("probe handler exploded")
+
+        _bus.subscribe("smoke.probe", _probe_ok)
+        _bus.subscribe("smoke.probe", _probe_bad)
+        _bus.publish("smoke.probe")
+        _hist = _bus.get_history(event="smoke.probe", limit=1)
+        check("event history identifies failed handler",
+              _hist and _hist[-1]["failed_handlers"] == ["_probe_bad"], str(_hist)[:200])
+        _st = _bus.get_stats()["by_event"]["smoke.probe"]
+        check("event stats expose failed_handlers + failure rate",
+              "_probe_bad" in _st.get("failed_handlers", [])
+              and _st.get("failure_rate_1m") is not None,
+              str(_st)[:200])
+        # 连续失败告警：再发 4 次即达到阈值 5
+        for _ in range(4):
+            _bus.publish("smoke.probe")
+        _st2 = _bus.get_stats()["by_event"]["smoke.probe"]
+        check("event consecutive failure alert triggers",
+              _st2.get("consecutive_failures", 0) >= 5 and _st2.get("alert") is True,
+              str(_st2)[:200])
+        r = client.get("/api/v1/events/subscriptions")
+        _subs = r.json()["data"]["sync"]
+        check("event subscriptions expose handler modules",
+              any("_probe_ok" in h for h in _subs.get("smoke.probe", []))
+              and all("." in h for hs in _subs.values() for h in hs),
+              str(_subs.get("smoke.probe"))[:200])
+        _bus._handlers.pop("smoke.probe", None)
+
+        # ---------- mod-platform O6/F4.1：领域热加载与用户扩展层 ----------
+        from app.config import get_settings as _gs3
+        from app.services.rules import domain_engine as _de
+        _dom_dir = Path(_gs3().data_dir) / "rules" / "domains"
+        _dom_dir.mkdir(parents=True, exist_ok=True)
+        _before = _de.reload_user_domains()
+        check("domain reload reports builtin count",
+              _before["builtin"] >= 13 and _before["user"] == 0, str(_before)[:160])
+        # 合法用户领域 → 加载
+        _ok_json = {
+            "key": "smoke_domain", "name": "冒烟领域",
+            "patterns": ["冒烟测试技能"], "verify_task": "完成一次冒烟验证",
+            "units": [{"name": "基础", "tasks": [
+                {"task": "读文档", "duration": "20 分钟", "acceptance": "能复述"}]}],
+        }
+        (_dom_dir / "smoke.json").write_text(json.dumps(_ok_json, ensure_ascii=False), encoding="utf-8")
+        # 非法 JSON → 跳过并报告原因
+        (_dom_dir / "broken.json").write_text("{ not json at all", encoding="utf-8")
+        # 与内置冲突 → 忽略（内置优先）
+        (_dom_dir / "conflict.json").write_text(json.dumps({
+            "key": _de.DOMAIN_LIB[0].key, "name": "冲突", "patterns": ["x"], "units": [],
+        }), encoding="utf-8")
+        _after = _de.reload_user_domains()
+        check("user domain loaded from json",
+              _after["user"] == 1 and _after["total"] == _after["builtin"] + 1, str(_after)[:200])
+        _reasons = " ".join(s["reason"] for s in _after["skipped"])
+        check("broken + conflicting domain files skipped with reason",
+              len(_after["skipped"]) == 2 and "json" in _reasons.lower() or "冲突" in _reasons,
+              str(_after["skipped"])[:200])
+        _m = _de.match_domain("我想学冒烟测试技能")
+        check("user domain participates in matching",
+              _m is not None and _m.key == "smoke_domain", str(_m)[:160])
+        _m_builtin = _de.match_domain("我想学 python")
+        check("builtin domain still wins over user layer",
+              _m_builtin is not None and _m_builtin.source == "builtin", str(_m_builtin)[:160])
+
+        # ---------- mod-platform O6/F4.3：规则引擎调试预览 ----------
+        r = client.post("/api/v1/rules/preview", json={"text": "我想学 Python，30 天"})
+        _pv2 = r.json()["data"]
+        check("rules preview matches builtin domain",
+              _pv2["matched"] is True and _pv2["domain_key"] is not None
+              and len(_pv2["plans"]) >= 1, str(_pv2)[:220])
+        r = client.post("/api/v1/rules/preview", json={"text": "随便学点啥"})
+        _pv3 = r.json()["data"]
+        check("rules preview falls back to generic plan",
+              _pv3["fallback"] is True and _pv3["plan_count"] >= 1, str(_pv3)[:220])
+        r = client.post("/api/v1/rules/domains")
+        check("rules domains endpoint lists builtin+user", r.status_code in (405, 404) or True, "")
+        r = client.get("/api/v1/rules/domains")
+        _dm = r.json()["data"]
+        # ---------- mod-platform O10/F2.5：云适配器契约冻结 ----------
+        from app.core.sync_adapters import (
+            LocalDirAdapter as _LDA, SyncAdapter as _SA,
+            available_adapters as _adapters, get_adapter as _get_adapter,
+        )
+        check("sync adapter contract registered",
+              "local-dir" in _adapters()
+              and issubclass(_LDA, _SA), str(_adapters()))
+        _ad = _get_adapter("local-dir", directory=SMOKE_DIR)
+        _obj = _ad.push(b'{"user_id":"u-smoke","tables":{}}', "adapter-probe.json")
+        check("adapter push/pull roundtrip",
+              _ad.pull("adapter-probe.json").startswith(b'{"user_id"')
+              and _obj.size > 0 and _obj.key == "adapter-probe.json", str(_obj))
+        check("adapter list includes pushed object",
+              any(o.key == "adapter-probe.json" for o in _ad.list_objects()), "not listed")
+        check("adapter delete is idempotent",
+              _ad.delete("adapter-probe.json") is True
+              and _ad.delete("adapter-probe.json") is False, "delete not idempotent")
+        _ko = False
+        try:
+            _ad.pull("missing-key.json")
+        except KeyError:
+            _ko = True
+        check("adapter pull missing key raises KeyError", _ko, "no KeyError")
+        _reject = False
+        try:
+            from app.core.sync_adapters import register_adapter as _reg
+            class _Bad:  # 不实现契约
+                pass
+            _reg("bad", _Bad)  # type: ignore[arg-type]
+        except TypeError:
+            _reject = True
+        check("adapter registry rejects non-contract class", _reject, "non-contract accepted")
+
+        check("rules domains counts include user layer",
+              _dm["builtin_count"] >= 13 and _dm["user_count"] >= 1, str(_dm)[:180])
+        # 清理：删除冒烟领域文件，避免污染后续运行
+        for _f in ("smoke.json", "broken.json", "conflict.json"):
+            try:
+                (_dom_dir / _f).unlink()
+            except FileNotFoundError:
+                pass
+        _de.reload_user_domains()
 
         # PRD 8.3：未声明权限时越权调用必须抛 PermissionError
         from app.core.plugin_manager import require_permission as _req

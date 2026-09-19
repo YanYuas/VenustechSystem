@@ -18,6 +18,12 @@ def event_stats():
     return success(event_bus.get_stats())
 
 
+@router.get("/subscriptions")
+def event_subscriptions():
+    """订阅关系清单：event → [handler 模块名.函数名]（F1.2 可视化用）"""
+    return success(event_bus.get_subscriptions())
+
+
 @router.get("/history")
 def event_history(
     event: str | None = Query(None, description="筛选特定事件"),

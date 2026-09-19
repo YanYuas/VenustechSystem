@@ -37,14 +37,50 @@ export interface ClearLogsResult {
 }
 
 /** 事件统计：事件名 → 次数 / 成功 / 失败 */
-export type EventStats = Record<string, { count: number; success: number; failed: number }>
+export interface EventStatItem {
+  count: number
+  success: number
+  failed: number
+  failed_handlers?: string[]
+  consecutive_failures?: number
+  failure_rate_1m?: number | null
+  alert?: boolean
+}
+
+export type EventStats = Record<string, EventStatItem>
 
 export interface EventRecord {
   event: string
+  time?: string
   kwargs?: Record<string, unknown>
   handlers_called?: number
+  handlers?: number
   success?: boolean
+  failed_handlers?: string[]
   timestamp?: number
+}
+
+export interface RuleDomainCount {
+  builtin_count: number
+  user_count: number
+  domains: Array<{ key: string; name: string; source: string; patterns: string[]; units: number }>
+}
+
+export interface RulePreviewResult {
+  matched: boolean
+  fallback?: boolean
+  domain_key: string | null
+  domain_name: string | null
+  matched_patterns?: string[]
+  plans: Array<{ unit: string; task: string; duration: string; acceptance?: string }>
+  plan_count?: number
+}
+
+export interface RuleReloadResult {
+  builtin: number
+  user: number
+  total: number
+  skipped: Array<{ file: string; reason: string }>
 }
 
 export interface EventTypes {
@@ -85,14 +121,30 @@ export const systemApi = {
   eventStats() {
     return http.get<EventStats>('/events/stats')
   },
-  eventHistory(limit = 50) {
-    return http.get<EventRecord[]>('/events/history', { limit })
+  eventHistory(limit = 50, event?: string) {
+    return http.get<EventRecord[]>('/events/history', { limit, event })
   },
   eventTypes() {
     return http.get<EventTypes>('/events/types')
   },
   clearEventHistory() {
     return http.post<{ cleared: boolean }>('/events/clear-history')
+  },
+  eventSubscriptions() {
+    return http.get<{ sync: Record<string, string[]>; async: Record<string, string[]> }>(
+      '/events/subscriptions',
+    )
+  },
+
+  // ---------- 规则引擎（O6 · F4.1/F4.3） ----------
+  ruleDomains() {
+    return http.get<RuleDomainCount>('/rules/domains')
+  },
+  ruleReload() {
+    return http.post<RuleReloadResult>('/rules/reload')
+  },
+  rulePreview(text: string) {
+    return http.post<RulePreviewResult>('/rules/preview', { text })
   },
 
   // ---------- 插件 ----------

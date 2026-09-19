@@ -26,10 +26,16 @@
 # ============================================================
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import math
 import re
 from dataclasses import dataclass
 
+from app.core.logger import get_logger
+
+logger = get_logger("rules")
 from app.services.rules.domain_lib import DOMAIN_LIB, DomainDef, TaskDef, UnitDef
 
 # 验证任务的「达标标准」是固定的 —— 源实现里就是硬编码字符串
@@ -136,15 +142,105 @@ def match_domain(text: str) -> DomainDef | None:
     「英语考试」之后，因为「口语」这个词更宽泛，让更专用的先匹配）。
     """
     lowered = (text or "").lower()
+    # 内置库优先（PRD F4.1：用户扩展不得覆盖内置语义）
     for domain in DOMAIN_LIB:
+        if any(_compiled(p).search(lowered) for p in domain.patterns):
+            return domain
+    # 其次用户扩展层
+    for domain in user_domains():
         if any(_compiled(p).search(lowered) for p in domain.patterns):
             return domain
     return None
 
 
 def list_domains() -> tuple[DomainDef, ...]:
-    """暴露领域清单，供设置页/计划页做「选择领域」下拉。"""
-    return DOMAIN_LIB
+    """暴露领域清单（内置 + 用户扩展），供设置页/计划页做「选择领域」下拉。"""
+    return DOMAIN_LIB + user_domains()
+
+
+# ============================================================
+# 用户扩展层（F4.1）：data_dir/rules/domains/*.json
+# - 内置库只读，用户不可改
+# - 非法 JSON 跳过并 warning（指出文件名与原因）
+# - 与内置 key 冲突的用户领域被忽略并 warning（内置优先）
+# - reload_user_domains() 支持热重载，无需重启
+# ============================================================
+
+_user_domains: tuple[DomainDef, ...] = ()
+_user_domains_loaded = False
+
+
+def user_domains() -> tuple[DomainDef, ...]:
+    """当前生效的用户扩展领域（未加载过则先加载一次）。"""
+    global _user_domains_loaded
+    if not _user_domains_loaded:
+        reload_user_domains()
+    return _user_domains
+
+
+def _parse_user_domain(raw: dict) -> DomainDef:
+    units = []
+    for u in raw.get("units", []) or []:
+        tasks = tuple(
+            TaskDef(
+                task=str(t.get("task", "")),
+                duration=str(t.get("duration", "25 分钟")),
+                acceptance=str(t.get("acceptance", "")),
+                repeatable=bool(t.get("repeatable", False)),
+            )
+            for t in (u.get("tasks") or [])
+        )
+        units.append(UnitDef(name=str(u.get("name", "")), tasks=tasks))
+    return DomainDef(
+        key=str(raw.get("key", "")),
+        name=str(raw.get("name", raw.get("key", ""))),
+        patterns=tuple(raw.get("patterns") or []),
+        verify_task=str(raw.get("verify_task", "")),
+        units=tuple(units),
+        source="user",
+    )
+
+
+def reload_user_domains() -> dict:
+    """扫描用户领域目录并热重载。返回统计（供 /rules/reload 与调试）。"""
+    global _user_domains, _user_domains_loaded
+    from app.config import get_settings
+
+    builtin_keys = {d.key for d in DOMAIN_LIB}
+    loaded: list[DomainDef] = []
+    skipped: list[dict] = []
+    directory = Path(get_settings().data_dir) / "rules" / "domains"
+    directory.mkdir(parents=True, exist_ok=True)
+
+    for path in sorted(directory.glob("*.json")):
+        try:
+            raw = json.loads(path.read_text(encoding="utf-8"))
+            domain = _parse_user_domain(raw)
+            if not domain.key or not domain.patterns:
+                raise ValueError("缺少 key 或 patterns")
+            if domain.key in builtin_keys:
+                logger.warning("用户领域 %s 与内置领域同名，已忽略（内置优先）: %s",
+                               domain.key, path.name)
+                skipped.append({"file": path.name, "reason": "与内置领域 key 冲突（内置优先）"})
+                continue
+            if any(d.key == domain.key for d in loaded):
+                logger.warning("用户领域 %s 重复定义，已忽略: %s", domain.key, path.name)
+                skipped.append({"file": path.name, "reason": "key 重复"})
+                continue
+            loaded.append(domain)
+            logger.info("加载用户领域: %s (%s)", domain.name, path.name)
+        except Exception as exc:  # noqa: BLE001 - 单个文件坏掉不影响其他领域
+            logger.warning("用户领域文件解析失败，已跳过: %s（原因：%s）", path.name, exc)
+            skipped.append({"file": path.name, "reason": str(exc)})
+
+    _user_domains = tuple(loaded)
+    _user_domains_loaded = True
+    return {
+        "builtin": len(DOMAIN_LIB),
+        "user": len(_user_domains),
+        "total": len(DOMAIN_LIB) + len(_user_domains),
+        "skipped": skipped,
+    }
 
 
 # ============================================================

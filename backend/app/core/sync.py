@@ -177,7 +177,12 @@ class SyncEngine:
                 elif not self._row_equal(lrow, rrow):
                     winner = self._newer(rrow, lrow)
                     if winner is rrow:
-                        ops.append({"table": table, "row": rrow, "op": "update"})
+                        # O5：远端较新 → 字段级合并（空值不覆盖本地非空值）
+                        ops.append({
+                            "table": table,
+                            "row": self.resolve_conflict(lrow, rrow),
+                            "op": "update",
+                        })
         # 删除传导：本地有而远端没有 → 对端已删，本地落墓碑（软删）
         if propagate_deletes:
             for table, lrows in local.items():
@@ -216,8 +221,28 @@ class SyncEngine:
         }
 
     def resolve_conflict(self, local_row: dict[str, Any], remote_row: dict[str, Any]) -> dict[str, Any]:
-        """冲突解决预留接口。当前默认 LWW；将来可替换为字段级合并。"""
-        return self._newer(remote_row, local_row)
+        """冲突解决（O5）：**字段级合并**，而非整行覆盖。
+
+        规则：以较新的一行为基准；对其中"空值"的字段，若较旧一行有非空值
+        则保留旧值（避免"对端只改了一个字段、其余字段被整行清空"的丢数据）。
+
+        诚实边界：本表没有字段级时间戳，因此"两边都改了同一个非空字段"
+        仍然按行级 LWW 取较新侧；要做真正的逐字段时间戳合并需要 schema 支持
+        （列入后续工作）。
+        """
+        newer, older = (
+            (remote_row, local_row)
+            if self._newer(remote_row, local_row) is remote_row
+            else (local_row, remote_row)
+        )
+        merged = dict(newer)
+        for key, old_val in older.items():
+            if key in ("id", "user_id", "created_at", "updated_at", "deleted_at"):
+                continue
+            new_val = merged.get(key)
+            if (new_val is None or new_val == "") and old_val not in (None, ""):
+                merged[key] = old_val
+        return merged
 
     # ---------- apply ----------
 

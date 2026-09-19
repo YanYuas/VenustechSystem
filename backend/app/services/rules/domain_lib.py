@@ -67,6 +67,8 @@ class DomainDef:
     patterns: tuple[str, ...]
     verify_task: str
     units: tuple[UnitDef, ...]
+    # 有默认值的字段必须排在最后（dataclass 规则）
+    source: str = "builtin"  # builtin / user（F4.1 用户扩展层）
 
 
 # 匹配用正则在引擎侧统一以 re.IGNORECASE 编译，

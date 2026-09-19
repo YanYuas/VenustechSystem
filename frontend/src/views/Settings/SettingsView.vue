@@ -2,13 +2,14 @@
 // ============================================================
 // 设置页 —— 外观 / AI / 第二分身 / 数据管理 / 关于
 // ============================================================
-import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { authApi, backupApi, systemApi, settingsApi, syncApi } from '@/api'
 import type { SyncPackage } from '@/api/sync'
 import { getApiBase, setApiBase, getApiToken, setApiToken } from '@/api/http'
 import type { EncryptionStatus, LogFile, PluginItem } from '@/api/system'
 import { useTheme } from '@/composables/useTheme'
 import { useToast } from '@/composables/useToast'
+import { useModal } from '@/composables/useModal'
 import BaseCard from '@/components/common/BaseCard.vue'
 import BaseButton from '@/components/common/BaseButton.vue'
 import BaseInput from '@/components/common/BaseInput.vue'
@@ -18,6 +19,53 @@ import AppIcon from '@/components/common/AppIcon.vue'
 import type { UserConfig, ThemePack, ThemeMode } from '@/types'
 
 const toast = useToast()
+const { confirm } = useModal()
+
+// ---------- 设置项搜索（F6.1） ----------
+// 卡片数量多（10+ 张、36 个字段组），这里对 .settings__group 与其所属
+// BaseCard 做文本匹配过滤：包含即命中、大小写不敏感、空搜索显示全部。
+const searchQuery = ref('')
+const searchInput = ref<HTMLInputElement | null>(null)
+const settingsRoot = ref<HTMLElement | null>(null)
+const searchHitCount = ref(0)
+
+function applySearch() {
+  const root = settingsRoot.value
+  if (!root) return
+  const q = searchQuery.value.trim().toLowerCase()
+  const groups = Array.from(root.querySelectorAll<HTMLElement>('.settings__group'))
+  if (!q) {
+    groups.forEach((el) => el.classList.remove('is-search-hidden'))
+    searchHitCount.value = 0
+    return
+  }
+  // 先按字段组匹配，再按所属卡片标题匹配（卡片标题在 BaseCard 头部）
+  let hits = 0
+  const cardHit = new Map<Element, boolean>()
+  groups.forEach((el) => {
+    const card = el.closest('.base-card')
+    const cardText = (card?.querySelector('.base-card__title')?.textContent ?? '').toLowerCase()
+    const text = `${el.textContent ?? ''}`.toLowerCase()
+    const hit = text.includes(q) || cardText.includes(q)
+    el.classList.toggle('is-search-hidden', !hit)
+    if (hit) hits += 1
+    if (card) cardHit.set(card, (cardHit.get(card) ?? false) || hit)
+  })
+  // 整卡无命中时隐藏卡片，避免只剩标题的空壳
+  cardHit.forEach((hit, card) => {
+    ;(card as HTMLElement).classList.toggle('is-search-hidden', !hit)
+  })
+  searchHitCount.value = hits
+}
+
+watch(searchQuery, () => nextTick(applySearch))
+
+function onSearchHotkey(e: KeyboardEvent) {
+  if ((e.ctrlKey || e.metaKey) && e.key === ',') {
+    e.preventDefault()
+    searchInput.value?.focus()
+  }
+}
 
 // ---------- 数据同步（S6-3b 前端出口） ----------
 const syncExporting = ref(false)
@@ -143,7 +191,95 @@ const encryption = ref<EncryptionStatus | null>(null)
 const logFiles = ref<LogFile[]>([])
 const logContent = ref('')
 const activeLog = ref('')
-const eventStats = ref<Array<{ name: string; count: number; failed: number }>>([])
+const eventStats = ref<Array<{
+  name: string
+  count: number
+  failed: number
+  failedHandlers: string[]
+  alert: boolean
+}>>([])
+let lastAlertedEvent = ''
+const activeEvent = ref('')
+const eventTimeline = ref<Array<{ time?: string; success?: boolean; failed_handlers?: string[] }>>([])
+const failedHandlerSummary = computed(() =>
+  Array.from(new Set(eventStats.value.flatMap((e) => e.failedHandlers))).join('、'),
+)
+
+// ---------- 规则引擎调试（F4.3） ----------
+const showRules = ref(false)
+const ruleText = ref('')
+const ruleDomains = ref({ builtin: 0, user: 0 })
+const rulePreview = ref<{
+  matched: boolean
+  domain_name: string | null
+  plans: Array<{ unit: string; task: string; duration: string }>
+} | null>(null)
+let ruleTimer: ReturnType<typeof setTimeout> | null = null
+
+async function loadRuleDomains() {
+  try {
+    const d = await systemApi.ruleDomains()
+    ruleDomains.value = { builtin: d.builtin_count, user: d.user_count }
+  } catch { /* 诊断面板失败不阻塞设置页 */ }
+}
+
+function onRuleInput() {
+  if (ruleTimer) clearTimeout(ruleTimer)
+  // 输入停止 400ms 后再预览（PRD F4.3）
+  ruleTimer = setTimeout(async () => {
+    const text = ruleText.value.trim()
+    if (!text) {
+      rulePreview.value = null
+      return
+    }
+    try {
+      rulePreview.value = await systemApi.rulePreview(text)
+    } catch {
+      rulePreview.value = null
+    }
+  }, 400)
+}
+
+watch(ruleText, onRuleInput)
+
+async function onReloadDomains() {
+  try {
+    const r = await systemApi.ruleReload()
+    ruleDomains.value = { builtin: r.builtin, user: r.user }
+    toast.success('领域库已热重载', `用户扩展 ${r.user} 个`)
+  } catch {
+    toast.error('热重载失败')
+  }
+}
+
+async function toggleEventDetail(name: string) {
+  if (activeEvent.value === name) {
+    activeEvent.value = ''
+    return
+  }
+  activeEvent.value = name
+  try {
+    eventTimeline.value = await systemApi.eventHistory(10, name)
+  } catch {
+    eventTimeline.value = []
+  }
+}
+
+async function onClearEvents() {
+  const ok = await confirm({
+    title: '清空事件历史',
+    message: '仅清空内存中的历史记录，订阅关系与统计不受影响。',
+  })
+  if (!ok) return
+  try {
+    await systemApi.clearEventHistory()
+    eventStats.value = []
+    activeEvent.value = ''
+    toast.success('事件历史已清空')
+  } catch {
+    toast.error('清空失败')
+  }
+}
 const plugins = ref<PluginItem[]>([])
 
 const showSecurity = ref(false)
@@ -162,8 +298,20 @@ async function loadDiagnostics() {
   try {
     const s = await systemApi.eventStats()
     eventStats.value = Object.entries(s ?? {})
-      .map(([name, v]) => ({ name, count: v.count ?? 0, failed: v.failed ?? 0 }))
+      .map(([name, v]) => ({
+        name,
+        count: (v as { count?: number }).count ?? 0,
+        failed: (v as { failed?: number }).failed ?? 0,
+        failedHandlers: (v as { failed_handlers?: string[] }).failed_handlers ?? [],
+        alert: Boolean((v as { alert?: boolean }).alert),
+      }))
       .sort((a, b) => b.count - a.count)
+    // 连续失败告警（PRD F1.2）：达阈值的事件提示一次
+    const hot = eventStats.value.find((e) => e.alert && e.failed >= 5)
+    if (hot && hot.name !== lastAlertedEvent) {
+      lastAlertedEvent = hot.name
+      toast.error(`事件 ${hot.name} 持续失败`, '请检查插件或服务')
+    }
   } catch { /* ignore */ }
 }
 
@@ -484,12 +632,41 @@ onMounted(() => {
   loadStats()
   loadDiagnostics()
   loadNotifySettings()
+  loadRuleDomains()
+  // 设置页内 Ctrl+, 聚焦搜索框（F6.1）
+  window.addEventListener('keydown', onSearchHotkey)
 })
 </script>
 
 <template>
-  <div class="settings">
+  <div class="settings" ref="settingsRoot">
     <h2 class="settings__title">设置</h2>
+
+    <!-- 设置项搜索（F6.1）：过滤卡片与其内字段；Ctrl+, 聚焦 -->
+    <div class="settings__search">
+      <AppIcon name="search" :size="16" />
+      <input
+        ref="searchInput"
+        v-model="searchQuery"
+        class="settings__search-input"
+        type="text"
+        placeholder="搜索设置项（如 主题 / 备份 / 令牌）"
+        aria-label="搜索设置项"
+      />
+      <button
+        v-if="searchQuery"
+        class="settings__search-clear"
+        type="button"
+        aria-label="清除搜索"
+        @click="searchQuery = ''"
+      >
+        <AppIcon name="close" :size="14" />
+      </button>
+    </div>
+    <p v-if="searchQuery && !searchHitCount" class="settings__search-empty">
+      没有找到相关设置
+      <BaseButton size="sm" variant="text" @click="searchQuery = ''">清除搜索</BaseButton>
+    </p>
 
     <div v-if="loading" class="settings__loading">
       <AppIcon name="loading" :size="24" class="spin" />
@@ -881,15 +1058,78 @@ onMounted(() => {
             <AppIcon :name="showEvents ? 'chevron-up' : 'chevron-down'" :size="14" />
           </button>
           <div v-if="showEvents" class="settings__diag">
-            <p v-if="eventStats.length === 0" class="settings__hint">暂无事件记录</p>
-            <ul v-else class="settings__event-list">
-              <li v-for="e in eventStats" :key="e.name">
-                <span class="settings__event-name">{{ e.name }}</span>
-                <span class="settings__event-count">
-                  {{ e.count }} 次<template v-if="e.failed"> · 失败 {{ e.failed }}</template>
-                </span>
-              </li>
-            </ul>
+            <div v-if="eventStats.length === 0" class="settings__hint">暂无事件记录（系统刚启动）</div>
+            <template v-else>
+              <ul class="settings__event-list">
+                <li
+                  v-for="e in eventStats.slice(0, 30)"
+                  :key="e.name"
+                  class="settings__event-row"
+                  :class="{ 'is-alert': e.alert }"
+                  @click="toggleEventDetail(e.name)"
+                >
+                  <span class="settings__event-name">{{ e.name }}</span>
+                  <span class="settings__event-count">
+                    {{ e.count }} 次
+                    <template v-if="e.failed">
+                      <em class="settings__event-badge">失败 {{ e.failed }}</em>
+                    </template>
+                  </span>
+                </li>
+              </ul>
+              <p v-if="eventStats.some((e) => e.failedHandlers.length)"
+                 class="settings__hint">
+                失败 handler：{{ failedHandlerSummary }}
+              </p>
+              <div v-if="activeEvent" class="settings__diag">
+                <p class="settings__hint">最近 10 条：{{ activeEvent }}</p>
+                <ul class="settings__event-timeline">
+                  <li v-for="(r, i) in eventTimeline" :key="i">
+                    <span>{{ r.time }}</span>
+                    <span :class="{ 'is-fail': !r.success }">
+                      {{ r.success ? '成功' : `失败（${(r.failed_handlers ?? []).join(', ')}）` }}
+                    </span>
+                  </li>
+                </ul>
+              </div>
+              <div class="settings__row">
+                <BaseButton variant="text" size="sm" @click="onClearEvents">清空历史</BaseButton>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <div class="settings__group">
+          <button class="settings__link-btn" @click="showRules = !showRules">
+            <AppIcon name="command" :size="14" /> 规则引擎
+            <AppIcon :name="showRules ? 'chevron-up' : 'chevron-down'" :size="14" />
+          </button>
+          <div v-if="showRules" class="settings__diag">
+            <p class="settings__hint">
+              领域库：内置 {{ ruleDomains.builtin }} 个 · 用户扩展 {{ ruleDomains.user }} 个
+            </p>
+            <div class="settings__row">
+              <BaseInput
+                v-model="ruleText"
+                placeholder="例如：我想学雅思，30 天"
+              />
+              <BaseButton variant="secondary" size="sm" @click="onReloadDomains">热重载</BaseButton>
+            </div>
+            <div v-if="rulePreview" class="settings__rule-preview">
+              <span v-if="rulePreview.matched" class="settings__rule-tag is-hit">
+                命中：{{ rulePreview.domain_name }}
+              </span>
+              <span v-else class="settings__rule-tag is-fallback">
+                未命中领域库，使用通用拆解
+              </span>
+              <ul v-if="rulePreview.plans.length" class="settings__event-list">
+                <li v-for="(pl, i) in rulePreview.plans.slice(0, 5)" :key="i">
+                  <span class="settings__event-name">{{ pl.unit }}</span>
+                  <span class="settings__event-count">{{ pl.task }} · {{ pl.duration }}</span>
+                </li>
+              </ul>
+              <p v-else class="settings__hint">计划生成失败或为空</p>
+            </div>
           </div>
         </div>
 
@@ -1334,5 +1574,128 @@ onMounted(() => {
 .settings__sync-size {
   font-size: var(--text-xs);
   color: var(--text-low);
+}
+
+// ---------- 设置项搜索（F6.1） ----------
+.settings__search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: var(--control-h);
+  padding: 0 var(--space-3);
+  margin-bottom: var(--space-3);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+
+  &:focus-within {
+    border-color: var(--primary);
+  }
+}
+
+.settings__search-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text-1);
+  font-size: var(--text-sm);
+}
+
+.settings__search-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+}
+
+.settings__search-empty {
+  margin: 0 0 var(--space-3);
+  color: var(--text-3);
+  font-size: var(--text-sm);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+// 过滤隐藏：淡出后不占位（避免布局跳动）
+.settings__group.is-search-hidden,
+.base-card.is-search-hidden {
+  display: none;
+}
+
+// ---------- 事件面板（F1.2） ----------
+.settings__event-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 150ms ease;
+
+  &:hover {
+    background: var(--primary-soft);
+  }
+
+  // 失败行左侧 3px 草莓红色条（PRD F1.2）
+  &.is-alert {
+    box-shadow: inset 3px 0 0 var(--strawberry);
+  }
+}
+
+.settings__event-badge {
+  margin-left: var(--space-1);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--straw-soft);
+  color: var(--straw-ink);
+  font-size: var(--text-xs);
+  font-style: normal;
+}
+
+.settings__event-timeline {
+  margin: var(--space-1) 0 0;
+  padding-left: var(--space-3);
+  font-size: var(--text-xs);
+  color: var(--text-3);
+
+  .is-fail {
+    color: var(--straw-ink);
+  }
+}
+
+// ---------- 规则引擎调试（F4.3） ----------
+.settings__rule-preview {
+  margin-top: var(--space-2);
+  animation: rule-fade-in 200ms ease;
+}
+
+.settings__rule-tag {
+  display: inline-block;
+  margin-bottom: var(--space-1);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+
+  &.is-hit {
+    background: var(--primary-soft);
+    color: var(--primary-ink);
+  }
+
+  &.is-fallback {
+    background: var(--butter-soft);
+    color: var(--butter-ink);
+  }
+}
+
+@keyframes rule-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 </style>

@@ -31,3 +31,6 @@ data_*/
 
 # 移动端访问令牌（勿入库）
 .qm-token
+backend/smoke_out.txt
+backend/.ck.txt
+backend/.ck2.txt

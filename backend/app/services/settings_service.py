@@ -17,6 +17,7 @@ import re
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import ValidationException
+from app.core.logger import get_logger
 from app.repositories import SettingRepository
 
 # key 格式：小写字母开头，允许小写字母/数字/下划线，可用点号分层
@@ -42,6 +43,9 @@ DEFAULT_SETTINGS: dict[str, str] = {
 }
 
 TRUE_VALUES = {"true", "1", "yes", "on"}
+
+
+logger = get_logger("settings")
 
 
 class SettingsService:
@@ -76,6 +80,77 @@ class SettingsService:
         """单键写入便捷方法（内部仍走批量校验）。"""
         self.set_many({key: value})
 
+    # ---------- 变更历史（F6.2） ----------
+
+    HISTORY_LIMIT = 200
+
+    def _record_history(self, key: str, old_value: str | None,
+                        new_value: str | None) -> None:
+        from app.models.settings_history import SettingHistory, mask_value
+
+        if old_value == new_value:
+            return
+        self.db.add(SettingHistory(
+            user_id=self.user_id, key=key,
+            old_value=mask_value(key, old_value),
+            new_value=mask_value(key, new_value),
+        ))
+        # 保留最近 200 条：超出即删最旧
+        from sqlalchemy import delete, func, select
+
+        total = self.db.scalar(
+            select(func.count()).select_from(SettingHistory)
+            .where(SettingHistory.user_id == self.user_id)
+        ) or 0
+        if total > self.HISTORY_LIMIT:
+            oldest = self.db.scalars(
+                select(SettingHistory)
+                .where(SettingHistory.user_id == self.user_id)
+                .order_by(SettingHistory.created_at.asc())
+                .limit(total - self.HISTORY_LIMIT)
+            ).all()
+            for row in oldest:
+                self.db.execute(delete(SettingHistory).where(SettingHistory.id == row.id))
+
+    def history(self, limit: int = 50) -> list[dict]:
+        from sqlalchemy import select
+
+        from app.models.settings_history import SettingHistory
+
+        rows = self.db.scalars(
+            select(SettingHistory)
+            .where(SettingHistory.user_id == self.user_id,
+                   SettingHistory.deleted_at.is_(None))
+            .order_by(SettingHistory.created_at.desc())
+            .limit(min(limit, self.HISTORY_LIMIT))
+        ).all()
+        return [
+            {"id": r.id, "key": r.key, "old_value": r.old_value,
+             "new_value": r.new_value,
+             "created_at": r.created_at.isoformat() if r.created_at else None}
+            for r in rows
+        ]
+
+    def rollback(self, history_id: str) -> dict:
+        """单 key 回滚到该记录之前的旧值（F6.2）。"""
+        from sqlalchemy import select
+
+        from app.models.settings_history import SettingHistory
+
+        row = self.db.scalars(
+            select(SettingHistory).where(
+                SettingHistory.id == history_id,
+                SettingHistory.user_id == self.user_id,
+            )
+        ).first()
+        if row is None:
+            raise ValidationException("历史记录不存在")
+        # 脱敏值不可回滚（否则会把 *** 写回配置）
+        if row.old_value is not None and row.old_value.endswith("***"):
+            raise ValidationException("该记录含敏感值（已脱敏），不支持回滚")
+        self.set_many({row.key: row.old_value or ""})
+        return {"key": row.key, "restored": row.old_value}
+
     def set_many(self, values: dict[str, str]) -> dict[str, str]:
         """批量写入，返回写入后的完整配置字典。"""
         if not values:
@@ -87,6 +162,13 @@ class SettingsService:
             self._validate_key(key)
             if value is not None and len(str(value)) > 4000:
                 raise ValidationException(f"配置项 {key} 的值过长")
+
+        # 校验通过后再记历史（F6.2）：历史失败不影响本次写入
+        for key, value in values.items():
+            try:
+                self._record_history(key, self.get(key), str(value))
+            except Exception:
+                logger.exception("设置历史记录失败: %s", key)
 
         for key, value in values.items():
             self.repo.upsert(self.user_id, key, str(value))

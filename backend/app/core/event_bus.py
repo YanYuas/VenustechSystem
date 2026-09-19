@@ -71,15 +71,21 @@ ALL_EVENTS = [
 
 
 class EventRecord:
-    """事件记录（用于历史追踪）"""
-    __slots__ = ("event", "timestamp", "kwargs", "handlers_called", "success")
+    """事件记录（用于历史追踪）
 
-    def __init__(self, event: str, kwargs: dict, handlers_called: int, success: bool):
+    F1.2：记录**哪个 handler 失败**（原实现只有整体成败，无法定位）。
+    """
+    __slots__ = ("event", "timestamp", "kwargs", "handlers_called", "success",
+                 "failed_handlers")
+
+    def __init__(self, event: str, kwargs: dict, handlers_called: int, success: bool,
+                 failed_handlers: list[str] | None = None):
         self.event = event
         self.timestamp = time.time()
         self.kwargs = kwargs
         self.handlers_called = handlers_called
         self.success = success
+        self.failed_handlers = failed_handlers or []
 
     def to_dict(self) -> dict:
         return {
@@ -87,6 +93,7 @@ class EventRecord:
             "time": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(self.timestamp)),
             "handlers": self.handlers_called,
             "success": self.success,
+            "failed_handlers": self.failed_handlers,
         }
 
 
@@ -95,6 +102,12 @@ class EventBus:
     _async_handlers: dict[str, list[Callable]] = {}
     _history: deque[EventRecord] = deque(maxlen=500)
     _stats: dict[str, dict] = {}
+    # 滑动窗口（1 分钟）：仅存 (时间戳, 是否成功)，用于失败率判定（F1.2）
+    _window: dict[str, deque] = {}
+    WINDOW_SECONDS = 60.0
+    # 连续失败阈值：达到即在日志侧告警（前端据此弹 toast）
+    CONSECUTIVE_FAIL_ALERT = 5
+    FAILURE_RATE_ALERT = 0.30
 
     @classmethod
     def subscribe(cls, event: str, handler: Callable) -> None:
@@ -114,12 +127,14 @@ class EventBus:
         handlers = cls._handlers.get(event, [])
         called = 0
         success = True
+        failed_handlers: list[str] = []
         for handler in handlers:
             try:
                 handler(**kwargs)
                 called += 1
             except Exception:
                 success = False
+                failed_handlers.append(getattr(handler, "__name__", repr(handler)))
                 logger.exception("事件处理失败: %s (handler=%s)", event, handler.__name__)
 
         # 异步事件放入事件循环
@@ -138,13 +153,38 @@ class EventBus:
                         called += 1
                     except Exception:
                         success = False
+                        failed_handlers.append(getattr(handler, "__name__", repr(handler)))
                         logger.exception("异步事件处理失败: %s", event)
 
-        # 记录历史和统计
-        cls._history.append(EventRecord(event, kwargs, called, success))
-        stat = cls._stats.setdefault(event, {"count": 0, "success": 0, "failed": 0})
+        # 记录历史和统计（F1.2：逐 handler 失败定位）
+        cls._history.append(EventRecord(event, kwargs, called, success, failed_handlers))
+        stat = cls._stats.setdefault(
+            event, {"count": 0, "success": 0, "failed": 0,
+                    "failed_handlers": [], "consecutive_failures": 0}
+        )
         stat["count"] += 1
         stat["success" if success else "failed"] += 1
+        if failed_handlers:
+            known = stat.setdefault("failed_handlers", [])
+            for name in failed_handlers:
+                if name not in known:
+                    known.append(name)
+            stat["consecutive_failures"] = stat.get("consecutive_failures", 0) + 1
+        else:
+            stat["consecutive_failures"] = 0
+
+        # 滑动窗口（1 分钟）失败率
+        win = cls._window.setdefault(event, deque(maxlen=200))
+        win.append((time.time(), success))
+        cls._window[event] = win
+        rate = cls._window_failure_rate(event)
+        if stat["consecutive_failures"] >= cls.CONSECUTIVE_FAIL_ALERT:
+            logger.warning(
+                "事件 %s 连续失败 %d 次，请检查插件或服务（失败 handler: %s）",
+                event, stat["consecutive_failures"], ", ".join(stat.get("failed_handlers", [])),
+            )
+        elif rate is not None and rate > cls.FAILURE_RATE_ALERT and stat["failed"] > 0:
+            logger.warning("事件 %s 近 1 分钟失败率 %.0f%%，超过阈值", event, rate * 100)
 
     @classmethod
     def get_history(cls, event: str | None = None, limit: int = 50) -> list[dict]:
@@ -155,17 +195,58 @@ class EventBus:
         return [r.to_dict() for r in records[-limit:]]
 
     @classmethod
+    def _window_failure_rate(cls, event: str) -> float | None:
+        """近 1 分钟失败率（窗口内无记录则 None）。"""
+        win = cls._window.get(event)
+        if not win:
+            return None
+        cutoff = time.time() - cls.WINDOW_SECONDS
+        recent = [ok for ts, ok in win if ts >= cutoff]
+        if not recent:
+            return None
+        return 1.0 - (sum(1 for r in recent if r) / len(recent))
+
+    @classmethod
     def get_stats(cls) -> dict:
-        """获取事件统计"""
+        """获取事件统计（F1.2：含逐 handler 失败、滑动失败率、告警标记）"""
+        by_event = {}
+        for event, stat in cls._stats.items():
+            rate = cls._window_failure_rate(event)
+            by_event[event] = {
+                **stat,
+                "failure_rate_1m": round(rate, 3) if rate is not None else None,
+                "alert": (
+                    stat.get("consecutive_failures", 0) >= cls.CONSECUTIVE_FAIL_ALERT
+                    or (rate is not None and rate > cls.FAILURE_RATE_ALERT)
+                ),
+            }
         return {
             "total_events": sum(s["count"] for s in cls._stats.values()),
-            "by_event": cls._stats,
+            "by_event": by_event,
             "active_subscriptions": {
                 event: len(handlers) for event, handlers in cls._handlers.items()
             },
             "async_subscriptions": {
                 event: len(handlers) for event, handlers in cls._async_handlers.items()
             },
+            "thresholds": {
+                "window_seconds": cls.WINDOW_SECONDS,
+                "consecutive_fail_alert": cls.CONSECUTIVE_FAIL_ALERT,
+                "failure_rate_alert": cls.FAILURE_RATE_ALERT,
+            },
+        }
+
+    @classmethod
+    def get_subscriptions(cls) -> dict:
+        """订阅关系清单：event → [handler 模块名.函数名]（F1.2 可视化用）。"""
+        def _name(fn: Callable) -> str:
+            module = getattr(fn, "__module__", "?")
+            return f"{module}.{getattr(fn, '__name__', repr(fn))}"
+
+        return {
+            "sync": {event: [_name(h) for h in hs] for event, hs in cls._handlers.items()},
+            "async": {event: [_name(h) for h in hs]
+                      for event, hs in cls._async_handlers.items()},
         }
 
     @classmethod

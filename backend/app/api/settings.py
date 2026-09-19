@@ -38,3 +38,21 @@ def update_settings(
     user: User = Depends(get_current_user),
 ):
     return success({"values": _svc(db, user).set_many(data.values)})
+
+
+@router.get("/history", summary="设置变更历史（F6.2，最近 200 条）")
+def settings_history(
+    limit: int = 50,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    return success({"items": _svc(db, user).history(limit)})
+
+
+@router.post("/history/{history_id}/rollback", summary="单 key 回滚到旧值（F6.2）")
+def settings_rollback(
+    history_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    return success(_svc(db, user).rollback(history_id))
