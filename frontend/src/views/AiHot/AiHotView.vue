@@ -57,9 +57,22 @@ async function load() {
   }
 }
 
-function openLink(it: AihotItem) {
+async function openLink(it: AihotItem) {
   const url = it.links?.aihot ?? it.links?.original
-  if (url) window.open(url, '_blank', 'noopener')
+  if (!url) return
+  // 移动端（Capacitor 壳）里 window.open 可能被 WebView 拦截，
+  // 优先走 @capacitor/browser 打开系统浏览器；Web/PWA 降级为 window.open
+  try {
+    const { Capacitor } = await import('@capacitor/core')
+    if (Capacitor.isNativePlatform()) {
+      const { Browser } = await import('@capacitor/browser')
+      await Browser.open({ url })
+      return
+    }
+  } catch {
+    /* 插件不可用（未 sync 或纯 Web）→ 降级 */
+  }
+  window.open(url, '_blank', 'noopener')
 }
 
 onMounted(load)
@@ -218,5 +231,45 @@ onMounted(load)
   font-size: var(--text-xs);
   color: var(--text-low);
   text-align: center;
+}
+
+/* ---------- 移动端适配（PRD-模块-tools §5.2） ---------- */
+@media (max-width: 767px) {
+  .aihot {
+    padding: var(--space-3);
+  }
+
+  // 标题字号 --text-md（15px）；摘要保持 2 行截断
+  .aihot__title {
+    font-size: var(--text-md);
+  }
+
+  // Tab 横滑（F3.2 规格）
+  .aihot__tabs {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    scrollbar-width: none;
+
+    &::-webkit-scrollbar { display: none; }
+  }
+
+  // 日报纯文本：行高 1.8、字号 --text-sm
+  .aihot__digest {
+    line-height: 1.8;
+    font-size: var(--text-sm);
+  }
+
+  // 列表项触摸反馈
+  .aihot__item {
+    min-height: 64px;
+
+    &:active {
+      transform: scale(0.99);
+    }
+  }
+
+  .aihot__list {
+    overscroll-behavior: contain; // 防橡皮筋穿透
+  }
 }
 </style>

@@ -10,6 +10,8 @@ import { workspaceApi } from '@/api'
 import { useIdentity } from '@/composables/useIdentity'
 import { useModal } from '@/composables/useModal'
 import { useToast } from '@/composables/useToast'
+import { useDevice } from '@/composables/useDevice'
+import ActionSheet, { type SheetAction } from '@/components/common/ActionSheet.vue'
 import BaseCard from '@/components/common/BaseCard.vue'
 import BaseButton from '@/components/common/BaseButton.vue'
 import BaseInput from '@/components/common/BaseInput.vue'
@@ -97,6 +99,46 @@ async function onRemove(root: WorkspaceRoot) {
     }
     await loadRoots()
   } catch { /* http 层已提示 */ }
+}
+
+// ---------- 移动端动作菜单（PRD §5.2） ----------
+const { isMobile } = useDevice()
+const sheetOpen = ref(false)
+const sheetFile = ref<WorkspaceFile | null>(null)
+
+const sheetActions = computed<SheetAction[]>(() => [
+  { key: 'terminal', label: '在父目录打开终端', icon: 'command', hint: '白名单动作：只打开目录' },
+  { key: 'copy', label: '复制路径', icon: 'copy' },
+])
+
+function openSheet(file: WorkspaceFile) {
+  sheetFile.value = file
+  sheetOpen.value = true
+}
+
+function fullPathOf(file: WorkspaceFile): string {
+  if (!activeRoot.value) return file.rel_path
+  const full = `${activeRoot.value.path}/${file.rel_path}`
+  if (file.is_dir) return full
+  return full.slice(0, full.lastIndexOf('/')) || activeRoot.value.path
+}
+
+async function onSheetSelect(key: string) {
+  const file = sheetFile.value
+  if (!file) return
+  if (key === 'terminal') {
+    openFileRoot(file)
+  } else if (key === 'copy') {
+    const path = fullPathOf(file)
+    try {
+      await navigator.clipboard.writeText(path)
+      toast.success('路径已复制', path)
+    } catch {
+      // 非安全上下文（http）下 Clipboard API 不可用 → 回退到输入框选择
+      toast.error('复制失败', '当前环境不允许访问剪贴板')
+    }
+  }
+  sheetFile.value = null
 }
 
 function openFileRoot(file: WorkspaceFile) {
@@ -209,14 +251,32 @@ onMounted(async () => {
         <div v-if="filesLoading"><BaseSkeleton variant="list" :rows="5" /></div>
         <BaseEmpty v-else-if="files.length === 0" description="没有匹配的条目" />
         <ul v-else class="ws__list">
-          <li v-for="f in files" :key="f.id" class="ws__file" @dblclick="openFileRoot(f)">
+          <li
+            v-for="f in files"
+            :key="f.id"
+            class="ws__file"
+            :tabindex="isMobile ? 0 : -1"
+            @dblclick="!isMobile && openFileRoot(f)"
+            @click="isMobile && openSheet(f)"
+            @keyup.enter="isMobile && openSheet(f)"
+          >
             <AppIcon :name="f.is_dir ? 'folder' : 'doc'" :size="14" />
             <span class="ws__file-name">{{ f.name }}</span>
             <span class="ws__file-dir">{{ f.rel_path }}</span>
             <span class="ws__file-size">{{ f.is_dir ? '—' : formatSize(f.size) }}</span>
           </li>
         </ul>
-        <p class="ws__tip">双击条目可在其所在文件夹打开终端（唯一白名单动作）</p>
+        <p class="ws__tip">
+          {{ isMobile ? '点击条目选择操作（终端为唯一白名单动作）' : '双击条目可在其所在文件夹打开终端（唯一白名单动作）' }}
+        </p>
+
+        <!-- 移动端动作菜单（PRD §5.2：双击在移动端不存在，改为点击弹底部菜单） -->
+        <ActionSheet
+          v-model="sheetOpen"
+          :title="sheetFile?.name ?? ''"
+          :actions="sheetActions"
+          @select="onSheetSelect"
+        />
       </BaseCard>
     </template>
   </div>

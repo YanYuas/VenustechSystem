@@ -435,4 +435,57 @@ onMounted(loadTodos)
   color: var(--text-low);
   text-align: center;
 }
+
+/* ---------- 移动端适配（PRD-模块-tools §5.2） ---------- */
+@media (max-width: 767px) {
+  // 麦克风按钮：保持 96px 高，左右边距 --space-4
+  .asst__mic {
+    height: 96px;
+    margin-left: var(--space-4);
+    margin-right: var(--space-4);
+  }
+
+  // 建议条目：勾选框 24×24、时间右对齐
+  .asst__item-check,
+  .asst__check {
+    width: 24px;
+    height: 24px;
+    min-width: 24px;
+  }
+
+  .asst__item-time,
+  .asst__time {
+    margin-left: auto;
+    text-align: right;
+  }
+
+  // 待办分组：完成勾选保持 26px、标题 --text-sm
+  .asst__todo-check {
+    width: 26px;
+    height: 26px;
+  }
+
+  .asst__todo-title {
+    font-size: var(--text-sm);
+  }
+
+  // 文本输入：自适应高度（rows=3）、宽度 100%
+  .asst__text-input,
+  textarea.asst__text-input {
+    width: 100%;
+    min-height: calc(var(--control-h) * 3);
+    resize: vertical;
+  }
+
+  // 列表滚动不穿透 + 触摸反馈
+  .asst__list,
+  .asst__todos {
+    overscroll-behavior: contain;
+  }
+
+  .asst__item:active,
+  .asst__todo:active {
+    transform: scale(0.97);
+  }
+}
 </style>

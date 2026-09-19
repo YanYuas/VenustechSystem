@@ -460,4 +460,56 @@ const categoryOptions = [
   transition: background-color 0.15s, color 0.15s;
   &:hover { background: var(--bg-inset); color: var(--text-hi); }
 }
+
+/* ---------- 移动端适配（PRD-模块-tools §5.2） ---------- */
+@media (max-width: 767px) {
+  // 头部按钮区：纵向排列、按钮宽度 100%
+  .vault__head {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-2);
+  }
+
+  .vault__head-actions {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-2);
+
+    :deep(.base-btn),
+    :deep(button) {
+      width: 100%;
+      min-height: var(--control-h);
+    }
+  }
+
+  // 操作按钮：32×32 图标按钮、间距 --space-1
+  .vault__ops {
+    gap: var(--space-1);
+  }
+
+  .vault__op {
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    padding: 0;
+  }
+
+  // 明文显示区：字号 --text-sm + 任意位置换行（长密钥不撑破布局）
+  .vault__secret {
+    font-size: var(--text-sm);
+    word-break: break-all;
+    overflow-wrap: anywhere;
+  }
+
+  // 凭据行：加大触摸高度
+  .vault__item {
+    min-height: 56px;
+    padding: var(--space-3) var(--space-2);
+  }
+
+  // 底部安全区（移动端手势条）
+  .vault {
+    padding-bottom: max(var(--space-6), env(safe-area-inset-bottom, 0px));
+  }
+}
 </style>

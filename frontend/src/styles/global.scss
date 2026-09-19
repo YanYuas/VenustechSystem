@@ -376,3 +376,34 @@ img {
     grid-template-columns: repeat(2, 1fr) !important;
   }
 }
+
+
+/* ============================================================
+   移动端动画与触摸反馈（PRD-模块-tools §5.3）
+   - 移动端动画时长收敛到 200ms（桌面 300ms）
+   - 可点击元素统一 :active 缩放反馈
+   - 列表滚动 overscroll-behavior: contain 防橡皮筋穿透
+   ============================================================ */
+@media (max-width: 767px) {
+  * {
+    transition-duration: 200ms;
+  }
+
+  button:active,
+  [role='button']:active,
+  .base-card__item:active,
+  li:active {
+    transform: scale(0.97);
+  }
+
+  // 触摸反馈不应影响正在拖动的元素
+  button:disabled:active {
+    transform: none;
+  }
+
+  [class*='__list'],
+  [class*='__scroll'],
+  main {
+    overscroll-behavior: contain;
+  }
+}

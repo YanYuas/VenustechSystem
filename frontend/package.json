@@ -14,6 +14,7 @@
   "dependencies": {
     "@capacitor-community/speech-recognition": "^7.0.0",
     "@capacitor/android": "^7.6.9",
+    "@capacitor/browser": "^7.0.5",
     "@capacitor/cli": "^7.0.0",
     "@capacitor/core": "^7.0.0",
     "@element-plus/icons-vue": "^2.3.1",
