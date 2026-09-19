@@ -246,6 +246,14 @@ async function doRequest<T>(path: string, options: RequestInit = {}): Promise<T>
       if (res.status === 404) {
         throw new ApiError(ApiErrorCode.NOT_FOUND, message || '资源不存在')
       }
+      // 网关层错误码 = 后端不可达（server.js 在代理失败时返回 502）。
+      // 归入 ApiUnreachableError 而非普通服务端错误，这样：
+      //   - 提示走统一的「连不上后端服务」可操作文案，而不是含糊的"服务异常"
+      //   - 写操作会被离线队列接管（服务不可达期间不该让用户白填一遍）
+      if (res.status === 502 || res.status === 503 || res.status === 504) {
+        markUnreachable()
+        throw new ApiUnreachableError(message || '后端服务不可达')
+      }
       throw new ApiError(ApiErrorCode.SERVER_ERROR, message)
     }
     const body: ApiResponse<T> = await res.json()

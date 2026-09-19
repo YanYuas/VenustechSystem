@@ -1,20 +1,59 @@
-# Python
+# ============================================================
+# 说明：本文件必须自给自足。
+# 曾出现的问题：backend/.venv（2163 个文件）与 backend/.pytest_cache
+# 只被开发机的全局 ~/.gitignore_global 忽略 —— 换机器/换人执行
+# `git add -A` 会把整个 venv 提交进仓库。以下规则补齐这一层。
+# ============================================================
+
+# ---------- Python ----------
 __pycache__/
-*.pyc
+*.py[cod]
 venv/
+.venv/
+*.venv/
+env/
+.eggs/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
 .env
-# Node
+.env.*
+!.env.example
+
+# ---------- Node ----------
 node_modules/
 dist/
 build/
-# IDE
+*.tsbuildinfo
+.vite/
+
+# ---------- Android（Capacitor 构建产物；android/.gitignore 之外再兜一层） ----------
+frontend/android/.gradle/
+frontend/android/build/
+frontend/android/app/build/
+frontend/android/local.properties
+frontend/android/.idea/
+*.apk
+*.aab
+*.keystore
+!frontend/android/app/debug.keystore
+
+# ---------- IDE ----------
 .vscode/
 .idea/
-# OS
+*.iml
+
+# ---------- OS ----------
 .DS_Store
 Thumbs.db
+desktop.ini
+
+# ---------- 日志 ----------
 *.log
-# 运行期数据（避免切分支时覆盖本地数据库）
+logs/
+
+# ---------- 运行期数据（避免切分支时覆盖本地数据库） ----------
 backend/data/
 backend/data_test/
 backend/data_smoke/
@@ -22,19 +61,29 @@ backend/data_diag/
 data-fusion/
 data-*/
 data_*/
-# 本地工具状态（智能体记忆/会话数据，非项目源码）
+
+# ---------- 本地工具状态（智能体记忆/会话数据，非项目源码） ----------
 .workbuddy/
 
-# git 灾难恢复备份（2026-09-17，勿删，待确认后清理）
+# ---------- git 灾难恢复备份（2026-09-17，勿删，待确认后清理） ----------
 .git-broken-20260917/
 .claude/
 
-# 移动端访问令牌（勿入库）
+# ---------- 密钥与令牌（绝不入库） ----------
 .qm-token
+*.pem
+*.key
+
+# ---------- 临时文件（构建/调试/提交信息） ----------
 backend/smoke_out.txt
 backend/.ck.txt
 backend/.ck2.txt
+backend/run_out.txt
 build_out.txt
+srv.txt
 frontend/.tq.mjs
 frontend/.tc.mjs
 .tc.mjs
+.tq.mjs
+.git-commit-msg.tmp
+*.tmp

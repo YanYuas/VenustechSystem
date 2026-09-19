@@ -129,7 +129,7 @@ VenustechSystem/
 │   ├── backend/             后端开发说明
 │   ├── management/          进度评估 / 决策日志 / 考校报告
 │   └── assets/              截图等资源
-├── scripts/                 开发脚本（dev.ps1一键启动）
+├── scripts/                 开发脚本（check_all.py 一键校验等）
 ├── server.js                统一Web服务（生产：静态 + /api代理）
 ├── CHANGELOG.md             变更日志
 └── README.md                本文件
@@ -143,47 +143,82 @@ VenustechSystem/
 
 - Python 3.11+
 - Node 18+
+- （可选）[uv](https://docs.astral.sh/uv/)：安装后端依赖更快
+
+### 首次安装依赖（只做一次）
+
+双击 **`setup.bat`**，或命令行执行：
+
+```bash
+setup.bat
+```
+
+它会：创建 `backend\.venv` → 安装 `backend/requirements.txt` → `npm install`。
+**它不会碰 git**（旧版初始化脚本会执行 `git add -A && git commit`，已移除）。
 
 ### 一键启动（开发模式）
 
-双击「启动开发.bat」，或命令行执行：
+双击 **`start-dev.bat`**，或命令行执行：
 
 ```bash
 powershell -ExecutionPolicy Bypass -File scripts\dev.ps1
 ```
 
-自动启动：后端 8765 + 前端 5173 + 打开浏览器
+自动启动：后端 8765 + 前端 5173 + 打开浏览器。
+
+> ⚠️ 后端依赖装在 `backend\.venv`，脚本会**优先使用该 venv 的解释器**。
+> 直接跑 `python -m uvicorn` 用的是 PATH 上的系统 Python，通常缺
+> fastapi/uvicorn，会立刻 `ModuleNotFoundError` 退出。
 
 ### 手动启动
 
 ```bash
-# 后端
+# 后端（注意用 venv 里的 python）
 cd backend
-python -m uvicorn app.main:app --reload --port 8765
+.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8765 --reload
 
 # 前端（新开终端）
 cd frontend
-npm install   # 首次运行
 npm run dev   # http://localhost:5173
 ```
 
-### 生产 / 局域网访问
+### 生产 / 局域网 / 手机访问
 
 ```bash
 cd frontend && npm run build && cd ..
 node server.js
-# → http://<本机IP>:3000 （前端 + /api代理到8765）
+# → http://<本机IP>:3000 （前端 + /api 代理到 8765）
 ```
+
+手机端（Tailscale 或同一 WiFi）：双击 **`start-mobile.bat`** ——
+它会生成/读取访问令牌、构建 dist、起后端与统一服务，并把令牌打印出来，
+在 App 的「设置 → 服务器地址」页填一次即可。
+
+> `/api/*` 需要 `X-API-Token` 请求头（本机回环来源豁免，PC 前端零配置）。
+> 服务监听 `0.0.0.0`，同网络设备都可访问；开放 WiFi 下建议改用 Tailscale。
 
 ### 验证
 
 ```bash
-# 后端冒烟测试
-cd backend && python scripts/smoke_backend.py
+# 一键全量校验（架构守护 / 冒烟 / 版本一致性 / 设计引用 /
+#                类型检查 / 离线队列 / HTTP 连通性 —— 共 7 项）
+python scripts/check_all.py
 
-# 前端类型检查 + 构建
-cd frontend && npm run typecheck && npm run build
+# 单项
+cd backend && python scripts/smoke_backend.py     # 后端端到端断言
+cd frontend && npm run typecheck                  # 前端类型检查
+python scripts/audit_hardcoded_colors.py          # 硬编码颜色审计
 ```
+
+### 脚本一览
+
+| 脚本 | 用途 |
+|---|---|
+| `setup.bat` | 首次安装依赖（venv + pip + npm），**不碰 git** |
+| `start-dev.bat` | 开发启动：后端 8765 + 前端 5173 + 开浏览器 |
+| `start-mobile.bat` | 手机/局域网：后端 + 统一服务 3000 + 打印访问令牌 |
+| `push-branches.bat` | 推送 main + 8 个模块分支 + tag（网络不稳时重跑） |
+| `scripts/dev.ps1` | 开发启动（PowerShell 版，支持 `-DataDir` 隔离数据目录） |
 
 ---
 
