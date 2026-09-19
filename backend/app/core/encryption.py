@@ -31,7 +31,16 @@ class EncryptionManager:
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self._key_file = data_dir / ".encryption_key"
         self._salt_file = data_dir / ".encryption_key.salt"
+        # 密钥环（PRD 8.2）：保留 current + previous 两把密钥。
+        # 轮换中断时旧密文仍可用 previous 解密 —— 避免"换了 key 却
+        # 没来得及重加密"造成的静默数据丢失。
+        self._keyring_file = data_dir / ".encryption_keys.json"
+        # 密钥环（PRD 8.2）：保留 current + previous 两把密钥。
+        # 轮换中断时旧密文仍可用 previous 解密 —— 避免"换了 key 却
+        # 没来得及重加密"造成的静默数据丢失。
+        self._keyring_file = data_dir / ".encryption_keys.json"
         self._fernet: Fernet | None = None
+        self._previous_fernet: Fernet | None = None
         self._master_key = master_key
         self._initialize()
 
@@ -83,6 +92,24 @@ class EncryptionManager:
                 pass
 
         self._fernet = Fernet(key)
+        # 密钥环里的 previous 用于解密历史密文（轮换中断场景）
+        try:
+            if self._keyring_file.exists():
+                ring = json.loads(self._keyring_file.read_text(encoding="utf-8"))
+                prev = ring.get("previous")
+                if prev:
+                    self._previous_fernet = Fernet(prev.encode("utf-8"))
+        except Exception:
+            self._previous_fernet = None
+        # 密钥环里的 previous 用于解密历史密文（轮换中断场景）
+        try:
+            if self._keyring_file.exists():
+                ring = json.loads(self._keyring_file.read_text(encoding="utf-8"))
+                prev = ring.get("previous")
+                if prev:
+                    self._previous_fernet = Fernet(prev.encode("utf-8"))
+        except Exception:
+            self._previous_fernet = None
 
     @property
     def is_available(self) -> bool:
@@ -106,6 +133,12 @@ class EncryptionManager:
         try:
             return self._fernet.decrypt(token).decode("utf-8")
         except InvalidToken:
+            # PRD 8.2：轮换中断后旧密文用 previous 密钥仍可解密
+            if self._previous_fernet is not None:
+                try:
+                    return self._previous_fernet.decrypt(token).decode("utf-8")
+                except InvalidToken:
+                    pass
             raise ValueError("解密失败：密钥不匹配或数据已损坏")
 
     def encrypt_json(self, obj: Any) -> bytes:
@@ -145,8 +178,24 @@ class EncryptionManager:
             new_key = self.derive_key(new_master_key, salt)
         else:
             new_key = Fernet.generate_key()
-        # 保存新密钥
+        # 保留旧密钥为 previous（供历史密文解密），再落新密钥
+        old_key = self._key_file.read_bytes() if self._key_file.exists() else None
         self._key_file.write_bytes(new_key)
+        try:
+            self._keyring_file.write_text(
+                json.dumps({
+                    "current": new_key.decode() if isinstance(new_key, bytes) else str(new_key),
+                    "previous": (old_key.decode()
+                                 if isinstance(old_key, bytes) else old_key),
+                }), encoding="utf-8"
+            )
+            try:
+                os.chmod(self._keyring_file, 0o600)
+            except OSError:
+                pass
+        except OSError:
+            pass
+        self._previous_fernet = Fernet(old_key) if old_key else None
         self._fernet = Fernet(new_key)
 
     def get_status(self) -> dict:
@@ -158,6 +207,7 @@ class EncryptionManager:
             "key_file": str(self._key_file),
             "key_exists": self._key_file.exists(),
             "has_custom_key": self._master_key is not None,
+            "has_previous_key": self._previous_fernet is not None,
         }
 
 

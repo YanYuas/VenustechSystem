@@ -1199,6 +1199,40 @@ def main() -> int:
         check("encryption manager initialized at startup",
               _get_enc() is not None and _get_enc().is_available is True, "not initialized")
         _tok = _enc("sk-smoke-secret-001")
+        # ---------- mod-platform 验收 8.2：轮换中断后旧数据仍可解密 ----------
+        import tempfile as _tf
+        from app.core.encryption import EncryptionManager as _EM
+        _rot_dir = pathlib.Path(_tf.mkdtemp()) if 'pathlib' in dir() else None
+        import pathlib as _pl
+        _rot_dir = _pl.Path(_tf.mkdtemp())
+        _m1 = _EM(_rot_dir)
+        _old_token = _m1.encrypt("secret-before-rotation").decode()
+        _m1.rotate_key()  # 模拟"换了 key 但尚未重加密"的中断状态
+        _m2 = _EM(_rot_dir)
+        check("rotation interrupt keeps old ciphertext decryptable",
+              _m2.decrypt(_old_token) == "secret-before-rotation"
+              and _m2.get_status().get("has_previous_key") is True,
+              _m2.get_status())
+        check("rotation still serves new ciphertexts",
+              _m2.decrypt(_m2.encrypt("after").decode()) == "after", "new cipher broken")
+
+        # ---------- mod-platform 验收 8.2：轮换中断后旧数据仍可解密 ----------
+        import tempfile as _tf
+        from app.core.encryption import EncryptionManager as _EM
+        _rot_dir = pathlib.Path(_tf.mkdtemp()) if 'pathlib' in dir() else None
+        import pathlib as _pl
+        _rot_dir = _pl.Path(_tf.mkdtemp())
+        _m1 = _EM(_rot_dir)
+        _old_token = _m1.encrypt("secret-before-rotation").decode()
+        _m1.rotate_key()  # 模拟"换了 key 但尚未重加密"的中断状态
+        _m2 = _EM(_rot_dir)
+        check("rotation interrupt keeps old ciphertext decryptable",
+              _m2.decrypt(_old_token) == "secret-before-rotation"
+              and _m2.get_status().get("has_previous_key") is True,
+              _m2.get_status())
+        check("rotation still serves new ciphertexts",
+              _m2.decrypt(_m2.encrypt("after").decode()) == "after", "new cipher broken")
+
         check("secret encryption never plaintext",
               not _tok.startswith("plain:") and _dec(_tok) == "sk-smoke-secret-001",
               _tok[:24])
