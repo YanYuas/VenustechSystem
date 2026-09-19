@@ -217,6 +217,94 @@ def main() -> int:
         d = r.json()
         check("backup export", d.get("code") == 0 and os.path.exists(d["data"]["path"]), str(d))
 
+        # ---------- mod-platform 验收 8.2：备份完整性（F7.2） ----------
+        from app.database import SessionLocal as _BKSession
+        from app.models.user import User as _BKUser
+        from app.services.backup_service import BackupService as _BKS
+        _bk_db = _BKSession()
+        _bk_uid = _bk_db.query(_BKUser.id).first()[0]
+        import io as _io
+        import zipfile as _zf
+        _bpath = Path(d["data"]["path"])
+        _bb = _bpath.read_bytes()
+        with _zf.ZipFile(_io.BytesIO(_bb)) as _z:
+            _names = _z.namelist()
+            _man = json.loads(_z.read("MANIFEST.json"))
+        check("backup writes MANIFEST with sha256",
+              "MANIFEST.json" in _names and _man.get("files")
+              and len(_man["files"][0]["sha256"]) == 64,
+              str(_man)[:180])
+        check("backup records user binding for cross-user rejection",
+              _man.get("user_id") is not None, str(_man.get("user_id")))
+        # 正常包校验通过
+        _ok_info = _BKS(_bk_db, _bk_uid).verify(_bb, _bpath.name)
+        check("backup verify accepts intact package", _ok_info["valid"] is True, str(_ok_info)[:160])
+        # 篡改包内文件 → 校验和不符，必须拒绝
+        _tampered = _io.BytesIO()
+        with _zf.ZipFile(_io.BytesIO(_bb)) as _zin, _zf.ZipFile(_tampered, "w", _zf.ZIP_DEFLATED) as _zout:
+            for _n in _zin.namelist():
+                _data = _zin.read(_n)
+                if _n == "app.db":
+                    _data = _data + b"tampered"  # 破坏内容但保持 zip 合法
+                _zout.writestr(_n, _data)
+        import app.core.exceptions as _exc2
+        _rejected = False
+        try:
+            _BKS(_bk_db, _bk_uid).verify(_tampered.getvalue(), "tampered.zip")
+        except _exc2.ValidationException:
+            _rejected = True
+        check("backup tampered package rejected", _rejected, "tamper not detected")
+        # 跨用户包 → 拒绝
+        _foreign = _io.BytesIO()
+        with _zf.ZipFile(_io.BytesIO(_bb)) as _zin, _zf.ZipFile(_foreign, "w", _zf.ZIP_DEFLATED) as _zout:
+            for _n in _zin.namelist():
+                _data = _zin.read(_n)
+                if _n == "MANIFEST.json":
+                    _m2 = json.loads(_data)
+                    _m2["user_id"] = "00000000-0000-0000-0000-000000000000"
+                    _data = json.dumps(_m2).encode()
+                _zout.writestr(_n, _data)
+        _cross = False
+        try:
+            _BKS(_bk_db, _bk_uid).verify(_foreign.getvalue(), "foreign.zip")
+        except _exc2.ValidationException:
+            _cross = True
+        check("backup cross-user package rejected", _cross, "cross-user not detected")
+        # 非 zip → 拒绝
+        _bad = False
+        try:
+            _BKS(_bk_db, _bk_uid).verify(b"not a zip at all", "bad.bin")
+        except _exc2.ValidationException:
+            _bad = True
+        check("backup garbage file rejected", _bad, "garbage accepted")
+
+        # ---------- mod-platform 验收 8.2：自动备份（F7.1） ----------
+        from app.repositories import SettingRepository as _SR
+        from app.config import get_settings as _gs2
+        _bksvc = _BKS(_bk_db, _bk_uid)
+        check("auto backup off by default",
+              _bksvc.auto_backup_if_due()["ran"] is False, "should be disabled by default")
+        _sr = _SR(_bk_db)
+        _sr.upsert(_bk_uid, "backup.auto_enabled", "true")
+        _sr.upsert(_bk_uid, "backup.interval_hours", "0")   # 立即到期
+        _sr.upsert(_bk_uid, "backup.keep", "1")
+        _bk_db.commit()
+        _r1 = _bksvc.auto_backup_if_due()
+        check("auto backup runs when due",
+              _r1.get("ran") is True and Path(_r1["path"]).exists(), str(_r1)[:180])
+        # 间隔 0 小时 → 第二次会因"距上次不足间隔"?? 此处用 1 小时间隔验证跳过逻辑
+        _sr.upsert(_bk_uid, "backup.interval_hours", "24")
+        _bk_db.commit()
+        _r2 = _bksvc.auto_backup_if_due()
+        check("auto backup skips when interval not elapsed",
+              _r2.get("ran") is False and _r2.get("reason") == "interval not elapsed",
+              str(_r2)[:160])
+        # 保留份数：keep=1 时旧自动备份被清理
+        _bk_count = len(list(_gs2().backups_dir.glob("backup-*.zip")))
+        check("auto backup retention keeps configured count",
+              _bk_count <= 1, f"{_bk_count} backups kept")
+        _bk_db.close()
+
         # ==================== S6-1 领域规则引擎 ====================
         # 这一组断言的战略意义：证明「不配 API Key 也能生成专业学习计划」。
         # 此前未配 Key 时后端只会复读用户输入，学习计划生成是纯空壳。

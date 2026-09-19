@@ -72,6 +72,22 @@ async def lifespan(_app: FastAPI):
                 logger.info(f"重复任务生成 {total} 个实例")
         except Exception:
             logger.exception("重复任务生成失败（不影响启动）")
+    # 自动备份（PRD F7.1）：默认关闭；开启后按配置间隔判断是否到期
+    try:
+        from sqlalchemy import select as _select
+
+        from app.models.user import User as _User
+        from app.services.backup_service import BackupService
+
+        with SessionLocal() as _bdb:
+            _uid_row = _bdb.execute(_select(_User.id)).first()
+            if _uid_row:
+                _info = BackupService(_bdb, _uid_row[0]).auto_backup_if_due()
+                if _info.get("ran"):
+                    logger.info(f"自动备份完成: {_info.get('path')}")
+    except Exception:
+        logger.exception("自动备份检查失败（不影响启动）")
+
     # 注册事件总线订阅者（文档保存→AI摘要/标签，任务完成→通知）
     import asyncio
     set_event_loop(asyncio.get_running_loop())

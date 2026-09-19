@@ -29,6 +29,17 @@ def export(db: Session = Depends(get_db), user: User = Depends(get_current_user)
     return success(_svc(db, user).export())
 
 
+@router.post("/verify")
+def verify_backup(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """校验备份包完整性（PRD F7.2）——不落盘、不改库，供 UI 导入前预检。"""
+    content = file.file.read()
+    return success(_svc(db, user).verify(content, file.filename or "backup.zip"))
+
+
 @router.post("/import")
 def import_backup(
     file: UploadFile = File(...),
