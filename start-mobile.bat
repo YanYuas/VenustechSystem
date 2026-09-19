@@ -66,8 +66,8 @@ if not exist "frontend\dist\index.html" (
     echo [build] frontend\dist not found - building ^(may take a minute^) ...
     pushd frontend
     call npm run build
-    rem `if errorlevel 1` 是运行时判定；若写成 set "RC=%errorlevel%" 放在块内，
-    rem %展开% 会在进入该块时就完成，取到的是旧值。
+    rem `if errorlevel 1` is evaluated at run time; writing
+    rem set "RC=%errorlevel%" inside a block would expand too early (stale value).
     if errorlevel 1 (
         popd
         echo [ERROR] frontend build failed. See output above.

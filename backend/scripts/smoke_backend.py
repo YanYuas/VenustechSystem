@@ -1125,7 +1125,8 @@ def main() -> int:
         check("rules preview falls back to generic plan",
               _pv3["fallback"] is True and _pv3["plan_count"] >= 1, str(_pv3)[:220])
         r = client.post("/api/v1/rules/domains")
-        check("rules domains endpoint lists builtin+user", r.status_code in (405, 404) or True, "")
+        check("rules domains POST is rejected (read-only endpoint)",
+              r.status_code in (405, 404), f"status={r.status_code}")
         r = client.get("/api/v1/rules/domains")
         _dm = r.json()["data"]
         # ---------- mod-platform O10/F2.5：云适配器契约冻结 ----------

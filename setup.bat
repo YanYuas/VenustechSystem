@@ -2,7 +2,7 @@
 rem ============================================================
 rem Qimingxing System - environment setup (run ONCE, or after wiping deps)
 rem
-rem Replaces the old 初始化项目.bat, which was written at project-bootstrap
+rem Replaces the old Chinese-named init script, which was written at bootstrap
 rem time and had two problems:
 rem   1. it created stray dirs (src\, tests\, config\) that do not belong to
 rem      the current layout (backend\ frontend\ docs\ scripts\)
