@@ -16,11 +16,16 @@ from app.core.encryption import EncryptionManager
 from app.core.exceptions import BusinessException, ValidationException
 from app.config import get_settings
 from app.models.settings import Setting
+from app.models.user import User
 from app.models.vault import VaultItem
 
 # 需要跟随密钥轮换重加密的（模型/表, 密文列）
+# 考察修复：原来只覆盖 vault_items，漏了 users.api_key_encrypted ——
+# 密钥环只保留 current+previous 两级，第二次轮换后更早的密钥即失效，
+# 遗漏的密文会永久解不开。凡"用 EncryptionManager 加密落库"的列都必须登记。
 _CIPHER_COLUMNS: list[tuple[str, str]] = [
     ("vault_items", "secret_encrypted"),
+    ("users", "api_key_encrypted"),
 ]
 
 
@@ -50,10 +55,16 @@ class SecurityService:
                 if not token:
                     continue
                 try:
-                    collected.append((row, column, mgr.decrypt(token)))
+                    plaintext = mgr.decrypt(token)
                 except Exception:
-                    # 单条解不开（脏数据）不阻塞整体轮换，跳过并记录
+                    # user.api_key_encrypted 可能由 DPAPI 加密（非 Fernet），
+                    # 由 DPAPI 自行管理密钥，此处跳过而非失败
                     continue
+                # 仅当密文确实是本加密管理器的产物时才重加密：
+                # DPAPI 密文（dpapi: 前缀）不归本密钥管
+                if str(token).startswith("dpapi:"):
+                    continue
+                collected.append((row, column, plaintext))
 
         # 2) 设置类密文（assistant.deepseek_key）
         setting_rows: list[tuple[Setting, str]] = []
@@ -99,6 +110,11 @@ class SecurityService:
                 self.db.scalars(
                     select(VaultItem).where(VaultItem.user_id == self.user_id)
                 ).all()
+            )
+        if table == "users":
+            # api_key_encrypted 存在 users 行上（单用户模型下即本用户）
+            return list(
+                self.db.scalars(select(User).where(User.id == self.user_id)).all()
             )
         return []
 

@@ -45,6 +45,10 @@ SYNC_POLICY: dict[str, SyncPolicy] = {
     "vault_items": SyncPolicy.ENCRYPTED_ONLY,     # 只同步密文材料
     "vault_config": SyncPolicy.ENCRYPTED_ONLY,    # salt + verifier 本身即密文材料
     "settings": SyncPolicy.FILTERED,              # 排除设备相关键
+    # 设备本地痕迹（考察修复）：审计日志与设置变更历史是"这台机器上
+    # 发生过什么"的记录，跨端同步没有意义，还会让同步包无谓膨胀
+    "audit_logs": SyncPolicy.DERIVED_SKIP,
+    "settings_history": SyncPolicy.DERIVED_SKIP,
 }
 
 # encrypted-only：列白名单（明文列一律剥除，进不了同步包）

@@ -1216,6 +1216,46 @@ def main() -> int:
         check("rotation still serves new ciphertexts",
               _m2.decrypt(_m2.encrypt("after").decode()) == "after", "new cipher broken")
 
+
+        # ---------- 考察修复：新表不得跨端同步（本地痕迹） ----------
+        from app.core.sync import policy_of as _policy_of, SyncPolicy as _SP
+        check("audit_logs excluded from sync",
+              _policy_of("audit_logs") is not _SP.FULL, str(_policy_of("audit_logs")))
+        check("settings_history excluded from sync",
+              _policy_of("settings_history") is not _SP.FULL, str(_policy_of("settings_history")))
+        _snap_all = _sync_engine().snapshot()
+        check("snapshot omits audit + history tables",
+              "audit_logs" not in _snap_all and "settings_history" not in _snap_all,
+              str([t for t in _snap_all if "audit" in t or "history" in t])[:120])
+
+        # ---------- 考察修复：密钥轮换覆盖 API Key 密文 ----------
+        from app.services.security_service import _CIPHER_COLUMNS as _CC
+        check("rotation covers api_key_encrypted",
+              ("users", "api_key_encrypted") in _CC, str(_CC))
+        # 真实往返：写入 API Key（fernet）→ 轮换 → 仍可解密
+        from app.core.security import decrypt_secret as _ds2, encrypt_secret as _es2
+        from app.database import SessionLocal as _S4
+        from app.models.user import User as _U4
+        _kdb = _S4()
+        _urow = _kdb.query(_U4).first()
+        _urow.api_key_encrypted = _es2("sk-rotation-probe-777")
+        _kdb.commit()
+        if client.post("/api/v1/vault/unlock",
+                       json={"master_password": "new master password 9"}).json().get("code") == 0:
+            _rr = client.post("/api/v1/security/key/rotate", json={})
+            check("rotation endpoint returns rotated count",
+                  _rr.json().get("code") == 0
+                  and isinstance(_rr.json()["data"].get("rotated"), int), _rr.text[:160])
+            _kdb.expire_all()
+            _after = _kdb.query(_U4).first().api_key_encrypted
+            check("api key still decryptable after rotation",
+                  _ds2(_after) == "sk-rotation-probe-777"
+                  and not str(_after).startswith("dpapi:"), str(_after)[:32])
+        _kdb.close()
+
+        check("rotation still serves new ciphertexts",
+              _m2.decrypt(_m2.encrypt("after").decode()) == "after", "new cipher broken")
+
         # ---------- mod-platform 验收 8.2：轮换中断后旧数据仍可解密 ----------
         import tempfile as _tf
         from app.core.encryption import EncryptionManager as _EM
