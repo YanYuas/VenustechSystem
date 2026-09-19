@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import subprocess
+import shutil
 import sys
 from pathlib import Path
 
@@ -27,6 +28,7 @@ FRONTEND = ROOT / "frontend"
 # 后端解释器优先用项目 venv，回退到当前解释器
 VENV_PY = BACKEND / ".venv" / ("Scripts/python.exe" if sys.platform == "win32" else "bin/python")
 PYTHON = str(VENV_PY) if VENV_PY.exists() else sys.executable
+NODE = shutil.which('node') or 'node'
 
 VUE_TSC = FRONTEND / "node_modules" / ".bin" / ("vue-tsc.cmd" if sys.platform == "win32" else "vue-tsc")
 
@@ -87,10 +89,32 @@ def main() -> int:
 
     if args.skip_frontend:
         results.append(("前端类型检查", True, "skipped"))
+        results.append(("离线队列测试", True, "skipped"))
     else:
-        ok, st = _run("4/4 前端类型检查（vue-tsc）",
+        ok, st = _run("4/5 前端类型检查（vue-tsc）",
                       [str(VUE_TSC), "--noEmit"], FRONTEND)
         results.append(("前端类型检查", ok, st))
+
+        # 5/5 离线队列核心测试（esbuild 转译 TS → node 跑；见 mod-tools F4.3）
+        esbuild = FRONTEND / "node_modules/.bin/esbuild.cmd"
+        if not esbuild.exists():
+            esbuild = FRONTEND / "node_modules/.bin/esbuild"
+        bundle = FRONTEND / ".tq.mjs"
+        ok_build, st_build = _run(
+            "5/5a 离线队列测试打包（esbuild）",
+            [str(esbuild), "--bundle", "scripts/test-offline-queue.ts",
+             "--outfile=.tq.mjs", "--format=esm", "--platform=node"],
+            FRONTEND,
+        )
+        if ok_build:
+            ok, st = _run("5/5 离线队列核心测试（node）", [NODE, ".tq.mjs"], FRONTEND)
+        else:
+            ok, st = False, st_build
+        try:
+            bundle.unlink()
+        except OSError:
+            pass
+        results.append(("离线队列测试(15)", ok, st))
 
     print(f"\n{'=' * 62}\n汇总\n{'=' * 62}")
     for name, ok, st in results:

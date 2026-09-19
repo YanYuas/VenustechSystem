@@ -7,6 +7,31 @@
 
 ## [Unreleased]
 
+### Added — 模块化深度开发 · mod-tools / F4.3 离线队列（2026-09-19）
+
+**离线队列基础设施（弱网记待办不再丢）**
+- `utils/offlineQueueCore.ts`：纯逻辑核心（FIFO 重放 / 失败重试计数 /
+  上限停止 / 重试全部 / 清空失败 / 并发保护），存储与发送接口注入，
+  可脱离浏览器单测
+- `utils/offlineQueueIdb.ts`：IndexedDB 持久化（库
+  `venustech_offline_queue` / 表 `queue` / 自增主键），App 重启不丢
+- `stores/offlineQueue.ts`：Pinia store + online/offline 监听 + 事件广播
+- `api/http.ts`：写操作拦截——离线或网络失败（含服务端不可达）时入队，
+  抛 `OfflineQueuedError`（消息即"已离线，操作已加入同步队列"）；
+  用注册钩子接入 store，避免 http ↔ store 循环依赖
+- `components/layout/OfflineQueueIndicator.vue`：右上角数字角标
+  （>99 显示 99+，失败转草莓红，同步中转 spinner）+ 底部抽屉面板
+  （条目列表 / 重试全部 / 清空失败）
+- 状态语义明确并写入注释：pending / retrying（>0 且 <3）/ failed（>=3）
+
+**验证**：新增 `frontend/scripts/test-offline-queue.ts` **15 条行为测试**
+（esbuild 转译 + node 执行），并纳入 `check_all` 第 5 步；
+check_all 五项全绿（架构守护 / 冒烟 228 / 版本一致性 / 类型检查 / 队列测试）。
+
+**已知边界**：冲突策略为"最后写入胜出"（PRD 列为 P2）；超时后重放可能重复，
+真幂等需服务端 `X-Idempotency-Key`（后续）。
+
+
 ### Added — 模块化深度开发 · mod-platform（2026-09-18）
 
 **P0 安全债（四条真实缺陷）**

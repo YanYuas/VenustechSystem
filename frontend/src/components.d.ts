@@ -43,6 +43,7 @@ declare module 'vue' {
     MobileTabBar: typeof import('./components/layout/MobileTabBar.vue')['default']
     ModalHost: typeof import('./components/common/ModalHost.vue')['default']
     ModalItem: typeof import('./components/common/ModalItem.vue')['default']
+    OfflineQueueIndicator: typeof import('./components/layout/OfflineQueueIndicator.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     SidebarFooter: typeof import('./components/layout/SidebarFooter.vue')['default']

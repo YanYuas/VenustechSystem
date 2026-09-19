@@ -8,6 +8,7 @@
 import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppIcon from '@/components/common/AppIcon.vue'
+import OfflineQueueIndicator from '@/components/layout/OfflineQueueIndicator.vue'
 import { useNotification } from '@/composables/useNotification'
 import { MAIN_NAV_ITEMS, getDimensionByRoute } from '@/constants/dimensions'
 import type { NavItem } from '@/types/common'
@@ -113,6 +114,9 @@ function handleNotifClick(n: { id: string; is_read: boolean; type: string; relat
 
     <!-- 右侧操作区 -->
     <div class="topnav__actions">
+      <!-- 离线队列角标（mod-tools F4.3） -->
+      <OfflineQueueIndicator />
+
       <!-- 搜索框 -->
       <button class="topnav__search" @click="emit('open-search')">
         <AppIcon name="search" :size="16" />

@@ -59,6 +59,51 @@ class ApiError extends Error {
   }
 }
 
+
+// ---------- 离线队列接入（mod-tools F4.3） ----------
+// 用注册钩子而非直接 import store：store 需要 getApiBase/getApiToken，
+// 直接互相 import 会形成循环依赖。
+export type OfflineEnqueueHandler = (
+  path: string,
+  method: 'POST' | 'PATCH' | 'PUT' | 'DELETE',
+  body?: unknown,
+  label?: string,
+) => Promise<void>
+
+let offlineEnqueueHandler: OfflineEnqueueHandler | null = null
+
+export function setOfflineQueueHandler(handler: OfflineEnqueueHandler | null): void {
+  offlineEnqueueHandler = handler
+}
+
+/** 写操作被离线队列接管时抛出的错误（UI 可据此显示"已加入队列"） */
+export class OfflineQueuedError extends Error {
+  readonly queued = true
+  constructor(message = '已离线，操作已加入同步队列') {
+    super(message)
+    this.name = 'OfflineQueuedError'
+  }
+}
+
+const WRITE_METHODS = new Set(['POST', 'PATCH', 'PUT', 'DELETE'])
+
+function isOffline(): boolean {
+  try {
+    return typeof navigator !== 'undefined' && navigator.onLine === false
+  } catch {
+    return false
+  }
+}
+
+/** 网络层失败（不是业务错误）：fetch 抛 TypeError / 超时 abort / 502 网关等 */
+function isNetworkFailure(err: unknown): boolean {
+  if (err instanceof ApiError) return false
+  if (err instanceof DOMException && err.name === 'AbortError') return true
+  if (err instanceof TypeError) return true
+  const msg = err instanceof Error ? err.message : String(err)
+  return /Failed to fetch|NetworkError|请求超时|timeout|aborted/i.test(msg)
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers: Record<string, string> = { ...(options.headers as Record<string, string>) }
   const token = getApiToken()
@@ -81,7 +126,38 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
       await new Promise((r) => setTimeout(r, RETRY_DELAY))
     }
   }
+  // 写操作 + （离线 或 网络失败）→ 交给离线队列，而不是直接失败
+  if (WRITE_METHODS.has(method) && offlineEnqueueHandler) {
+    if (isOffline() || isNetworkFailure(lastError)) {
+      try {
+        const body = typeof options.body === 'string' ? JSON.parse(options.body) : undefined
+        await offlineEnqueueHandler(
+          path,
+          method as 'POST' | 'PATCH' | 'PUT' | 'DELETE',
+          body,
+          offlineLabel(path),
+        )
+        throw new OfflineQueuedError()
+      } catch (e) {
+        if (e instanceof OfflineQueuedError) throw e
+        // 入队本身失败（如 IndexedDB 不可用）→ 保留原始错误
+      }
+    }
+  }
   throw lastError
+}
+
+/** 给队列条目一个可读标签（面板展示用；未知路径回退为方法+路径） */
+function offlineLabel(path: string): string {
+  if (path.includes('/assistant/apply')) return 'AI 助理 · 加入待办'
+  if (path.startsWith('/workspace/roots')) return '工作区 · 根目录'
+  if (path.startsWith('/workspace/scan')) return '工作区 · 扫描'
+  if (path.startsWith('/vault/items')) return '保险箱 · 凭据'
+  if (path.startsWith('/tasks')) return '任务'
+  if (path.startsWith('/documents')) return '文档'
+  if (path.startsWith('/reviews')) return '复盘'
+  if (path.startsWith('/diaries')) return '日记'
+  return path
 }
 
 async function doRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
