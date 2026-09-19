@@ -87,3 +87,7 @@ frontend/.tc.mjs
 .tq.mjs
 .git-commit-msg.tmp
 *.tmp
+backend/seed_out.txt
+backend/verify_out.txt
+backend/api_out.txt
+backend/data_demo/
