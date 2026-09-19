@@ -76,38 +76,42 @@ def main() -> int:
 
     results: list[tuple[str, bool, str]] = []
 
-    ok, st = _run("1/3 架构守护（分层依赖）",
+    ok, st = _run("1/6 架构守护（分层依赖）",
                   [PYTHON, "tests/test_architecture.py"], BACKEND)
     results.append(("架构守护", ok, st))
 
-    ok, st = _run("2/4 后端冒烟（端到端 + 迁移 + 回归断言）",
+    ok, st = _run("2/6 后端冒烟（端到端 + 迁移 + 回归断言）",
                   [PYTHON, "scripts/smoke_backend.py"], BACKEND)
     results.append(("后端冒烟", ok, st))
 
-    ok, st = _run("3/4 版本一致性（F1.4）", [PYTHON, "scripts/check_versions.py"], ROOT)
+    ok, st = _run("3/6 版本一致性（F1.4）", [PYTHON, "scripts/check_versions.py"], ROOT)
     results.append(("版本一致性", ok, st))
+
+    # 4/6 设计令牌存在性：用了不存在的 var(--x) 会让样式静默失效
+    ok, st = _run("4/6 设计引用存在性（令牌 + 图标）", [PYTHON, "scripts/audit-tokens.py"], FRONTEND)
+    results.append(("设计引用审计", ok, st))
 
     if args.skip_frontend:
         results.append(("前端类型检查", True, "skipped"))
         results.append(("离线队列测试", True, "skipped"))
     else:
-        ok, st = _run("4/5 前端类型检查（vue-tsc）",
+        ok, st = _run("5/6 前端类型检查（vue-tsc）",
                       [str(VUE_TSC), "--noEmit"], FRONTEND)
         results.append(("前端类型检查", ok, st))
 
-        # 5/5 离线队列核心测试（esbuild 转译 TS → node 跑；见 mod-tools F4.3）
+        # 6/6 离线队列核心测试（esbuild 转译 TS → node 跑；见 mod-tools F4.3）
         esbuild = FRONTEND / "node_modules/.bin/esbuild.cmd"
         if not esbuild.exists():
             esbuild = FRONTEND / "node_modules/.bin/esbuild"
         bundle = FRONTEND / ".tq.mjs"
         ok_build, st_build = _run(
-            "5/5a 离线队列测试打包（esbuild）",
+            "6/6a 离线队列测试打包（esbuild）",
             [str(esbuild), "--bundle", "scripts/test-offline-queue.ts",
              "--outfile=.tq.mjs", "--format=esm", "--platform=node"],
             FRONTEND,
         )
         if ok_build:
-            ok, st = _run("5/5 离线队列核心测试（node）", [NODE, ".tq.mjs"], FRONTEND)
+            ok, st = _run("6/6 离线队列核心测试（node）", [NODE, ".tq.mjs"], FRONTEND)
         else:
             ok, st = False, st_build
         try:

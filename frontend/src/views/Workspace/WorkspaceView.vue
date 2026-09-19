@@ -32,10 +32,17 @@ const loading = ref(true)
 const activeRootId = ref('')
 const activeRoot = computed(() => roots.value.find((r) => r.id === activeRootId.value) ?? null)
 
+const PAGE_SIZE = 50
+const DEBOUNCE_MS = 400
+
 const files = ref<WorkspaceFile[]>([])
 const filesTotal = ref(0)
 const search = ref('')
 const filesLoading = ref(false)
+// 分页：files 是"已加载页"的累积；filesPage 是当前已加载到第几页
+const filesPage = ref(1)
+const loadingMore = ref(false)
+const hasMore = computed(() => files.value.length < filesTotal.value)
 
 async function loadRoots() {
   loading.value = true
@@ -52,27 +59,108 @@ async function loadRoots() {
   }
 }
 
-async function loadFiles() {
+/**
+ * 拉取文件列表。
+ * append=false（默认）→ 重置到第 1 页；append=true → 追加下一页。
+ * 搜索条件变化与切根必须走 append=false，否则会串页。
+ */
+async function loadFiles(append = false) {
   if (!activeRootId.value) return
-  filesLoading.value = true
+  const nextPage = append ? filesPage.value + 1 : 1
+  if (append) loadingMore.value = true
+  else filesLoading.value = true
   try {
     const res = await workspaceApi.files(activeRootId.value, {
       search: search.value.trim() || undefined,
+      page: nextPage,
+      page_size: PAGE_SIZE,
     })
-    files.value = res.items
+    files.value = append ? files.value.concat(res.items) : res.items
     filesTotal.value = res.total
+    filesPage.value = nextPage
   } catch { /* http 层已提示 */ } finally {
     filesLoading.value = false
+    loadingMore.value = false
   }
 }
 
+function loadMore() {
+  if (loadingMore.value || !hasMore.value) return
+  void loadFiles(true)
+}
+
+// 搜索防抖：400ms 内连续输入只发最后一次请求（原来每次按键都发）
+let searchTimer: ReturnType<typeof setTimeout> | undefined
+function onSearchInput() {
+  if (searchTimer) clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => {
+    searchTimer = undefined
+    void loadFiles(false)
+  }, DEBOUNCE_MS)
+}
+
+function onRefresh() {
+  if (searchTimer) clearTimeout(searchTimer)
+  void loadFiles(false)
+}
+
+// ---------- 扫描（P1-4 异步 + 进度） ----------
+const scanningId = ref('')
+const scanFound = ref(0)
+
+const SCAN_POLL_MS = 1000
+const SCAN_TIMEOUT_MS = 120000 // 2 分钟兜底：超时后停止轮询，避免无限轮询
+
+function replaceRoot(updated: Partial<WorkspaceRoot> & { id: string }) {
+  roots.value = roots.value.map((r) => (r.id === updated.id ? { ...r, ...updated } : r))
+}
+
 async function onScan(root: WorkspaceRoot) {
+  if (scanningId.value) return toast.info('已有扫描在进行中', '请等待当前扫描完成')
   try {
-    const updated = await workspaceApi.scan(root.id)
-    roots.value = roots.value.map((r) => (r.id === root.id ? updated : r))
-    toast.success('扫描完成', `${updated.file_count} 个条目已索引`)
-    if (root.id === activeRootId.value) await loadFiles()
-  } catch { /* http 层已提示 */ }
+    const started = await workspaceApi.scan(root.id)
+    replaceRoot(started)
+    scanningId.value = root.id
+    scanFound.value = 0
+    toast.info('开始扫描', '大目录需要一会儿，可继续做别的事')
+    await pollScan(root.id)
+  } catch { /* http 层已提示 */ } finally {
+    scanningId.value = ''
+  }
+}
+
+async function pollScan(rootId: string) {
+  const deadline = Date.now() + SCAN_TIMEOUT_MS
+  // 轮询到终态（ok/error）即止；超时或服务端异常也停止，不做无限循环
+  for (;;) {
+    await new Promise((r) => setTimeout(r, SCAN_POLL_MS))
+    let prog
+    try {
+      prog = await workspaceApi.scanProgress(rootId)
+    } catch {
+      return
+    }
+    scanFound.value = prog.found
+    replaceRoot({
+      id: rootId,
+      scan_status: prog.status,
+      scan_error: prog.error,
+      file_count: prog.file_count,
+    })
+    if (prog.status === 'ok') {
+      toast.success('扫描完成', `${prog.file_count} 个条目已索引`)
+      if (rootId === activeRootId.value) await loadFiles(false)
+      return
+    }
+    if (prog.status === 'error') {
+      toast.error('扫描失败', prog.error ?? (prog.interrupted ? '扫描被中断' : '未知原因'))
+      return
+    }
+    if (Date.now() > deadline) {
+      toast.warning('扫描仍在进行', '已停止等待，可稍后刷新查看结果')
+      return
+    }
+  }
 }
 
 async function onOpenTerminal(root: WorkspaceRoot) {
@@ -96,6 +184,7 @@ async function onRemove(root: WorkspaceRoot) {
       activeRootId.value = ''
       files.value = []
       filesTotal.value = 0
+      filesPage.value = 1
     }
     await loadRoots()
   } catch { /* http 层已提示 */ }
@@ -193,7 +282,7 @@ onMounted(async () => {
           v-for="r in roots" :key="r.id"
           class="ws__root" :class="{ 'is-active': r.id === activeRootId }"
           type="button"
-          @click="activeRootId = r.id; loadFiles()"
+          @click="activeRootId = r.id; loadFiles(false)"
         >
           <AppIcon name="folder" :size="15" />
           <span class="ws__root-label">{{ r.label ?? r.path }}</span>
@@ -220,14 +309,21 @@ onMounted(async () => {
         <div class="ws__ops">
           <BaseInput
             v-model="search"
-            placeholder="按文件名搜索…"
-            @update:model-value="loadFiles"
+            placeholder="按文件名搜索…（输入即搜）"
+            @update:model-value="onSearchInput"
           />
-          <BaseButton size="sm" variant="secondary" icon="reload" :loading="filesLoading" @click="loadFiles">
+          <BaseButton size="sm" variant="secondary" icon="reload" :loading="filesLoading" @click="onRefresh">
             刷新
           </BaseButton>
-          <BaseButton size="sm" variant="secondary" icon="command" @click="onScan(activeRoot)">
-            重新扫描
+          <BaseButton
+            size="sm"
+            variant="secondary"
+            icon="command"
+            :loading="scanningId === activeRoot.id"
+            :disabled="Boolean(scanningId) && scanningId !== activeRoot.id"
+            @click="onScan(activeRoot)"
+          >
+            {{ scanningId === activeRoot.id ? `扫描中 ${scanFound}` : '重新扫描' }}
           </BaseButton>
           <BaseButton size="sm" variant="primary" icon="command" @click="onOpenTerminal(activeRoot)">
             打开终端
@@ -245,6 +341,9 @@ onMounted(async () => {
           <template v-if="activeRoot.scan_status === 'error'">
             · <span class="ws__error">上次扫描出错：{{ activeRoot.scan_error }}</span>
           </template>
+          <span v-if="scanningId === activeRoot.id" class="ws__scan-hint">
+            · 正在扫描，已发现 {{ scanFound }} 项
+          </span>
           <span class="ws__total-hint">（搜索命中 {{ filesTotal }}）</span>
         </p>
 
@@ -266,6 +365,19 @@ onMounted(async () => {
             <span class="ws__file-size">{{ f.is_dir ? '—' : formatSize(f.size) }}</span>
           </li>
         </ul>
+        <div v-if="hasMore && !filesLoading" class="ws__loadmore">
+          <BaseButton
+            size="sm"
+            variant="secondary"
+            :loading="loadingMore"
+            @click="loadMore"
+          >
+            加载更多（已显示 {{ files.length }} / {{ filesTotal }}）
+          </BaseButton>
+        </div>
+        <p v-else-if="!hasMore && files.length > 0" class="ws__loadmore-hint">
+          已显示全部 {{ filesTotal }} 条
+        </p>
         <p class="ws__tip">
           {{ isMobile ? '点击条目选择操作（终端为唯一白名单动作）' : '双击条目可在其所在文件夹打开终端（唯一白名单动作）' }}
         </p>
@@ -402,5 +514,23 @@ onMounted(async () => {
   margin: var(--space-3) 0 0;
   font-size: var(--text-xs);
   color: var(--text-low);
+}
+
+.ws__loadmore {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-3) 0 var(--space-1);
+}
+
+.ws__loadmore-hint {
+  margin: var(--space-3) 0 0;
+  text-align: center;
+  font-size: var(--text-xs);
+  color: var(--text-low);
+}
+
+.ws__scan-hint {
+  color: var(--primary-ink);
+  font-weight: 600;
 }
 </style>

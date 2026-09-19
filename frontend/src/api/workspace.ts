@@ -29,6 +29,7 @@ export const workspaceApi = {
   removeRoot(id: string) {
     return http.delete<{ deleted: boolean }>(`/workspace/roots/${id}`)
   },
+  /** 启动异步扫描（P1-4）：立即返回 scanning 态，随后用 scanProgress 轮询 */
   scan(id: string) {
     return http.post<WorkspaceRoot>(`/workspace/roots/${id}/scan`)
   },
@@ -40,6 +41,19 @@ export const workspaceApi = {
     return http.get<WorkspaceFilesOut>('/workspace/files', {
       root_id: rootId, ...params,
     } as Record<string, unknown>)
+  },
+  /** 扫描进度（P1-4） */
+  scanProgress(rootId: string) {
+    return http.get<{
+      root_id: string
+      status: 'never' | 'scanning' | 'ok' | 'error'
+      phase: 'queued' | 'walking' | 'writing' | 'done' | 'error' | null
+      found: number
+      total: number
+      file_count: number
+      error: string | null
+      interrupted: boolean
+    }>(`/workspace/roots/${rootId}/scan-progress`)
   },
   /** 一键开终端（后端唯一白名单动作，路径必须在已启用根内） */
   openTerminal(path: string) {

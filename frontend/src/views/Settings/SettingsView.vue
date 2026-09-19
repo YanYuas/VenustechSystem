@@ -669,7 +669,7 @@ onMounted(() => {
     </p>
 
     <div v-if="loading" class="settings__loading">
-      <AppIcon name="loading" :size="24" class="spin" />
+      <AppIcon name="spin" :size="24" class="spin" />
       <span>加载中...</span>
     </div>
 

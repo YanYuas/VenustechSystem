@@ -627,11 +627,34 @@ def main() -> int:
               r.json()["data"]["created"] == [] and r.json()["data"]["skipped"] == ["音乐"],
               r.text[:160])
 
-        # 扫描：噪声目录/扩展名被剪枝，只存元数据
+        # 扫描（P1-4 异步化）：启动即返回 scanning，随后轮询进度到 ok
         r = client.post(f"/api/v1/workspace/roots/{ws_root_id}/scan")
         d = r.json()["data"]
-        check("workspace scan ok", d["scan_status"] == "ok" and d["file_count"] == 3,
-              str(d)[:200])
+        check("workspace scan starts async",
+              d["scan_status"] == "scanning", str(d)[:200])
+        import time as _t
+
+        _scan_ok = False
+        _prog = {}
+        for _ in range(60):  # 最多等 ~12s
+            _prog = client.get(
+                f"/api/v1/workspace/roots/{ws_root_id}/scan-progress"
+            ).json()["data"]
+            if _prog["status"] in ("ok", "error"):
+                _scan_ok = True
+                break
+            _t.sleep(0.2)
+        check("workspace scan progress structure",
+              isinstance(_prog.get("phase"), (str, type(None)))
+              and "found" in _prog and "interrupted" in _prog, str(_prog)[:200])
+        check("workspace scan completes", _scan_ok and _prog["status"] == "ok"
+              and _prog["file_count"] == 3, str(_prog)[:200])
+        r = client.get("/api/v1/workspace/roots")
+        _roots_now = r.json()["data"]
+        _roots_now = _roots_now.get("items", []) if isinstance(_roots_now, dict) else _roots_now
+        _root_now = next((x for x in _roots_now if x["id"] == ws_root_id), {})
+        check("workspace scan ok", _root_now.get("scan_status") == "ok"
+              and _root_now.get("file_count") == 3, str(_root_now)[:200])
         r = client.get("/api/v1/workspace/files", params={"root_id": ws_root_id, "search": "venv"})
         check("workspace noise pruned", r.json()["data"]["total"] == 0, r.text[:160])
         r = client.get("/api/v1/workspace/files", params={"root_id": ws_root_id, "search": "notes"})
@@ -767,6 +790,36 @@ def main() -> int:
             "secret": str(SMOKE_DIR / "no_such_key.pem"),
         })
         check("vault action save", r.json().get("code") == 0 and r.json()["data"]["action_type"] == "ssh", r.text[:200])
+
+        # ---------- mod-tools P1-5：SSH 动作连通性测试 ----------
+        _ssh_item = r.json()["data"]["id"]
+
+        # 已配置 ssh 动作 → 对不可达主机返回 reachable=False 且有原因（不抛错）
+        r = client.post(f"/api/v1/vault/items/{_ssh_item}/test-connection")
+        d = r.json()["data"]
+        check("vault ssh test returns reachable flag",
+              r.json().get("code") == 0 and d.get("reachable") is False
+              and d.get("host") == "demo.example.com" and bool(d.get("error")),
+              str(d)[:200])
+        check("vault ssh test reports port", d.get("port") == 22, str(d)[:160])
+
+        # 请求体无法注入 host/port（只认凭据里的值）——传入端口应被忽略
+        r = client.post(f"/api/v1/vault/items/{_ssh_item}/test-connection",
+                        json={"host": "127.0.0.1", "port": 1})
+        check("vault ssh test ignores request body",
+              r.json()["data"]["host"] == "demo.example.com", r.text[:200])
+
+        # 未配置 ssh 动作的凭据 → 明确拒绝
+        r = client.post("/api/v1/vault/items", json={"name": "非 SSH 凭据", "category": "note"})
+        _plain_id = r.json()["data"]["id"]
+        r = client.post(f"/api/v1/vault/items/{_plain_id}/test-connection")
+        check("vault test rejects non-ssh item", r.json().get("code") != 0, r.text[:200])
+
+        # 探测动作应留下审计记录
+        r = client.get("/api/v1/security/audit?limit=30")
+        _acts = [i["action"] for i in r.json()["data"]["items"]]
+        check("vault ssh test is audited",
+              "vault.test_connection" in _acts, str(_acts[:8]))
         # 密钥路径不存在 → 拒绝执行（不真正拉起终端，冒烟不开窗）
         r = client.post(f"/api/v1/vault/items/{vault_item_id}/run-action")
         check("vault run-action missing key rejected", r.json().get("code") != 0, r.text[:160])

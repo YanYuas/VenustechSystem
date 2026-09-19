@@ -103,6 +103,27 @@ def change_password(
 
 # ---------- 凭据 ----------
 
+@router.post("/items/{item_id}/test-connection", summary="测试 SSH 动作连通性（仅 TCP 探测）")
+def test_connection(
+    item_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    result = _svc(db, user).test_action_connection(item_id)
+    try:
+        from app.services.security_service import audit
+
+        audit(
+            db, user.id, "vault.test_connection",
+            target=f"{result['host']}:{result['port']}",
+            ok=bool(result["reachable"]),
+            detail=result.get("error") or f"{result['elapsed_ms']}ms",
+        )
+    except Exception:
+        pass  # 审计失败不影响探测结果
+    return success(result)
+
+
 @router.get("/items", summary="凭据列表（不含密文）")
 def list_items(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     return success(_svc(db, user).list_items())

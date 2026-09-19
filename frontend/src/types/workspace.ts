@@ -8,7 +8,7 @@ export interface WorkspaceRoot {
   label: string | null
   identity_id: string | null
   enabled: boolean
-  scan_status: 'never' | 'ok' | 'error'
+  scan_status: 'never' | 'scanning' | 'ok' | 'error'
   scan_error: string | null
   last_scanned_at: string | null
   file_count: number

@@ -4,7 +4,7 @@
 // 语音双通道：App 内原生 STT（Capacitor 插件）/ 浏览器 Web Speech API。
 // AI 只产建议 —— 用户勾选确认后才 apply 落库。
 // ============================================================
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { assistantApi, taskApi } from '@/api'
 import { useToast } from '@/composables/useToast'
 import BaseCard from '@/components/common/BaseCard.vue'
@@ -22,10 +22,29 @@ const toast = useToast()
 const isNative = computed(() => Boolean((window as any).Capacitor?.isNativePlatform?.()))
 const listening = ref(false)
 const transcript = ref('')
+// 实时识别中的"未定稿"文字（interimResults）：只做视觉反馈，不进正式文本
+const interimText = ref('')
 
+/** 按一下开听，再按一下停止（原来只能等它自己结束） */
 function startVoice() {
+  if (listening.value) {
+    if (isNative.value) return // 原生通道由 popup 自行收尾
+    stopWebVoice()
+    return
+  }
   if (isNative.value) return startNativeVoice()
   startWebVoice()
+}
+
+// 非致命错误：只是"这轮没听到话"，不该当成故障弹警告
+const SILENT_SPEECH_ERRORS = new Set(['no-speech', 'aborted'])
+
+let webRec: any = null
+let webGuard: ReturnType<typeof setTimeout> | undefined
+
+function stopWebVoice() {
+  if (webGuard) { clearTimeout(webGuard); webGuard = undefined }
+  try { webRec?.stop() } catch { /* 已结束 */ }
 }
 
 function startWebVoice() {
@@ -35,15 +54,47 @@ function startWebVoice() {
     return
   }
   const rec = new SR()
+  webRec = rec
   rec.lang = 'zh-CN'
-  rec.interimResults = false
+  // 关键：开启 interim 才能边说边出字（原来 false → 说完才一次性给结果）
+  rec.interimResults = true
+  // 连续模式：一段话中间停顿不会立刻结束，适合"说一整件事"
+  rec.continuous = true
+  rec.maxAlternatives = 1
   listening.value = true
+  interimText.value = ''
+
   rec.onresult = (e: any) => {
-    transcript.value = (transcript.value + ' ' + (e.results[e.results.length - 1][0].transcript ?? '')).trim()
+    let pending = ''
+    for (let i = e.resultIndex; i < e.results.length; i += 1) {
+      const chunk = e.results[i][0]?.transcript ?? ''
+      if (e.results[i].isFinal) {
+        // 定稿：并入正式文本，同时清掉幽灵字
+        transcript.value = (transcript.value + ' ' + chunk).trim().replace(/\s+/g, ' ')
+        pending = ''
+      } else {
+        pending += chunk
+      }
+    }
+    interimText.value = pending.trim()
   }
-  rec.onerror = () => { listening.value = false; toast.warning('语音识别失败', '请用文本输入') }
-  rec.onend = () => { listening.value = false }
+  rec.onerror = (e: any) => {
+    const code = e?.error ?? ''
+    if (!SILENT_SPEECH_ERRORS.has(code)) {
+      toast.warning('语音识别失败', code === 'not-allowed' ? '请在浏览器里允许麦克风权限' : '请用文本输入')
+    }
+    listening.value = false
+    interimText.value = ''
+  }
+  rec.onend = () => {
+    listening.value = false
+    interimText.value = ''
+    if (webGuard) { clearTimeout(webGuard); webGuard = undefined }
+    if (webRec === rec) webRec = null
+  }
   rec.start()
+  // 20s 兜底：与原生通道行为一致，避免无限占用麦克风
+  webGuard = setTimeout(() => stopWebVoice(), 20000)
 }
 
 async function startNativeVoice() {
@@ -53,6 +104,7 @@ async function startNativeVoice() {
     settled = true
     if (t.trim()) transcript.value = (transcript.value + ' ' + t.trim()).trim()
     listening.value = false
+    interimText.value = ''
   }
   try {
     // 动态 import：PWA 构建永远不加载原生插件分包。
@@ -73,6 +125,8 @@ async function startNativeVoice() {
     })
     const partSub = await SR.addListener('partialResults', (d: { matches: string[] }) => {
       text = d.matches?.[d.matches.length - 1] ?? text
+      // 原生 partial 同样实时上屏（与 Web 通道体验对齐）
+      interimText.value = text
     })
     await SR.startListening({ language: 'zh-CN', maxResults: 1, partialResults: true, popup: true })
     // 20s 兜底：超时自动停并交出已识别文本
@@ -101,6 +155,11 @@ interface Suggestion {
   checked: boolean
 }
 const suggestions = ref<Suggestion[]>([])
+
+/** 移除单条建议（AI 可能给出不想要的条目；原来只能取消勾选占位） */
+function removeSuggestion(index: number) {
+  suggestions.value.splice(index, 1)
+}
 const clarifications = ref<string[]>([])
 const source = ref<'deepseek' | 'local' | null>(null)
 const parsing = ref(false)
@@ -140,6 +199,7 @@ async function onApply() {
     toast.success(`已加入 ${res.applied} 条`, `任务 ${res.by_kind.task ?? 0} · 备忘 ${res.by_kind.note ?? 0}`)
     suggestions.value = []
     transcript.value = ''
+  interimText.value = ''
     await loadTodos()
   } catch { /* http 层已提示 */ } finally {
     applying.value = false
@@ -185,6 +245,8 @@ async function completeTask(t: Task) {
   } catch { /* http 层已提示 */ }
 }
 
+onBeforeUnmount(() => stopWebVoice())
+
 onMounted(loadTodos)
 </script>
 
@@ -204,8 +266,12 @@ onMounted(loadTodos)
         @click="startVoice"
       >
         <AppIcon :name="listening ? 'reload' : 'mic'" :size="26" />
-        <span>{{ listening ? '正在听…' : '按一下，说事情' }}</span>
+        <span>{{ listening ? '正在听…（再按一下停止）' : '按一下，说事情' }}</span>
       </button>
+      <p v-if="listening || interimText" class="assistant__interim">
+        <span v-if="interimText">{{ interimText }}</span>
+        <span v-else class="assistant__interim-hint">正在听，请说话…</span>
+      </p>
       <textarea
         v-model="transcript" class="assistant__text" rows="3"
         placeholder="也可以直接打字：明天下午3点找老师谈开题，然后买高铁票…"
@@ -234,6 +300,14 @@ onMounted(loadTodos)
             <p v-if="s.notes && s.notes !== s.title" class="assistant__sug-notes">{{ s.notes }}</p>
           </div>
           <span v-if="s.deadline" class="assistant__sug-time">{{ fmtDeadline(s.deadline) }}</span>
+          <button
+            class="assistant__sug-del"
+            title="移除此条"
+            aria-label="移除此条"
+            @click="removeSuggestion(i)"
+          >
+            ✕
+          </button>
         </li>
       </ul>
       <BaseButton variant="primary" block :loading="applying" @click="onApply">
@@ -486,6 +560,45 @@ onMounted(loadTodos)
   .asst__item:active,
   .asst__todo:active {
     transform: scale(0.97);
+  }
+}
+
+/* 实时识别中的"未定稿"文字：视觉上弱于正式内容，避免误认为已确认 */
+.assistant__interim {
+  margin: 0 0 var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  min-height: var(--control-h);
+  border-radius: var(--radius-md);
+  background: var(--bg-inset);
+  color: var(--text-mid);
+  font-size: var(--text-sm);
+  line-height: 1.7;
+  word-break: break-all;
+}
+
+.assistant__interim-hint {
+  color: var(--text-low);
+  font-style: italic;
+}
+
+/* 建议条目删除按钮：触摸目标 32px，弱色以免抢视觉 */
+.assistant__sug-del {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-low);
+  font-size: var(--text-sm);
+  cursor: pointer;
+
+  &:hover {
+    background: var(--straw-soft);
+    color: var(--strawberry);
   }
 }
 </style>

@@ -24,6 +24,8 @@ AUDIT_ACTIONS = {
     "vault.unlock",
     "vault.lock",
     "vault.reveal_secret",
+    "vault.test_connection",
+    "vault.run_action",
     "plugin.load",
     "plugin.error",
     "sync.export",

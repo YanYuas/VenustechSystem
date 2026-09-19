@@ -95,6 +95,33 @@
   --control-h-lg: 48px;
   --row-h: 44px;              // 列表/侧边栏项高
   --table-row-h: 40px;        // 表格行高
+
+  // ============================================================
+  // LEGACY ALIAS —— 历史命名兼容层（待收敛，勿在新代码中使用）
+  //
+  // 用途：这些名字在组件里被大量引用但从未定义，导致样式静默失效。
+  // 此处统一映射到「设计令牌唯一来源」里的规范令牌，作为迁移缓冲。
+  // 全部写成 var(<既有令牌>) 引用 → 自动跟随 4 套主题明暗切换。
+  // 新代码请直接使用右侧的规范令牌名；本段为待删除项。
+  // ============================================================
+  --surface: var(--bg-panel);          // → 卡片/侧栏底
+  --surface-2: var(--bg-raised);       // → 浮层底
+  --bg-body: var(--bg-cream);          // → 页面底
+  --bg-soft: var(--bg-inset);          // → 内嵌底
+  --bg-input: var(--bg-inset);         // → 输入框底
+  --bg-hover: var(--primary-soft);     // → 悬停/激活态背景
+  --border-soft: var(--line);          // → 分割线
+  --text-1: var(--text-hi);            // → 标题/数值
+  --text-2: var(--text-mid);           // → 正文
+  --text-3: var(--text-low);           // → 辅助/占位
+  --text-3xl: var(--text-2xl);         // → 最大字号（32px）
+  --danger: var(--strawberry);         // → 高危/删除
+  --success: var(--mint);              // → 成功/完成
+  --warning: var(--butter);            // → 提醒/待办
+  --info: var(--sky);                  // → 信息/链接
+  --primary-light: var(--primary-soft);// → 主色浅底
+  --primary-shadow: var(--shadow-card);// → 主色辉光
+  --strawberry-soft: var(--straw-soft);// → 草莓红浅底
 }
 
 // ============================================================

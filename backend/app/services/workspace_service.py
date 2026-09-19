@@ -22,7 +22,10 @@ from __future__ import annotations
 import os
 import re
 import shutil
+import threading
 import subprocess
+import time
+from typing import Any, Callable
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -30,6 +33,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import NotFoundException, ValidationException
+from app.core.logger import get_logger
 from app.models.workspace import WorkspaceFile, WorkspaceRoot
 from app.repositories.identity_repo import IdentityRepository
 from app.services.settings_service import SettingsService
@@ -40,6 +44,32 @@ _UNSAFE_FS_CHARS = re.compile(r'[\\/:*?"<>|]')
 
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
+
+
+# ---------- 扫描进度注册表（进程内，按 root_id） ----------
+# 为什么不用 DB：进度是"此刻正在发生"的瞬时状态，写库既慢又要处理清理；
+# 而进程重启后的僵尸态由 scan_progress() 主动识别并归位。
+logger = get_logger("workspace")
+
+_SCAN_PROGRESS: dict[str, dict[str, Any]] = {}
+_SCAN_LOCK = threading.Lock()
+
+
+def _progress_set(root_id: str, **fields: Any) -> None:
+    with _SCAN_LOCK:
+        cur = _SCAN_PROGRESS.setdefault(root_id, {})
+        cur.update(fields)
+        cur["updated_at"] = time.time()
+
+
+def _progress_get(root_id: str) -> dict[str, Any]:
+    with _SCAN_LOCK:
+        return dict(_SCAN_PROGRESS.get(root_id) or {})
+
+
+def _progress_clear(root_id: str) -> None:
+    with _SCAN_LOCK:
+        _SCAN_PROGRESS.pop(root_id, None)
 
 
 class WorkspaceService:
@@ -111,46 +141,133 @@ class WorkspaceService:
 
     # ---------- 扫描（噪声过滤 + 只存元数据） ----------
 
-    def scan_root(self, root_id: str) -> dict:
+    def start_scan(self, root_id: str) -> dict:
+        """启动异步扫描（P1-4）：立即返回 scanning 态，不再阻塞请求。
+
+        大根目录下原来要在一个请求里走完「递归 + 数千行 INSERT」，
+        前端无进度可显示且易超时；现改为后台线程执行 + 轮询进度。
+        """
         root = self._owned_root(root_id)
         if not root.enabled:
             raise ValidationException("根已停用，请先启用再扫描")
-        base = Path(root.path)
-        try:
-            entries = self._walk(base)
-        except OSError as e:
-            root.scan_status = "error"
-            root.scan_error = str(e)[:500]
-            self.db.commit()
-            raise ValidationException(f"扫描失败: {e}")
+        if root.scan_status == "scanning":
+            raise ValidationException("该根正在扫描中，请等待完成")
 
-        # 全量替换（个人规模千级，diff 不值得）；单事务，失败即回滚
-        self.db.execute(delete(WorkspaceFile).where(WorkspaceFile.root_id == root.id))
-        now = _utcnow()
-        total_size = 0
-        for rel, is_dir, size, mtime in entries:
-            self.db.add(WorkspaceFile(
-                root_id=root.id,
-                rel_path=rel,
-                name=rel.rsplit("/", 1)[-1],
-                ext=self._ext_of(rel, is_dir),
-                is_dir=is_dir,
-                size=size,
-                mtime=mtime,
-                identity_id=root.identity_id,  # 从根继承（根改身份后重扫即刷新）
-                indexed_at=now,
-            ))
-            total_size += size
-        root.file_count = len(entries)
-        root.total_size = total_size
-        root.scan_status = "ok"
+        base = Path(root.path)
+        if not base.exists():
+            root.scan_status = "error"
+            root.scan_error = f"路径不存在: {root.path}"
+            self.db.commit()
+            raise ValidationException(f"路径不存在: {root.path}")
+
+        root.scan_status = "scanning"
         root.scan_error = None
-        root.last_scanned_at = now
         self.db.commit()
+        _progress_set(root_id, phase="queued", found=0, started_at=time.time())
+
+        threading.Thread(
+            target=self._scan_worker,
+            args=(self.user_id, root_id),
+            name=f"ws-scan-{root_id[:8]}",
+            daemon=True,
+        ).start()
         return self._root_out(root)
 
-    def _walk(self, base: Path) -> list[tuple[str, bool, int, float]]:
-        """os.scandir 递归 + 噪声剪枝（命中黑名单目录不进入子树）。"""
+    def _scan_worker(self, user_id: str, root_id: str) -> None:
+        """后台扫描线程：**必须自建 Session**（请求 Session 已随请求关闭）。"""
+        from app.database import SessionLocal
+
+        db = SessionLocal()
+        try:
+            svc = WorkspaceService(db, user_id)
+            root = svc._owned_root(root_id)
+            base = Path(root.path)
+
+            def on_progress(found: int) -> None:
+                _progress_set(root_id, phase="walking", found=found)
+
+            _progress_set(root_id, phase="walking", found=0)
+            entries = svc._walk(base, on_progress=on_progress)
+
+            _progress_set(root_id, phase="writing", found=len(entries), total=len(entries))
+            # 全量替换（个人规模千级，diff 不值得）；单事务，失败即回滚
+            db.execute(delete(WorkspaceFile).where(WorkspaceFile.root_id == root.id))
+            now = _utcnow()
+            total_size = 0
+            for rel, is_dir, size, mtime in entries:
+                db.add(WorkspaceFile(
+                    root_id=root.id,
+                    rel_path=rel,
+                    name=rel.rsplit("/", 1)[-1],
+                    ext=svc._ext_of(rel, is_dir),
+                    is_dir=is_dir,
+                    size=size,
+                    mtime=mtime,
+                    identity_id=root.identity_id,
+                    indexed_at=now,
+                ))
+                total_size += size
+            root.file_count = len(entries)
+            root.total_size = total_size
+            root.scan_status = "ok"
+            root.scan_error = None
+            root.last_scanned_at = now
+            db.commit()
+            _progress_set(root_id, phase="done", found=len(entries), total=len(entries),
+                          finished_at=time.time())
+        except Exception as e:  # 扫描失败必须落到 root.scan_status，不能只留在日志里
+            db.rollback()
+            try:
+                root = WorkspaceService(db, user_id)._owned_root(root_id)
+                root.scan_status = "error"
+                root.scan_error = str(e)[:500]
+                db.commit()
+            except Exception:
+                db.rollback()
+            _progress_set(root_id, phase="error", error=str(e)[:300], finished_at=time.time())
+            logger.exception("工作区扫描失败: root=%s", root_id)
+        finally:
+            db.close()
+
+    def scan_progress(self, root_id: str) -> dict:
+        """查询扫描进度（P1-4）。含僵尸态识别：服务重启会丢注册表。"""
+        root = self._owned_root(root_id)
+        prog = _progress_get(root_id)
+
+        db_status = root.scan_status
+        interrupted = False
+        # DB 说在扫、注册表却没记录 → 进程重启过，本次扫描已不可能完成
+        if db_status == "scanning" and not prog:
+            interrupted = True
+            root.scan_status = "error"
+            root.scan_error = "扫描被中断（服务重启）"
+            self.db.commit()
+            db_status = "error"
+
+        if db_status != "scanning" and prog.get("phase") in {"done", "error"}:
+            _progress_clear(root_id)
+
+        return {
+            "root_id": root_id,
+            "status": db_status,
+            "phase": prog.get("phase") or ("error" if interrupted else None),
+            "found": prog.get("found", root.file_count),
+            "total": prog.get("total", root.file_count),
+            "file_count": root.file_count,
+            "error": root.scan_error,
+            "interrupted": interrupted,
+        }
+
+    def _walk(
+        self,
+        base: Path,
+        on_progress: Callable[[int], None] | None = None,
+    ) -> list[tuple[str, bool, int, float]]:
+        """os.scandir 递归 + 噪声剪枝（命中黑名单目录不进入子树）。
+
+        on_progress：每发现 200 个条目回调一次已发现数量（P1-4 进度反馈）。
+        节流是必要的 —— 每文件回调一次会让进度更新本身成为瓶颈。
+        """
         noise_dirs = self._noise_set("workspace.noise_dirs")
         noise_exts = self._noise_set("workspace.noise_exts")
         out: list[tuple[str, bool, int, float]] = []
@@ -173,8 +290,12 @@ class WorkspaceService:
                             continue
                         st = entry.stat()
                         out.append((rel_str(full), False, st.st_size, st.st_mtime))
+                    if on_progress and len(out) % 200 == 0:
+                        on_progress(len(out))
 
         walk(base)
+        if on_progress:
+            on_progress(len(out))
         return out
 
     def _noise_set(self, key: str) -> set[str]:

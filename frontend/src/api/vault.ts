@@ -49,6 +49,16 @@ export const vaultApi = {
   revealSecret(id: string) {
     return http.get<{ secret: string | null }>(`/vault/items/${id}/secret`)
   },
+  /** SSH 动作连通性测试（P1-5，仅 TCP 探测；host/port 取自凭据本身） */
+  testConnection(id: string) {
+    return http.post<{
+      reachable: boolean
+      host: string
+      port: number
+      elapsed_ms: number
+      error: string | null
+    }>(`/vault/items/${id}/test-connection`, {})
+  },
   /** 执行终端动作（白名单模板：ssh -i 密钥路径，后端校验注入面） */
   runAction(id: string) {
     return http.post<{ opened: boolean; command: string }>(`/vault/items/${id}/run-action`)

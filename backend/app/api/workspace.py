@@ -124,7 +124,16 @@ def scan_root(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    return success(_svc(db, user).scan_root(root_id))
+    return success(_svc(db, user).start_scan(root_id))
+
+
+@router.get("/roots/{root_id}/scan-progress", summary="扫描进度（P1-4）")
+def scan_progress(
+    root_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    return success(_svc(db, user).scan_progress(root_id))
 
 
 @router.post("/roots/{root_id}/skeleton", summary="按身份生成目录骨架（引导路径 b）")

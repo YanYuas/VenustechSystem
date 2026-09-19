@@ -10,6 +10,7 @@ import BaseCard from '@/components/common/BaseCard.vue'
 import BaseSkeleton from '@/components/common/BaseSkeleton.vue'
 import BaseEmpty from '@/components/common/BaseEmpty.vue'
 import BaseTag from '@/components/common/BaseTag.vue'
+import BaseButton from '@/components/common/BaseButton.vue'
 import AppIcon from '@/components/common/AppIcon.vue'
 
 type Tab = 'items24' | 'items7d' | 'hot' | 'daily'
@@ -26,6 +27,51 @@ const TABS: Array<{ id: Tab; label: string }> = [
   { id: 'hot', label: '热点' },
   { id: 'daily', label: '日报' },
 ]
+
+const refreshing = ref(false)
+const pullDistance = ref(0)
+
+const PULL_THRESHOLD = 56 // 触发刷新的下拉距离（px）
+const PULL_DAMPING = 0.45 // 阻尼：手指下拉 100px 视觉只走 45px
+
+/** 手动刷新（按钮 / 下拉松手）：保留当前 Tab，只重新拉数据 */
+async function onRefresh() {
+  if (refreshing.value || loading.value) return
+  refreshing.value = true
+  try {
+    await load()
+  } finally {
+    refreshing.value = false
+    pullDistance.value = 0
+  }
+}
+
+// ---------- 下拉刷新（移动端手势） ----------
+let touchStartY = 0
+let pulling = false
+
+function onTouchStart(e: TouchEvent) {
+  if (window.scrollY > 0 || loading.value) return // 只在页面顶部起手
+  touchStartY = e.touches[0]?.clientY ?? 0
+  pulling = true
+}
+
+function onTouchMove(e: TouchEvent) {
+  if (!pulling) return
+  const dy = (e.touches[0]?.clientY ?? 0) - touchStartY
+  if (dy <= 0) {
+    pullDistance.value = 0
+    return
+  }
+  pullDistance.value = Math.min(dy * PULL_DAMPING, PULL_THRESHOLD * 1.5)
+}
+
+function onTouchEnd() {
+  if (!pulling) return
+  pulling = false
+  if (pullDistance.value >= PULL_THRESHOLD) void onRefresh()
+  else pullDistance.value = 0
+}
 
 function timeOf(it: AihotItem): string {
   return (it.publishedAt ?? it.discoveredAt ?? '').slice(0, 10)
@@ -79,16 +125,41 @@ onMounted(load)
 </script>
 
 <template>
-  <div class="aihot">
+  <div
+    class="aihot"
+    @touchstart.passive="onTouchStart"
+    @touchmove.passive="onTouchMove"
+    @touchend="onTouchEnd"
+  >
     <div class="aihot__head">
       <h1 class="aihot__title">AI 资讯</h1>
-      <div class="aihot__tabs">
-        <button
-          v-for="t in TABS" :key="t.id"
-          class="aihot__tab" :class="{ 'is-active': tab === t.id }"
-          @click="tab = t.id; load()"
-        >{{ t.label }}</button>
+      <div class="aihot__head-ops">
+        <div class="aihot__tabs">
+          <button
+            v-for="t in TABS" :key="t.id"
+            class="aihot__tab" :class="{ 'is-active': tab === t.id }"
+            @click="tab = t.id; load()"
+          >{{ t.label }}</button>
+        </div>
+        <BaseButton
+          size="sm"
+          variant="secondary"
+          icon="reload"
+          :loading="refreshing"
+          @click="onRefresh"
+        >
+          刷新
+        </BaseButton>
       </div>
+    </div>
+
+    <!-- 下拉刷新反馈（仅移动端手势触发时出现） -->
+    <div
+      v-if="pullDistance > 0"
+      class="aihot__pull"
+      :style="{ height: pullDistance + 'px' }"
+    >
+      {{ pullDistance >= PULL_THRESHOLD ? '松开刷新' : '下拉刷新' }}
     </div>
 
     <p v-if="degraded" class="aihot__degraded">
@@ -270,6 +341,48 @@ onMounted(load)
 
   .aihot__list {
     overscroll-behavior: contain; // 防橡皮筋穿透
+  }
+}
+
+.aihot__head-ops {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+/* 下拉刷新提示条：高度由手势驱动，内容居中 */
+.aihot__pull {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  font-size: var(--text-xs);
+  color: var(--text-low);
+  transition: height 160ms var(--ease-soft);
+}
+
+@media (max-width: 767px) {
+  /* 标题一行、Tab+刷新一行；Tab 独占剩余宽度（横滑规则见上方既有声明） */
+  .aihot__head {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-2);
+  }
+
+  .aihot__head-ops {
+    justify-content: space-between;
+  }
+
+  .aihot__tabs {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  /* 触摸目标：Tab 高度 ≥ 32px */
+  .aihot__tab {
+    min-height: var(--control-h-sm);
+    padding: 0 var(--space-3);
   }
 }
 </style>

@@ -6,7 +6,7 @@
 // 已解锁 → 凭据 CRUD。明文只在「查看」时按需解密显示。
 // 服务重启即自动上锁（后端解锁态只存进程内存）。
 // ============================================================
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { vaultApi } from '@/api'
 import { useIdentity } from '@/composables/useIdentity'
 import { useToast } from '@/composables/useToast'
@@ -144,6 +144,24 @@ async function onSave() {
   } catch { /* http 层已提示 */ }
 }
 
+// ---------- SSH 连通性测试（P1-5） ----------
+const testingId = ref('')
+
+async function onTestConnection(item: VaultItem) {
+  if (testingId.value) return
+  testingId.value = item.id
+  try {
+    const r = await vaultApi.testConnection(item.id)
+    if (r.reachable) {
+      toast.success('可以连通', `${r.host}:${r.port}（${r.elapsed_ms}ms）`)
+    } else {
+      toast.error('连不通', `${r.host}:${r.port} —— ${r.error ?? '未知原因'}`)
+    }
+  } catch { /* http 层已提示 */ } finally {
+    testingId.value = ''
+  }
+}
+
 async function onRunAction(item: VaultItem) {
   try {
     await vaultApi.runAction(item.id)
@@ -160,6 +178,34 @@ async function onDelete(item: VaultItem) {
     await vaultApi.removeItem(item.id)
     await loadItems()
   } catch { /* http 层已提示 */ }
+}
+
+// ---------- 更换主密码（P0-3） ----------
+// 后端：校验旧密码 → 全部凭据重加密 → 换 salt/verifier → 更新会话密钥
+const pwdOpen = ref(false)
+const pwdSaving = ref(false)
+const pwdForm = ref({ old: '', next: '', confirm: '' })
+
+function openChangePassword() {
+  pwdForm.value = { old: '', next: '', confirm: '' }
+  pwdOpen.value = true
+}
+
+async function onChangePassword() {
+  const { old, next, confirm } = pwdForm.value
+  if (!old) return toast.warning('请输入原主密码')
+  if (next.length < 8) return toast.warning('新主密码至少 8 位')
+  if (next !== confirm) return toast.warning('两次输入的新密码不一致')
+  if (next === old) return toast.warning('新密码不能与原密码相同')
+  pwdSaving.value = true
+  try {
+    status.value = await vaultApi.changePassword(old, next)
+    pwdOpen.value = false
+    pwdForm.value = { old: '', next: '', confirm: '' }
+    toast.success('主密码已更换', '全部凭据已用新密码重新加密')
+  } catch { /* http 层已提示（含"原主密码错误"） */ } finally {
+    pwdSaving.value = false
+  }
 }
 
 // ---------- 明文查看（唯一出口，看一次显示一次） ----------
@@ -184,6 +230,44 @@ async function loadItems() {
   }
 }
 
+// ---------- 凭据筛选（P1-1）：纯前端派生，不改后端契约 ----------
+const filterText = ref('')
+const filterCategory = ref<'all' | 'login' | 'note'>('all')
+const filterIdentity = ref<string>('all')
+
+const categoryFilterOptions = [
+  { label: '全部类型', value: 'all' },
+  { label: '账号', value: 'login' },
+  { label: '笔记', value: 'note' },
+]
+
+const identityFilterOptions = computed(() => [
+  { label: '全部身份', value: 'all' },
+  ...identityOptions(true),
+])
+
+const hasFilter = computed(
+  () => filterText.value.trim() !== '' || filterCategory.value !== 'all' || filterIdentity.value !== 'all',
+)
+
+/** 名称 / 用户名 / 网址 / 分类 / 身份 五项匹配（大小写不敏感） */
+const filteredItems = computed(() => {
+  const q = filterText.value.trim().toLowerCase()
+  return items.value.filter((it) => {
+    if (filterCategory.value !== 'all' && it.category !== filterCategory.value) return false
+    if (filterIdentity.value !== 'all' && (it.identity_id ?? '') !== filterIdentity.value) return false
+    if (!q) return true
+    return [it.name, it.username ?? '', it.url ?? '', it.notes ?? '']
+      .some((field) => field.toLowerCase().includes(q))
+  })
+})
+
+function clearFilters() {
+  filterText.value = ''
+  filterCategory.value = 'all'
+  filterIdentity.value = 'all'
+}
+
 const identityName = (id: string | null) => byId(id)?.name ?? null
 const categoryLabel = (c: string) => (c === 'login' ? '账号' : '笔记')
 const categoryOptions = [
@@ -198,6 +282,9 @@ const categoryOptions = [
       <h1 class="vault__title">保险箱</h1>
       <div v-if="status?.unlocked" class="vault__head-actions">
         <BaseButton variant="primary" icon="plus" @click="openCreate">新增凭据</BaseButton>
+        <BaseButton variant="secondary" icon="command" @click="openChangePassword">
+          更换主密码
+        </BaseButton>
         <BaseButton variant="secondary" icon="command" @click="onLock">上锁</BaseButton>
       </div>
     </div>
@@ -239,6 +326,17 @@ const categoryOptions = [
     <!-- 已解锁：凭据列表 -->
     <template v-else>
       <BaseCard>
+        <!-- 筛选栏（P1-1）：置于 loading/empty/list 条件链之外，
+             否则会插断 v-if / v-else-if 链导致骨架屏与列表同时渲染 -->
+        <div v-if="!itemsLoading && items.length > 1" class="vault__filters">
+          <BaseInput v-model="filterText" placeholder="按名称 / 用户名 / 网址搜索…" />
+          <BaseSelect v-model="filterCategory" :options="categoryFilterOptions" />
+          <BaseSelect v-model="filterIdentity" :options="identityFilterOptions" />
+          <BaseButton v-if="hasFilter" size="sm" variant="secondary" @click="clearFilters">
+            清除
+          </BaseButton>
+        </div>
+
         <div v-if="itemsLoading"><BaseSkeleton variant="list" :rows="4" /></div>
         <BaseEmpty
           v-else-if="items.length === 0"
@@ -249,8 +347,13 @@ const categoryOptions = [
             <BaseButton variant="primary" @click="openCreate">新增凭据</BaseButton>
           </template>
         </BaseEmpty>
+        <BaseEmpty
+          v-else-if="filteredItems.length === 0"
+          title="没有匹配的凭据"
+          description="换个关键词，或清除筛选条件"
+        />
         <ul v-else class="vault__list">
-          <li v-for="it in items" :key="it.id" class="vault__item">
+          <li v-for="it in filteredItems" :key="it.id" class="vault__item">
             <span
               v-if="it.identity_id"
               class="vault__dot" :style="{ background: colorVar(byId(it.identity_id)?.color_token ?? null) }"
@@ -269,6 +372,12 @@ const categoryOptions = [
               <p v-if="revealed[it.id]" class="vault__secret">{{ revealed[it.id] }}</p>
             </div>
             <div class="vault__ops">
+              <button
+                v-if="it.action_type === 'ssh'" class="vault__op" title="测试连通性"
+                :disabled="testingId === it.id" @click="onTestConnection(it)"
+              >
+                <AppIcon :name="testingId === it.id ? 'reload' : 'target'" :size="16" />
+              </button>
               <button
                 v-if="it.action_type === 'ssh'" class="vault__op" title="SSH 连接"
                 @click="onRunAction(it)"
@@ -291,6 +400,9 @@ const categoryOptions = [
           </li>
         </ul>
       </BaseCard>
+      <p v-if="hasFilter" class="vault__filter-hint">
+        筛选命中 {{ filteredItems.length }} / {{ items.length }} 条
+      </p>
       <p class="vault__footnote">
         明文只在点击「查看」时按需解密显示；服务重启自动上锁。主密码不落盘，忘记无法找回。
       </p>
@@ -330,6 +442,34 @@ const categoryOptions = [
           上方「密码/令牌」栏填<b>密钥文件路径</b>（如 C:\Users\你\.ssh\id_ed25519）。
           连接时会打开终端执行 ssh -i 密钥路径 登录 —— 只支持密钥认证，不支持密码。
         </p>
+      </div>
+    </BaseModal>
+
+    <!-- 更换主密码（P0-3）：showFooter=false，自带按钮以便展示保存中状态 -->
+    <BaseModal v-model="pwdOpen" title="更换主密码" :width="440" :show-footer="false">
+      <div class="vault__form">
+        <p class="vault__action-hint">
+          更换后<b>全部凭据会用新密码重新加密</b>。旧密码立即失效；新密码同样不落盘，
+          忘记后无法找回。
+        </p>
+        <input
+          v-model="pwdForm.old" type="password" placeholder="原主密码"
+          class="vault__pwd" autocomplete="current-password"
+        />
+        <input
+          v-model="pwdForm.next" type="password" placeholder="新主密码（至少 8 位）"
+          class="vault__pwd" autocomplete="new-password"
+        />
+        <input
+          v-model="pwdForm.confirm" type="password" placeholder="再输一遍新主密码"
+          class="vault__pwd" autocomplete="new-password" @keyup.enter="onChangePassword"
+        />
+        <div class="vault__pwd-actions">
+          <BaseButton variant="secondary" @click="pwdOpen = false">取消</BaseButton>
+          <BaseButton variant="primary" :loading="pwdSaving" @click="onChangePassword">
+            确认更换
+          </BaseButton>
+        </div>
       </div>
     </BaseModal>
   </div>
@@ -510,6 +650,52 @@ const categoryOptions = [
   // 底部安全区（移动端手势条）
   .vault {
     padding-bottom: max(var(--space-6), env(safe-area-inset-bottom, 0px));
+  }
+}
+
+.vault__pwd-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+/* P0-2：375px 下 2 列栅格输入框过窄 → 单列堆叠 */
+@media (max-width: 767px) {
+  .vault__form-row {
+    grid-template-columns: 1fr;
+    gap: var(--space-2);
+  }
+
+  .vault__pwd-actions {
+    flex-direction: column-reverse;
+
+    :deep(.base-btn),
+    :deep(button) {
+      width: 100%;
+      min-height: var(--control-h);
+    }
+  }
+}
+
+/* 筛选栏：桌面三列并排；移动端纵向堆叠（375px 不挤压） */
+.vault__filters {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr auto;
+  gap: var(--space-2);
+  align-items: center;
+  margin-bottom: var(--space-3);
+}
+
+.vault__filter-hint {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-xs);
+  color: var(--text-low);
+}
+
+@media (max-width: 767px) {
+  .vault__filters {
+    grid-template-columns: 1fr;
   }
 }
 </style>

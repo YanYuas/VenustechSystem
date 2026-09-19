@@ -10,6 +10,9 @@
 # ============================================================
 from __future__ import annotations
 
+import socket
+import time
+
 import os
 import re
 from datetime import datetime, timezone
@@ -312,6 +315,48 @@ class VaultService:
     def _require_unlocked(self) -> None:
         if self.user_id not in _session_keys:
             raise BusinessException("保险箱已上锁，请先解锁")
+
+    def test_action_connection(self, item_id: str) -> dict:
+        """SSH 动作连通性测试（P1-5）：只探测 TCP 可达性。
+
+        安全边界（勿放宽）：
+        - host/port **只从已存凭据读取**，不接受请求体传入 —— 否则这个方法
+          就成了任意 host:port 探测原语（SSRF / 端口扫描）。
+        - 仅完成 TCP 三次握手即关闭，不建立 SSH 会话、不发送任何密钥或凭据。
+        - 3 秒超时，不重试。
+        """
+        item = self._owned_item(item_id)
+        if item.action_type != "ssh":
+            raise ValidationException("该凭据未配置 SSH 动作（action_type != ssh）")
+
+        host = (item.action_host or "").strip()
+        if not host:
+            raise ValidationException("未配置主机地址（action_host）")
+        # 拒绝明显的注入/畸形输入：主机名只允许字母数字点横线冒号（IPv6 用方括号写法）
+        if not re.fullmatch(r"[A-Za-z0-9._:\-\[\]]{1,255}", host):
+            raise ValidationException("主机地址含非法字符")
+
+        raw_port = (item.action_port or "22").strip() or "22"
+        if not raw_port.isdigit():
+            raise ValidationException("端口必须是数字")
+        port = int(raw_port)
+        if not (1 <= port <= 65535):
+            raise ValidationException("端口须在 1-65535 之间")
+
+        started = time.perf_counter()
+        try:
+            with socket.create_connection((host, port), timeout=3):
+                elapsed = int((time.perf_counter() - started) * 1000)
+                return {
+                    "reachable": True, "host": host, "port": port,
+                    "elapsed_ms": elapsed, "error": None,
+                }
+        except OSError as e:
+            elapsed = int((time.perf_counter() - started) * 1000)
+            return {
+                "reachable": False, "host": host, "port": port,
+                "elapsed_ms": elapsed, "error": str(e)[:200],
+            }
 
     def _owned_item(self, item_id: str) -> VaultItem:
         row = self.db.get(VaultItem, item_id)

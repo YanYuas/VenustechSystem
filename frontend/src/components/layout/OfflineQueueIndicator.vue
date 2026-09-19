@@ -73,7 +73,7 @@ onBeforeUnmount(() => {
       :title="store.flushing ? '同步中…' : `${badgeCount} 条待同步`"
       @click="panelOpen = true"
     >
-      <AppIcon v-if="store.flushing" name="loading" :size="12" class="spin" />
+      <AppIcon v-if="store.flushing" name="spin" :size="12" class="spin" />
       <template v-else>{{ badgeCount > 99 ? '99+' : badgeCount }}</template>
     </button>
 
