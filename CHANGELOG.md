@@ -186,6 +186,17 @@ vue-tsc 全绿。
 - 支持 upsert（重复写入不撞 `(user_id, key)` 唯一约束）、键白名单（拒绝未登记键）、默认值合并
 - `BaseSwitch` 新增 `change` 事件：此前只发 `update:modelValue`，消费方无法区分「用户点了」与「程序赋值」
 
+### Fixed — start-demo.bat 起不来后端（2026-09-19）
+
+- 现象：双击 `start-demo.bat` 窗口一闪而过并退出，报
+  `ModuleNotFoundError: No module named 'app'`，前端自然看不到任何演示数据
+- 根因：脚本在**仓库根目录**执行 `uvicorn app.main:app`，而 `app` 包只在 `backend\` 下；
+  uvicorn 以 CWD 为 import 根，必然找不到
+- 修复：后端改用 `start /D "%~dp0backend"` 启动（与 `start-dev.bat` 一致）；
+  首次运行自动执行 `seed_demo.py --reset --yes`；同时拉起前端并打开浏览器；
+  8765 / 5173 占用由「提示」升级为「拦截退出」
+- 实测：identities 10 / projects 12 / tasks 57 / reviews 35，复习卡片有数据
+
 ### Fixed — 2026-09-16
 
 **P1 · 设置页 4 个通知开关是假的**
