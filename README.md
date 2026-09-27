@@ -239,6 +239,8 @@ python scripts/audit_hardcoded_colors.py          # 硬编码颜色审计
 
 | 文档 | 说明 |
 |------|------|
+| [板块结构](docs/PROJECT_STRUCTURE.md) | 九大业务板块的职责、状态、依赖关系 |
+| [开发规范](docs/DEVELOPMENT.md) | 分支策略、提交规范、前后端代码规范、启动方式 |
 | [PRD v1.0（一期）](docs/design/PRD-启明星系统-v1.0.md) | 一期产品需求文档（2993行） |
 | [PRD v2.0（二期）](docs/design/PRD-启明星系统-v2.0-二期.md) | 二期产品需求文档（1948行，约40页） |
 | [技术架构 v2.0](docs/design/02-技术架构-v2.0.md) | 系统架构设计 |
