@@ -255,7 +255,7 @@ class PetService:
                 action_label = "专注中"
                 bubble_text = f"还有{todo_count}个任务待完成，加油！"
         except Exception:
-            self.logger.warning("桌宠任务感知失败（降级为无待办）", exc_info=True)
+            self.logger.opt(exception=True).warning("桌宠任务感知失败（降级为无待办）")
 
         # 3. 心情感知（最近一条心情记录）
         mood = "neutral"
@@ -271,7 +271,7 @@ class PetService:
                     if mood_bubble:
                         bubble_text = mood_bubble
         except Exception:
-            self.logger.warning("桌宠心情感知失败（降级为平静）", exc_info=True)
+            self.logger.opt(exception=True).warning("桌宠心情感知失败（降级为平静）")
 
         return {
             "time_state": time_state,

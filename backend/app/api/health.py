@@ -36,7 +36,7 @@ def _get_disk_usage(path: str) -> dict:
             "usage_percent": round(used / total * 100, 1),
         }
     except Exception:
-        logger.warning("磁盘使用率读取失败，降级为 0: %s", path, exc_info=True)
+        logger.opt(exception=True).warning("磁盘使用率读取失败，降级为 0: {}", path)
         return {"total_gb": 0, "used_gb": 0, "free_gb": 0, "usage_percent": 0}
 
 
@@ -53,7 +53,7 @@ def _get_db_size() -> float:
         if db_path and os.path.exists(db_path):
             return round(os.path.getsize(db_path) / (1024 * 1024), 2)
     except Exception:
-        logger.warning("数据库大小读取失败", exc_info=True)
+        logger.opt(exception=True).warning("数据库大小读取失败")
     return 0.0
 
 
@@ -69,7 +69,7 @@ def _check_db_connection() -> bool:
             conn.execute(text("SELECT 1"))
         return True
     except Exception:
-        logger.warning("数据库连接检查失败", exc_info=True)
+        logger.opt(exception=True).warning("数据库连接检查失败")
         return False
 
 

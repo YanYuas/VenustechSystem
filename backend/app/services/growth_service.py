@@ -255,7 +255,7 @@ class GrowthService:
             )
         )
         if existing is not None:
-            logger.debug("EXP 已结算，跳过: %s", source_key)
+            logger.debug("EXP 已结算，跳过: {}", source_key)
             return {"granted": False, "exp": existing.exp, "level_up": False,
                     "level": None, "skill_cat_ids": existing.skill_cat_ids or []}
 
@@ -279,7 +279,7 @@ class GrowthService:
         self.db.commit()
 
         if new_level > old_level:
-            logger.info("用户 %s 升级: LV%d → LV%d", user_id, old_level, new_level)
+            logger.info("用户 {} 升级: LV{} → LV{}", user_id, old_level, new_level)
 
         return {
             "granted": True,

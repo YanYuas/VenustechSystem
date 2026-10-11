@@ -97,10 +97,10 @@ def safe_call(plugin_id: str, fn: Any, *args: Any, timeout: float | None = None,
         finally:
             pool.shutdown(wait=False, cancel_futures=True)
     except FuturesTimeout:
-        logger.error("插件调用超时: %s (%ss)", plugin_id, timeout)
+        logger.error("插件调用超时: {} ({}s)", plugin_id, timeout)
         return default
     except Exception:
-        logger.exception("插件调用异常已隔离: %s", plugin_id)
+        logger.exception("插件调用异常已隔离: {}", plugin_id)
         return default
 
 
@@ -135,7 +135,7 @@ class PluginManager:
         # 创建插件目录
         plugins_dir = data_dir / "plugins"
         plugins_dir.mkdir(parents=True, exist_ok=True)
-        logger.info("插件管理器初始化完成，插件目录: %s", plugins_dir)
+        logger.info("插件管理器初始化完成，插件目录: {}", plugins_dir)
 
     @classmethod
     def discover(cls, plugins_dir: Path | None = None) -> list[PluginInfo]:
@@ -167,9 +167,9 @@ class PluginManager:
                     )
                     cls._plugins[info.id] = info
                     discovered.append(info)
-                    logger.debug("发现插件: %s v%s", info.name, info.version)
+                    logger.debug("发现插件: {} v{}", info.name, info.version)
                 except Exception as e:
-                    logger.warning("插件元数据读取失败: %s (%s)", item, e)
+                    logger.warning("插件元数据读取失败: {} ({})", item, e)
 
         return discovered
 
@@ -178,22 +178,22 @@ class PluginManager:
         """加载指定插件"""
         info = cls._plugins.get(plugin_id)
         if not info:
-            logger.error("插件不存在: %s", plugin_id)
+            logger.error("插件不存在: {}", plugin_id)
             return False
         if not info.enabled:
-            logger.info("插件已禁用，跳过加载: %s", plugin_id)
+            logger.info("插件已禁用，跳过加载: {}", plugin_id)
             return False
 
         # 权限门禁（P1）：声明不合法 → 拒绝加载，fail-closed
         ok, reason = validate_permissions(info.permissions)
         if not ok:
-            logger.error("插件权限校验未通过，拒绝加载: %s (%s)", plugin_id, reason)
+            logger.error("插件权限校验未通过，拒绝加载: {} ({})", plugin_id, reason)
             return False
 
         try:
             entry_path = Path(info.path) / info.entry_point
             if not entry_path.exists():
-                logger.error("插件入口不存在: %s", entry_path)
+                logger.error("插件入口不存在: {}", entry_path)
                 return False
 
             spec = importlib.util.spec_from_file_location(
@@ -210,10 +210,10 @@ class PluginManager:
                     safe_call(plugin_id, getattr(module, "initialize"), ctx, timeout=10)
 
                 cls._instances[plugin_id] = module
-                logger.info("插件加载成功: %s v%s", info.name, info.version)
+                logger.info("插件加载成功: {} v{}", info.name, info.version)
                 return True
         except Exception as e:
-            logger.exception("插件加载失败: %s (%s)", plugin_id, e)
+            logger.exception("插件加载失败: {} ({})", plugin_id, e)
         return False
 
     @classmethod
@@ -241,7 +241,7 @@ class PluginManager:
                 # 卸载清理同样隔离（超时 5s），失败不阻断卸载
                 safe_call(plugin_id, getattr(instance, "shutdown"), timeout=5)
             del cls._instances[plugin_id]
-            logger.info("插件已卸载: %s", plugin_id)
+            logger.info("插件已卸载: {}", plugin_id)
             return True
         return False
 
@@ -264,7 +264,7 @@ class PluginManager:
                 try:
                     routers[pid] = factory()
                 except Exception:
-                    logger.exception("插件路由获取失败: %s", pid)
+                    logger.exception("插件路由获取失败: {}", pid)
         return routers
 
     @classmethod

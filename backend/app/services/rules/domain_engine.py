@@ -219,18 +219,18 @@ def reload_user_domains() -> dict:
             if not domain.key or not domain.patterns:
                 raise ValueError("缺少 key 或 patterns")
             if domain.key in builtin_keys:
-                logger.warning("用户领域 %s 与内置领域同名，已忽略（内置优先）: %s",
+                logger.warning("用户领域 {} 与内置领域同名，已忽略（内置优先）: {}",
                                domain.key, path.name)
                 skipped.append({"file": path.name, "reason": "与内置领域 key 冲突（内置优先）"})
                 continue
             if any(d.key == domain.key for d in loaded):
-                logger.warning("用户领域 %s 重复定义，已忽略: %s", domain.key, path.name)
+                logger.warning("用户领域 {} 重复定义，已忽略: {}", domain.key, path.name)
                 skipped.append({"file": path.name, "reason": "key 重复"})
                 continue
             loaded.append(domain)
-            logger.info("加载用户领域: %s (%s)", domain.name, path.name)
+            logger.info("加载用户领域: {} ({})", domain.name, path.name)
         except Exception as exc:  # noqa: BLE001 - 单个文件坏掉不影响其他领域
-            logger.warning("用户领域文件解析失败，已跳过: %s（原因：%s）", path.name, exc)
+            logger.warning("用户领域文件解析失败，已跳过: {}（原因：{}）", path.name, exc)
             skipped.append({"file": path.name, "reason": str(exc)})
 
     _user_domains = tuple(loaded)

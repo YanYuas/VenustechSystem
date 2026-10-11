@@ -59,7 +59,7 @@ def _on_future_done(future: "concurrent.futures.Future") -> None:
     try:
         exc = future.exception()
         if exc:
-            logger.error("后台事件任务异常: %s", exc, exc_info=exc)
+            logger.opt(exception=(type(exc), exc, exc.__traceback__)).error("后台事件任务异常: {}")
     except Exception:
         pass
 
@@ -83,7 +83,7 @@ async def _handle_document_saved(document_id: str) -> None:
         try:
             user = UserRepository(db).get_by_username("default_user")
             if not user or not user.api_key_encrypted or not user.ai_enabled:
-                logger.debug("AI 未启用，跳过文档自动摘要: %s", document_id)
+                logger.debug("AI 未启用，跳过文档自动摘要: {}", document_id)
                 return
 
             doc = DocumentRepository(db).get(document_id)
@@ -97,9 +97,9 @@ async def _handle_document_saved(document_id: str) -> None:
                 if summary and hasattr(summary, "summary") and summary.summary:
                     doc.summary = summary.summary[:500]
                     db.commit()
-                    logger.info("文档自动摘要完成: %s", document_id)
+                    logger.info("文档自动摘要完成: {}", document_id)
             except Exception:
-                logger.exception("文档自动摘要失败: %s", document_id)
+                logger.exception("文档自动摘要失败: {}", document_id)
 
             # 标签建议
             try:
@@ -107,9 +107,9 @@ async def _handle_document_saved(document_id: str) -> None:
                 if tags and hasattr(tags, "tags") and tags.tags:
                     doc.ai_suggested_tags = tags.tags[:10]
                     db.commit()
-                    logger.info("文档标签建议完成: %s", document_id)
+                    logger.info("文档标签建议完成: {}", document_id)
             except Exception:
-                logger.exception("文档标签建议失败: %s", document_id)
+                logger.exception("文档标签建议失败: {}", document_id)
         finally:
             db.close()
 
@@ -134,7 +134,7 @@ async def _handle_task_completed(task_id: str) -> None:
             source_type="task",
             source_id=task_id,
         )
-        logger.info("任务完成通知已创建: %s", task_id)
+        logger.info("任务完成通知已创建: {}", task_id)
     except Exception:
         logger.exception("创建任务完成通知失败")
     finally:

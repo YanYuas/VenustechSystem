@@ -225,7 +225,7 @@ class WorkspaceService:
             except Exception:
                 db.rollback()
             _progress_set(root_id, phase="error", error=str(e)[:300], finished_at=time.time())
-            logger.exception("工作区扫描失败: root=%s", root_id)
+            logger.exception("工作区扫描失败: root={}", root_id)
         finally:
             db.close()
 

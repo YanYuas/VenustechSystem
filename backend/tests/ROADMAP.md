@@ -2,11 +2,13 @@
 
 > 从零搭建测试体系的分阶段计划。task 模块已完成样板，后续按此推进。
 >
-> **2026-10-11**：全量清点 + 分级升级，共三轮。P0/P1/P2/P3（安全面）全部补齐，
-> 过程中修复 **18 处生产代码缺陷**（三轮各 6 处，详见文末）。
-> 所有数字均来自本次实际 `pytest --collect-only` / `pytest tests/` 输出，非估算。
+> **2026-10-11**：全量清点 + 分级升级，共**四轮**。P0/P1/P2/P3（安全面）全部补齐，
+> 过程中修复 **18 处生产代码缺陷**（前三轮各 6 处）+ **50 处日志写法失真**
+> （16 文件，第四轮由真机探针发现），并新增**真机端到端探针**
+> `scripts/probe_backend_live.py`（65 项断言，打真实 uvicorn + 真实 SQLite）。
+> 所有数字均来自本次实际 `pytest` / 探针输出，非估算。
 
-## 当前状态（2026-10-11 实测：**44 文件 / 1006 用例**，全量 36.8s）
+## 当前状态（2026-10-11 实测：**45 文件 / 1012 用例**，全量 44.6s）
 
 ### 基础设施与守护
 
@@ -15,6 +17,7 @@
 | test_architecture.py | 5 | 架构守护（分层依赖） |
 | test_db_infrastructure.py | 12 | 数据库基础设施回归守护（连接池/WAL/级联/清表循环） |
 | test_smoke.py | 7 | 冒烟 |
+| test_logging_contract.py | 6 | 日志契约（loguru `{}` 与 `%s` 的行为差异 + 全项目静态扫描） |
 
 ### P0 核心业务
 
@@ -88,6 +91,18 @@
 > vault 的测试文件必须自带 autouse fixture 清理它，否则跨用例泄漏
 > （单用户模式下 `default_user.id` 固定，必然串扰）。
 
+### 三个入口的分工
+
+| 入口 | 是否需要起服务 | 守什么 |
+|------|----------------|--------|
+| `backend/tests/`（pytest, 1012 条） | 否（进程内 TestClient） | 业务规则、边界、越权、契约 |
+| `backend/scripts/smoke_backend.py`（32 断言） | 否（TestClient） | 启动链路、迁移、种子 |
+| `backend/scripts/probe_backend_live.py`（65 断言） | **是**（真实 uvicorn + 真实 HTTP） | **用户路径**：全新库 → 全部迁移 → 种子 → 接口真可用 |
+
+> 第三个入口正是为「铁律：完成 = 双击 → 服务真的起来 → 关键接口非空」而建：
+> 前两个都跑在进程内，历史上出现过「全绿但用户打不开」。用法见文件头
+> （必须指向临时数据目录，勿拿真实库跑）。
+
 ### 尚未覆盖
 
 | 模块 | 备注 |
@@ -113,6 +128,10 @@
    （query / body / 路径），不要凭后端签名猜 —— 本轮即因此发现 `batch-process` 契约错配
 8. **改生产代码前先证明缺陷存在**：第三轮采用「探针先跑一次拿到实证，再动手」，
    例：pet 的 IDOR 探针打印出了「他人形象 user_id 被改成当前用户」才动代码
+9. **测试探针的断言必须先查代码/实测确认契约**：第四轮真机探针首跑 47/51，
+   4 项失败**全部是探针自身的假设错误**（凭空假设了 vault 的单条详情端点、
+   误以为 `setup` 后仍未解锁、把 409 写成 400、以为启动种子里有工作流预设）。
+   契约来源优先级：**读实现 > 读测试 > 猜**。
 
 ## 每模块执行 Checklist
 
@@ -125,6 +144,38 @@
 6. [ ] 运行全量测试确认无回归
 7. [ ] 更新本文档进度（数字取自本次实际输出）
 ```
+
+## 第四轮修复（2026-10-11，日志格式 · 由真机探针发现）
+
+**性质**：不是 1 处 bug，而是**系统性写法失真** —— 后端日志后端是 **loguru**
+（`app/core/logger.py`，占位符是 `{}`），但项目里有 50 处写成 printf 风格
+`%s` / `%d` / `%.Nf`，或标准库 logging 的 `exc_info=`。
+
+**实测行为**（`loguru` 直接实验，非理论推断）：
+
+| 写法 | 实际输出 | 参数/堆栈 |
+|------|----------|-----------|
+| `logger.info("A %s", 1)` | `A %s` | **丢失** |
+| `logger.info("B {}", 1)` | `B 1` | 正确 |
+| `logger.warning("C %s 与 %.0f%%", "e", 12.5)` | `C %s 与 %.0f%%` | **全部丢失** |
+| `logger.warning("D", exc_info=True)` | 无堆栈 | **`exc_info` 不生效** |
+
+**真机证据**（uvicorn 启动日志，修复前 → 修复后）：
+
+```
+- 2026-10-11 16:47:57 | INFO | app.main:create_app:133 - 插件路由已挂载: %s
++ 2026-10-11 17:01:44 | INFO | app.main:create_app:133 - 插件路由已挂载: aihot
+- 16:48:09 | INFO | app.core.growth_handlers:... - 成长体系订阅者已注册（%d 个事件）
++ 17:01:54 | INFO | app.core.growth_handlers:... - 成长体系订阅者已注册（14 个事件）
+```
+
+**涉及范围**：16 文件 / 50 处（`%s|%d|%.Nf` 41 处 + `exc_info=` 9 处；其中 3 行两者兼具）。
+修法：`{}` / `{:.Nf}`；`exc_info=True` → `logger.opt(exception=True)` 前缀。
+
+**为什么此前无人发现**：日志失真**不会让任何测试变红**，也不影响功能 ——
+排查线上问题时才会发现「用户 %s 升级: LV%d → LV%d」毫无信息量。
+故落成 `scripts/audit_log_format.py`（基线 0，纳入 `check_all.py` 第 11 项），
+并加 `tests/test_logging_contract.py` 把 loguru 的行为钉成契约。
 
 ## 第三轮修复（2026-10-11，panel / pet / resource content_type）
 
@@ -182,21 +233,42 @@
    增加了任何读取密文的行为，必须同时加 `_require_unlocked()`。
 9. **`PetConfig` 未使用 `TimestampMixin`**：自建了 `updated_at`（无 `created_at`），
    与其余模型不一致；若要纳入统一时间轴需补列（属迁移变更）。
+10. **vault 没有单条「详情」端点**（第四轮探针实测 `GET /vault/items/{id}` → 405）：
+    只有列表 `/items`、`PATCH`/`DELETE`、`/items/{id}/secret`。与资源中心/资产库的
+    「列表 + 详情」模式不一致。前端若需要单条元信息只能从列表里取 —— 目前无调用点，
+    属**接口一致性**观察，非缺陷。
+11. **启动种子（`app/seed.py`）不灌工作流/资产库预设**（第四轮探针实测：
+    全新库 `GET /workflows/presets` 返回空 `list`）：种子只覆盖
+    文件夹/任务/文档/复盘/对话/面板/通知。完整演示数据走 `scripts/seed_demo.py`
+    这条独立路径。若前端工作流页假设「开箱即有预设」，需要先确认。
 
 ## 运行命令
 
 ```bash
 cd backend
-.\.venv\Scripts\python.exe -m pytest tests/ -v                       # 全量（1006 条，约 37s）
+.\.venv\Scripts\python.exe -m pytest tests/ -v                       # 全量（1012 条，约 45s）
 .\.venv\Scripts\python.exe -m pytest tests/test_pet_production.py -v  # 单模块
 .\.venv\Scripts\python.exe -m pytest tests/ -k "越权 or ownership"     # 关键词筛选
 .\.venv\Scripts\python.exe -m pytest tests/ --tb=short               # 简短报错
 .\.venv\Scripts\python.exe -m pytest tests/ --collect-only -q        # 各文件用例数清单
 ```
 
-> 1006 条的主要耗时项是 vault 的 PBKDF2（200 000 轮）与 pet 的多次迁移建库 ——
+> 1012 条的主要耗时项是 vault 的 PBKDF2（200 000 轮）与 pet 的多次迁移建库 ——
 > 每次 `setup` / `unlock` / `change_master_password` 都要真实派生密钥。
 > 这是**刻意保留的真实性**：把它 mock 掉就等于不测加密路径。
 
+### 真机探针（需要先起服务）
+
+```bash
+# 终端 1：用临时数据目录起服务（勿指向真实库，探针里有「全新库」断言）
+cd backend
+VENUSTECH_DATA_DIR="C:/Users/<你>/AppData/Local/Temp/venustech_probe" ^
+    .venv\Scripts\python.exe -m uvicorn app.main:app --port 8765
+
+# 终端 2：跑探针（65 项断言）
+cd backend && .venv\Scripts\python.exe scripts\probe_backend_live.py
+```
+
 一键入口（架构守护 / pytest / 冒烟 / 版本 / 令牌 / 类型检查 / 离线队列 /
-连通性 / 交付物守护 / **测试质量审计**，共 10 项）：仓库根目录 `python scripts/check_all.py`
+连通性 / 交付物守护 / 测试质量审计 / **日志格式审计**，共 11 项）：
+仓库根目录 `python scripts/check_all.py`

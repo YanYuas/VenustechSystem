@@ -92,7 +92,7 @@ async def _grant(event_type: str, source_key: str, label: str, loader: Loader,
         )
     except Exception:
         # 结算失败绝不能影响主流程（用户的任务已经完成、卡片已经复习）
-        logger.exception("EXP 结算失败: %s", source_key)
+        logger.exception("EXP 结算失败: {}", source_key)
     finally:
         db.close()
 
@@ -271,4 +271,4 @@ def register_growth_handlers() -> None:
     """注册成长体系订阅者（由 lifespan 调用一次）。"""
     for event, handler in _SUBSCRIPTIONS:
         event_bus.subscribe(event, handler)
-    logger.info("成长体系订阅者已注册（%d 个事件）", len(_SUBSCRIPTIONS))
+    logger.info("成长体系订阅者已注册（{} 个事件）", len(_SUBSCRIPTIONS))

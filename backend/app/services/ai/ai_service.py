@@ -119,7 +119,7 @@ class AIService:
                 reason = "API Key 无效或无权限（HTTP 401/403）"
             else:
                 reason = f"服务不可用：{msg}"
-            logger.warning("API Key 校验失败: %s", reason)
+            logger.warning("API Key 校验失败: {}", reason)
             return ApiVerifyResult(valid=False, reason=reason)
         except Exception as exc:
             logger.exception("API Key 校验异常（非 HTTP 错误，可能是网络/超时）")

@@ -98,5 +98,5 @@ def clear_logs():
         except Exception:
             # 文件被占用/权限不足时静默 skip 会让用户以为"已清空"，实为部分失败。
             failed.append(f.name)
-            logger.warning("日志文件清空失败: %s", f.name, exc_info=True)
+            logger.opt(exception=True).warning("日志文件清空失败: {}", f.name)
     return success({"cleared": count, "failed": failed})

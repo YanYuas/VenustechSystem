@@ -87,7 +87,7 @@ class BackupService:
             zf.writestr("app.db", db_bytes)
             zf.writestr(MANIFEST_NAME, json.dumps(manifest, ensure_ascii=False, indent=2))
             zf.writestr("manifest.json", json.dumps(legacy, ensure_ascii=False, indent=2))
-        logger.info("备份已导出: %s（%d 字节，sha256 已记录）", zip_path, len(db_bytes))
+        logger.info("备份已导出: {}（{} 字节，sha256 已记录）", zip_path, len(db_bytes))
         return {"path": str(zip_path), "size": len(db_bytes),
                 "sha256": files[0]["sha256"], "created_at": created_at}
 

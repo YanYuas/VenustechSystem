@@ -130,7 +130,7 @@ def create_app() -> FastAPI:
         plugin_manager.load_all()
         for pid, router in plugin_manager.get_routers().items():
             app.include_router(router, prefix=f"/api/v1/plugins/{pid}")
-            logger.info("插件路由已挂载: %s", pid)
+            logger.info("插件路由已挂载: {}", pid)
     except Exception:
         logger.exception("插件系统初始化失败（不影响主应用）")
 

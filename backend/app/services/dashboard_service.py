@@ -194,7 +194,7 @@ class DashboardService:
         except Exception:
             # 降级为占位（前端会显示为「待开发」）。必须打日志，否则模块真实报错
             # 会被伪装成"功能未上线"，掩盖 bug。
-            logger.warning("资源中心数据聚合失败，降级为占位", exc_info=True)
+            logger.opt(exception=True).warning("资源中心数据聚合失败，降级为占位")
             resource_center = ResourceCenter(categories=RESOURCE_CATEGORIES, status="planned")
 
         # 学习成长（真实数据）
@@ -217,7 +217,7 @@ class DashboardService:
                 cards_count=card_count,
             )
         except Exception:
-            logger.warning("学习成长数据聚合失败，降级为占位", exc_info=True)
+            logger.opt(exception=True).warning("学习成长数据聚合失败，降级为占位")
             learning = LearningSection(status="planned")
 
         # 生活记录（真实数据）
@@ -234,7 +234,7 @@ class DashboardService:
             ]
             life = LifeSection(categories=life_categories, status="ready")
         except Exception:
-            logger.warning("生活记录数据聚合失败，降级为占位", exc_info=True)
+            logger.opt(exception=True).warning("生活记录数据聚合失败，降级为占位")
             life = LifeSection(categories=LIFE_CATEGORIES, status="planned")
 
         # 长期资产库（真实数据）
@@ -251,7 +251,7 @@ class DashboardService:
             ]
             assets = AssetsSection(categories=asset_categories, status="ready")
         except Exception:
-            logger.warning("长期资产库数据聚合失败，降级为占位", exc_info=True)
+            logger.opt(exception=True).warning("长期资产库数据聚合失败，降级为占位")
             assets = AssetsSection(categories=ASSET_CATEGORIES, status="planned")
 
         quick_actions = QuickActions(items=QUICK_ACTIONS)
@@ -418,7 +418,7 @@ class DashboardService:
                 return ProjectsSection(items=items, status="ready")
         except Exception:
             # 降级到 project_tag 聚合属预期路径（老数据无 project_id），但失败原因仍需可观测。
-            logger.warning("Project 实体加载失败，降级为 project_tag 聚合", exc_info=True)
+            logger.opt(exception=True).warning("Project 实体加载失败，降级为 project_tag 聚合")
 
         # 降级：基于 project_tag 聚合
         project_map: dict[str, list] = {}

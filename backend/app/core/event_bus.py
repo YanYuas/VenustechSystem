@@ -113,13 +113,13 @@ class EventBus:
     def subscribe(cls, event: str, handler: Callable) -> None:
         """订阅同步事件"""
         cls._handlers.setdefault(event, []).append(handler)
-        logger.debug("订阅事件: %s (handler=%s)", event, handler.__name__)
+        logger.debug("订阅事件: {} (handler={})", event, handler.__name__)
 
     @classmethod
     def subscribe_async(cls, event: str, handler: Callable) -> None:
         """订阅异步事件（handler 为协程函数）"""
         cls._async_handlers.setdefault(event, []).append(handler)
-        logger.debug("订阅异步事件: %s (handler=%s)", event, handler.__name__)
+        logger.debug("订阅异步事件: {} (handler={})", event, handler.__name__)
 
     @classmethod
     def publish(cls, event: str, **kwargs: Any) -> None:
@@ -135,7 +135,7 @@ class EventBus:
             except Exception:
                 success = False
                 failed_handlers.append(getattr(handler, "__name__", repr(handler)))
-                logger.exception("事件处理失败: %s (handler=%s)", event, handler.__name__)
+                logger.exception("事件处理失败: {} (handler={})", event, handler.__name__)
 
         # 异步事件放入事件循环
         async_handlers = cls._async_handlers.get(event, [])
@@ -154,7 +154,7 @@ class EventBus:
                     except Exception:
                         success = False
                         failed_handlers.append(getattr(handler, "__name__", repr(handler)))
-                        logger.exception("异步事件处理失败: %s", event)
+                        logger.exception("异步事件处理失败: {}", event)
 
         # 记录历史和统计（F1.2：逐 handler 失败定位）
         cls._history.append(EventRecord(event, kwargs, called, success, failed_handlers))
@@ -184,7 +184,7 @@ class EventBus:
                 event, stat["consecutive_failures"], ", ".join(stat.get("failed_handlers", [])),
             )
         elif rate is not None and rate > cls.FAILURE_RATE_ALERT and stat["failed"] > 0:
-            logger.warning("事件 %s 近 1 分钟失败率 %.0f%%，超过阈值", event, rate * 100)
+            logger.warning("事件 {} 近 1 分钟失败率 {:.0f}%，超过阈值", event, rate * 100)
 
     @classmethod
     def get_history(cls, event: str | None = None, limit: int = 50) -> list[dict]:

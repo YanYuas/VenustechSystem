@@ -91,7 +91,7 @@ def run_maintenance() -> None:
         try:
             mode = conn.exec_driver_sql("PRAGMA journal_mode=WAL").scalar()
             if str(mode).lower() != "wal":
-                logger.warning("WAL 模式未能启用，当前 journal_mode=%s（功能正常，并发写性能下降）", mode)
+                logger.warning("WAL 模式未能启用，当前 journal_mode={}（功能正常，并发写性能下降）", mode)
         except Exception:  # noqa: BLE001 — 降级不阻断启动
             logger.exception("设置 WAL 模式失败，退化为默认 journal 模式")
         conn.exec_driver_sql("PRAGMA wal_checkpoint(TRUNCATE)")

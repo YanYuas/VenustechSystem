@@ -7,6 +7,44 @@
 
 ## [Unreleased]
 
+### Added — 真机端到端探针 + 日志格式守护（2026-10-11 第四轮）
+
+**规模：44 文件 / 1006 用例 → 45 文件 / 1012 用例**（全量 44.6s）
+
+- **新增真机端到端探针 `backend/scripts/probe_backend_live.py`（65 项断言）**：
+  打**真实 uvicorn 服务 + 真实 SQLite 库**，验证「全新库 → 20 个迁移 → 种子 → 接口真可用」。
+  与 `tests/`（进程内 TestClient）及 `scripts/smoke_backend.py`（TestClient 冒烟）互补，
+  守的是**用户路径** —— 对应铁律「完成 = 双击 → 服务真的起来 → 关键接口非空」。
+  实测：全新库就绪 21.4s · 20 个迁移全部成功 · 库文件 0.79MB · **65 项断言全绿**
+- **新增 `scripts/audit_log_format.py`**（纳入 `check_all.py` 第 11 项，基线 0）：
+  扫描 loguru 不生效的 `%s` / `exc_info=` 写法；已用植入坏样本反向验证会报警
+- **新增 `tests/test_logging_contract.py`（6 条）**：把 loguru 的实际行为钉成契约
+  （`%s` 参数丢失 / `{}` 正确 / `exc_info` 不进堆栈 / `opt(exception=True)` 进堆栈）
+- `scripts/check_all.py` 从 10 项扩到 **11 项**
+
+### Fixed — 日志写法系统性失真（2026-10-11 第四轮 · 真机探针发现，16 文件 / 50 处）
+
+后端日志后端是 **loguru**（占位符 `{}`），但项目里有 50 处写成 printf 风格
+`%s` / `%d` / `%.Nf`，或标准库 logging 的 `exc_info=`。实测（loguru 直接实验，非推断）：
+
+| 写法 | 实际输出 | 参数/堆栈 |
+|------|----------|-----------|
+| `logger.info("A %s", 1)` | `A %s` | **丢失** |
+| `logger.info("B {}", 1)` | `B 1` | 正确 |
+| `logger.warning("D", exc_info=True)` | 无堆栈 | **不生效** |
+
+真机 uvicorn 启动日志为证（修复前 → 修复后）：
+`插件路由已挂载: %s` → `插件路由已挂载: aihot`；
+`成长体系订阅者已注册（%d 个事件）` → `（14 个事件）`。
+
+修法：`%s|%d|%.Nf` → `{}|{:.Nf}`；`exc_info=` → `logger.opt(exception=True)` 前缀。
+影响：`main.py` / `database.py` / `core/{plugin_manager,event_bus,event_handlers,growth_handlers}.py` /
+`api/{health,logs}.py` / `services/{dashboard,pet,growth,settings,workspace,backup}.py` /
+`services/ai/ai_service.py` / `services/rules/domain_engine.py`。
+
+> 这类失真**不会让任何测试变红**，也不影响功能，只让排查问题时看不到参数值 ——
+> 故必须落成脚本守护，否则一定会被再犯。
+
 ### Added — 测试覆盖第三轮：panel / pet（2026-10-11）
 
 **规模：40 文件 / 873 用例 → 44 文件 / 1006 用例**（全量 36.8s）

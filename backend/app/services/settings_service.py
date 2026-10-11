@@ -168,7 +168,7 @@ class SettingsService:
             try:
                 self._record_history(key, self.get(key), str(value))
             except Exception:
-                logger.exception("设置历史记录失败: %s", key)
+                logger.exception("设置历史记录失败: {}", key)
 
         for key, value in values.items():
             self.repo.upsert(self.user_id, key, str(value))
