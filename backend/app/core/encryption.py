@@ -33,13 +33,9 @@ class EncryptionManager:
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self._key_file = data_dir / ".encryption_key"
         self._salt_file = data_dir / ".encryption_key.salt"
-        # 密钥环（PRD 8.2）：保留 current + previous 两把密钥。
-        # 轮换中断时旧密文仍可用 previous 解密 —— 避免"换了 key 却
-        # 没来得及重加密"造成的静默数据丢失。
-        self._keyring_file = data_dir / ".encryption_keys.json"
-        # 密钥环（PRD 8.2）：保留 current + previous 两把密钥。
-        # 轮换中断时旧密文仍可用 previous 解密 —— 避免"换了 key 却
-        # 没来得及重加密"造成的静默数据丢失。
+        # 密钥环（PRD 8.2）：保留多代历史密钥。轮换中断时旧密文仍可用
+        # previous 解密 —— 避免"换了 key 却还没来得及重加密"造成的静默数据丢失。
+        # 2026-10-11：此处原有一次重复赋值（同一路径连写两遍），已删。
         self._keyring_file = data_dir / ".encryption_keys.json"
         self._fernet: Fernet | None = None
         # 历史密钥列表（考察修正）：原来只保留一代 previous，连续轮换两次
@@ -116,15 +112,9 @@ class EncryptionManager:
                         pass
         except Exception:
             self._previous_fernets = []
-        # 密钥环里的 previous 用于解密历史密文（轮换中断场景）
-        try:
-            if self._keyring_file.exists():
-                ring = json.loads(self._keyring_file.read_text(encoding="utf-8"))
-                prev = ring.get("previous")
-                if prev:
-                    self._previous_fernet = Fernet(prev.encode("utf-8"))
-        except Exception:
-            self._previous_fernet = None
+        # 2026-10-11：此处原有一段把 ring["previous"] 读进 `self._previous_fernet`
+        # （单数）的逻辑。该属性**全仓没有任何读取方**（decrypt() 只用复数
+        # `_previous_fernets`），且仅在存在旧格式键时才被赋值 —— 纯死代码，已删。
 
     @property
     def is_available(self) -> bool:
@@ -174,11 +164,21 @@ class EncryptionManager:
         return dest_path
 
     def decrypt_file(self, encrypted_path: Path, dest_path: Path | None = None) -> Path:
-        """解密文件"""
+        """解密文件。
+
+        2026-10-11 修正两处（探针实测，回归用例见 tests/test_encryption_production.py）：
+
+          ① 旧实现直接 `self._fernet.decrypt(...)`，**绕过了历史密钥回退** ——
+             同一份密文，`decrypt()` 在轮换后仍能解开（会依次试 previous），
+             `decrypt_file()` 却抛 InvalidToken。两条路径行为不一致是隐患。
+             改为统一走 `self.decrypt()`。
+          ② 旧实现写成 `self._fernet.decrypt(x) if self._fernet else x` ——
+             `_fernet` 为空（cryptography 缺失）时会把**密文原样写进目标文件**
+             当明文，静默产出垃圾。改为由 `decrypt()` 明确抛 RuntimeError。
+        """
         if dest_path is None:
             dest_path = encrypted_path.with_suffix("")
-        encrypted = encrypted_path.read_bytes()
-        plaintext = self._fernet.decrypt(encrypted) if self._fernet else encrypted
+        plaintext = self.decrypt(encrypted_path.read_bytes()).encode("utf-8")
         dest_path.write_bytes(plaintext)
         return dest_path
 
@@ -199,9 +199,8 @@ class EncryptionManager:
         # 历史密钥：当前生效中的 -> 入历史列表，保留最近 KEEP_PREVIOUS 代
         new_hist = ([old_key.decode() if isinstance(old_key, bytes) else old_key]
                     if old_key else [])
-        for f in ([self._fernet] if self._fernet else []):
-            # no-op：占位说明历史来自 keyring，避免误用运行期对象
-            pass
+        # 2026-10-11：此处原有一个 `for f in [self._fernet]: pass` 的空循环
+        # （注释自称"占位说明"，实际什么都没做且极易误导），已删。
         try:
             if self._keyring_file.exists():
                 ring = json.loads(self._keyring_file.read_text(encoding="utf-8"))
@@ -233,6 +232,25 @@ class EncryptionManager:
             except Exception:
                 continue
         self._fernet = Fernet(new_key)
+
+    def reload(self) -> None:
+        """重新从磁盘读取密钥与密钥环，就地刷新本实例。
+
+        为什么需要它（2026-10-11，由 smoke_backend 的「轮换后仍可解密」往返断言测出）：
+        密钥轮换发生在 `SecurityService.rotate_key` 里，那里自己 new 了一个
+        **局部** EncryptionManager；而 `decrypt_secret()` / `encrypt_secret()`
+        （app/core/security.py）走的是 main.py 启动时建的**全局单例**。
+        单例的 `_fernet` 只在进程启动时读一次磁盘 —— 不在轮换后刷新，它就会
+        一直用内存里的**旧密钥**去解刚用新密钥写回的行。症状极具误导性：
+
+            「密钥轮换成功」提示正常 → 但 API Key 当场失效 → **重启服务才恢复**。
+
+        用 `reload()` 而不是 `init_encryption()`：后者要重新解析 data_dir，
+        在测试里（data_dir 被 monkeypatch 到 tmp_path）会凭空替换掉应用单例、
+        污染同会话其他用例；`reload()` 复用本实例已确立的 `self.data_dir`，
+        目录不一致时也只是原地重读、天然幂等。
+        """
+        self._initialize()
 
     def get_status(self) -> dict:
         """获取加密状态"""

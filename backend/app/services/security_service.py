@@ -12,21 +12,36 @@ from pathlib import Path
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.encryption import EncryptionManager
+from app.core.encryption import EncryptionManager, get_encryption
 from app.core.exceptions import BusinessException, ValidationException
 from app.config import get_settings
 from app.models.settings import Setting
 from app.models.user import User
-from app.models.vault import VaultItem
 
-# 需要跟随密钥轮换重加密的（模型/表, 密文列）
-# 考察修复：原来只覆盖 vault_items，漏了 users.api_key_encrypted ——
-# 密钥环只保留 current+previous 两级，第二次轮换后更早的密钥即失效，
-# 遗漏的密文会永久解不开。凡"用 EncryptionManager 加密落库"的列都必须登记。
+# 需要跟随密钥轮换重加密的（模型/表, 密文列）。
+#
+# **登记的唯一判据**：该列的密文是由**全局 EncryptionManager**
+# （app/core/encryption.py 的 init_encryption / get_encryption）加出来的。
+# 只有这类密文才会因密钥轮换而失效，也才需要重加密。
+#
+# 2026-10-11 修正（探针实测，回归用例见 tests/test_security_production.py）：
+#   ① `users.api_key_encrypted` 旧实现**根本轮换不了**：`encrypt_secret()` 落库的
+#      是 `"fernet:" + <Fernet token>`（带前缀，见 app/core/security.py），
+#      而旧代码拿整串去 `mgr.decrypt()` → 必然 InvalidToken → 被 `except` 静默
+#      `continue`。后果不是立刻报错，而是该列只能靠密钥环兜底；密钥环只留
+#      `KEEP_PREVIOUS` 代，实测**第 4 次轮换后 API Key 永久解不开**
+#      —— 正是本段注释原本警告的失败模式，却一直在发生。现按前缀对齐。
+#   ② `vault_items.secret_encrypted` **不该登记在这里**：它的密文由**保险箱主密码**
+#      派生的独立 Fernet 加密（vault_service._require_fernet），与全局密钥无关，
+#      `mgr.decrypt` 必然失败 → 每次都静默跳过，却在返回值里谎报"已轮换"。
+#      它的轮换在 `VaultService.change_password` 中完成，不归本服务管。
 _CIPHER_COLUMNS: list[tuple[str, str]] = [
-    ("vault_items", "secret_encrypted"),
     ("users", "api_key_encrypted"),
 ]
+
+# `encrypt_secret()` 给 Fernet 密文加的前缀。解密前必须剥掉、回写后必须还原，
+# 否则（a）解不开、（b）`decrypt_secret()` 认不出格式。
+_FERNET_PREFIX = "fernet:"
 
 
 class SecurityService:
@@ -47,26 +62,37 @@ class SecurityService:
             raise BusinessException("加密模块不可用，无法轮换密钥")
 
         # 1) 收集所有密文（Fernet token），解密成明文
-        collected: list[tuple[object, str, str]] = []  # (row, column, plaintext)
+        #
+        # per_table 只统计**真的解开了、待重写**的行 —— 旧实现拿静态清单
+        # 当返回值，在列根本轮换不了的情况下等于谎报（探针实测 rotated=1
+        # 却声称 vault_items / users / settings 三表都轮换过）。
+        collected: list[tuple[object, str, str, str]] = []  # (row, column, plaintext, prefix)
+        per_table: dict[str, int] = {}
         for table, column in _CIPHER_COLUMNS:
             rows = self._rows_of(table)
             for row in rows:
                 token = getattr(row, column, None)
                 if not token:
                     continue
+                raw = str(token)
+                # 剥前缀：`encrypt_secret()` 存的是 "fernet:<token>"，
+                # 不剥就会喂给 Fernet 一个带前缀的串 → 必然解不开（见本文件顶部说明）
+                prefix = ""
+                if raw.startswith(_FERNET_PREFIX):
+                    prefix, raw = _FERNET_PREFIX, raw[len(_FERNET_PREFIX):]
+                # DPAPI 密文由 Windows DPAPI 自行管理密钥，不归本密钥管
+                if raw.startswith("dpapi:"):
+                    continue
                 try:
-                    plaintext = mgr.decrypt(token)
+                    plaintext = mgr.decrypt(raw)
                 except Exception:
-                    # user.api_key_encrypted 可能由 DPAPI 加密（非 Fernet），
-                    # 由 DPAPI 自行管理密钥，此处跳过而非失败
+                    # 解不开 = 非本密钥产物（或数据已损坏）。跳过而非失败：
+                    # 不能让一条坏数据把整次轮换拖成回滚。
                     continue
-                # 仅当密文确实是本加密管理器的产物时才重加密：
-                # DPAPI 密文（dpapi: 前缀）不归本密钥管
-                if str(token).startswith("dpapi:"):
-                    continue
-                collected.append((row, column, plaintext))
+                collected.append((row, column, plaintext, prefix))
+                per_table[table] = per_table.get(table, 0) + 1
 
-        # 2) 设置类密文（assistant.deepseek_key）
+        # 2) 设置类密文（assistant.deepseek_key）—— 无前缀，直接由本管理器加密
         setting_rows: list[tuple[Setting, str]] = []
         srows = self.db.scalars(
             select(Setting).where(
@@ -81,36 +107,53 @@ class SecurityService:
                 setting_rows.append((s, mgr.decrypt(s.value)))
             except Exception:
                 continue
+        if setting_rows:
+            per_table["settings"] = len(setting_rows)
 
         # 3) 换 key（此后 mgr 已持有新密钥）
         try:
             mgr.rotate_key(new_master_key)
 
-            # 4) 用新密钥重加密写回
+            # 4) 用新密钥重加密写回（前缀必须原样还原，否则 decrypt_secret 认不出）
             rotated = 0
-            for row, column, plaintext in collected:
-                setattr(row, column, mgr.encrypt(plaintext).decode())
+            for row, column, plaintext, prefix in collected:
+                setattr(row, column, prefix + mgr.encrypt(plaintext).decode())
                 rotated += 1
             for s, plaintext in setting_rows:
                 s.value = mgr.encrypt(plaintext).decode()
                 rotated += 1
             self.db.commit()
+            # 4.5) 让**应用级单例**跟上新密钥。
+            #
+            # 本方法用的是上面的局部 `mgr`，而 `encrypt_secret()` / `decrypt_secret()`
+            # 走的是全局单例（main.py 启动时 init_encryption 建的那个）。单例的
+            # `_fernet` 只在进程启动读一次磁盘 —— 不刷新，它就会在**本轮换真正
+            # 重写了密文之后**，继续拿内存里的旧密钥去解新密文。症状：
+            # 「提示轮换成功，但 API Key 当场失效，重启服务才恢复」。
+            # 这一步缺失时 old 代码看不出来（那时 api_key 列根本没被轮换），
+            # 是 2026-10-11 让轮换真正生效后才由 smoke_backend 的往返断言测出来的。
+            # 仅在单例已存在时刷新，避免在未初始化加密的场景凭空造出后端。
+            live = get_encryption()
+            if live is not None:
+                live.reload()
         except Exception as e:
             self.db.rollback()
             raise BusinessException(f"密钥轮换失败，已回滚：{e}") from e
 
         return {
             "rotated": rotated,
-            "tables": [t for t, _ in _CIPHER_COLUMNS] + ["settings"],
+            # 只列**实际发生重加密**的表（旧实现返回静态清单，会谎报）
+            "tables": sorted(per_table),
+            "details": per_table,
         }
 
     def _rows_of(self, table: str) -> list:
-        if table == "vault_items":
-            return list(
-                self.db.scalars(
-                    select(VaultItem).where(VaultItem.user_id == self.user_id)
-                ).all()
-            )
+        """按表名取本用户的待轮换行。
+
+        必须与 `_CIPHER_COLUMNS` 保持一致：登记了哪张表，这里就要能取到它的行，
+        否则该表的密文会在轮换中被静默漏掉（= 轮换后永不可解）。
+        `tests/test_security_production.py` 有一组用例专门钉这条一致性。
+        """
         if table == "users":
             # api_key_encrypted 存在 users 行上（单用户模型下即本用户）
             return list(

@@ -7,6 +7,70 @@
 
 ## [Unreleased]
 
+### Fixed — 密钥轮换此前是「假轮换」，可致 API Key 永久丢失（2026-10-11）
+
+**这是本轮最重要的一条**：`SecurityService.rotate_key()` 声称轮换三张表，
+实测只有 `settings` 真的被重加密。探针（`tests/test_zz_probe_security.py`，跑完即删）
+给出的硬证据：
+
+| 探针观测 | 含义 |
+|---|---|
+| `rotate_key` 返回 `{'rotated': 1, 'tables': ['vault_items','users','settings']}` | 声称三表已轮换 |
+| `users.api_key_encrypted` 密文**未变化** | **从未真正轮换** |
+| `vault_items.secret_encrypted` 密文**未变化** | 不归本密钥管，永远轮不到 |
+| `settings` 密文变化 | 只有这一项真的轮换了 |
+
+1. **`users.api_key_encrypted` 带前缀，导致整串无法解密**
+   `encrypt_secret()` 落库的是 `"fernet:" + <Fernet token>`（`app/core/security.py`），
+   而旧代码拿**整串**去 `mgr.decrypt()` → 必然 `InvalidToken` → 被 `except` 静默 `continue`。
+   后果不是当场报错，而是该列只能靠密钥环兜底；密钥环只留 `KEEP_PREVIOUS=5` 代，
+   实测**第 4 次轮换后 API Key 永久解不开**（`解密失败：密钥不匹配或数据已损坏`）
+   —— 正是这段代码注释原本警告的失败模式。
+   修法：读时剥 `fernet:` 前缀、写回时原样还原。
+2. **`vault_items.secret_encrypted` 本不该登记**
+   它的密文由**保险箱主密码**派生的独立 Fernet 加密（`vault_service._require_fernet`），
+   与全局密钥无关，`mgr.decrypt` 必然失败 → 每次都静默跳过，**却在返回值里谎报「已轮换」**。
+   已从 `_CIPHER_COLUMNS` 移除（它的轮换在 `VaultService.change_password` 里）。
+   登记判据已写明：**只有由全局 `EncryptionManager` 加出来的列才登记**。
+3. **轮换后全局单例不刷新 → API Key 当场失效**
+   修好 ①② 后，轮换开始**真的重写密文**，随即暴露出下一个环节：
+   `rotate_key` 用的是局部 `EncryptionManager`，而 `decrypt_secret()` 走的是
+   `main.py` 启动时建的**长驻单例**，其 `_fernet` 只在进程启动读一次磁盘。
+   症状极具误导性：提示「密钥轮换成功」，但 API Key 当场失效，**重启服务才恢复**
+   （由 `smoke_backend.py` 的往返断言先测出）。修法：新增
+   `EncryptionManager.reload()`，轮换提交成功后刷新已存在的单例。
+4. **返回值不再谎报**：改为按表统计**真的解开并重写**的行数
+   （`{"rotated": N, "tables": [...], "details": {...}}`），
+   而不是回一张静态清单。前端不消费该结构，无兼容风险。
+5. **`api/security.py` 改用项目异常体系**：原先用裸 `HTTPException`，会绕过统一信封，
+   前端（`http.ts` 只读 `errBody.message`）只能显示 `HTTP 503: Service Unavailable`。
+   它是**全仓唯一**这样写的 API 文件，已统一为 `ServerException` / `ValidationException`。
+
+### Fixed — `EncryptionManager` 的两处静默错误与三处死代码（2026-10-11）
+
+- **`decrypt_file()` 绕过历史密钥回退**：旧实现直接 `self._fernet.decrypt(...)`，
+  于是同一份密文 `decrypt()` 能解（会依次试 previous）、`decrypt_file()` 却抛
+  `InvalidToken` —— 两条路径行为不一致。改为统一走 `self.decrypt()`。
+- **`decrypt_file()` 在无密钥时把密文当明文写出**：旧写法 `self._fernet.decrypt(x) if self._fernet else x`，
+  `_fernet` 为空（cryptography 缺失）时会把**密文原样写进目标文件**，静默产出垃圾。
+  现由 `decrypt()` 明确抛 `RuntimeError`。
+- 删除三处死代码：`__init__` 里对同一路径的**重复赋值**、`_previous_fernet`（单数）
+  的赋值逻辑（**全仓无任何读取方**，`decrypt()` 只用复数 `_previous_fernets`）、
+  `rotate_key` 里的 `for f in [self._fernet]: pass` 空循环。
+  注：`decrypt_file` / `encrypt_file` 全仓**无生产调用方**，修它们零风险。
+
+### Added — 安全模块测试覆盖（2026-10-11）
+
+后端 pytest **1126 → 1219 条**（+93，50 → **52 个文件**）：
+
+| 文件 | 用例 | 守什么 |
+|------|------|--------|
+| `tests/test_encryption_production.py` | 33 | `EncryptionManager`：密钥派生 / 随机 salt / 密钥环多代回退 / 轮换后旧密文可解 / `reload()` / 单例入口 |
+| `tests/test_security_production.py` | 42 | **`rotate_key` 真的重加密**（核回归：连续轮换超代数后仍可解）/ 注册表一致性（扫描模型里所有 `*encrypted*` 列，漏登记即失败）/ DPAPI 与损坏值跳过不阻断 / 失败整体回滚 / `require_unlocked` 门禁 / 审计白名单与修剪 |
+| `tests/test_security_api.py` | 18 | 信封契约 / 未解锁 409 / 解密坏 token → 400 且信封完整 / 后端不可用 → 500 |
+
+- 注册表守护带**非空断言**：扫描函数返回空集时不得平凡通过（否则等于永真）。
+
 ### Added — 前端单元测试体系（vitest + jsdom，2026-10-11）
 
 **前端不再「零单元测试」**：新增 `frontend/vitest.config.ts` + `src/test/setup.ts`，

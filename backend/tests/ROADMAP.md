@@ -2,13 +2,14 @@
 
 > 从零搭建测试体系的分阶段计划。task 模块已完成样板，后续按此推进。
 >
-> **2026-10-11**：全量清点 + 分级升级，共**五轮**。P0/P1/P2/P3（安全面）全部补齐，
-> 过程中修复 **19 处生产代码缺陷**（前三轮各 6 处 + 第五轮 1 处）+ **50 处日志写法失真**
+> **2026-10-11**：全量清点 + 分级升级，共**七轮**。P0/P1/P2/P3（安全面）全部补齐，
+> 过程中修复 **28 处生产代码缺陷**（前三轮各 6 处 + 第五轮 1 处 + 第六轮前端 3 处
+> + 第七轮安全面 6 处）+ **50 处日志写法失真**
 > （16 文件，第四轮由真机探针发现），并新增**真机端到端探针**
 > `scripts/probe_backend_live.py`（65 项断言，打真实 uvicorn + 真实 SQLite）。
 > 所有数字均来自本次实际 `pytest` / 探针输出，非估算。
 
-## 当前状态（2026-10-11 实测：**49 文件 / 1126 用例**，全量 0 failed）
+## 当前状态（2026-10-11 实测：**52 文件 / 1219 用例**，全量 0 failed）
 
 ### 基础设施与守护
 
@@ -107,11 +108,28 @@
 > vault 的测试文件必须自带 autouse fixture 清理它，否则跨用例泄漏
 > （单用户模式下 `default_user.id` 固定，必然串扰）。
 
+### P5 加密与密钥轮换（第七轮 · 安全面）
+
+| 文件 | 用例数 | 层级 |
+|------|--------|------|
+| test_encryption_production.py | 33 | `EncryptionManager`：密钥派生 / 随机 salt / 密钥环多代回退 / 轮换后旧密文可解 / `reload()` / 单例入口 |
+| test_security_production.py | 42 | **`rotate_key` 真的重加密**（核回归）/ 注册表一致性 / 跳过不阻断 / 失败整体回滚 / `require_unlocked` 门禁 / 审计白名单与修剪 |
+| test_security_api.py | 18 | 信封契约 / 未解锁 409 / 坏 token 400 且信封完整 / 后端不可用 500 |
+
+> **本轮的教训：核回归要断言「密文变了」，不能只断言「还能解开」。**
+> `api_key_encrypted` 从未被轮换却一直能读 —— 因为它靠**密钥环兜底**，
+> 只要轮换次数没超过 `KEEP_PREVIOUS`，旧密钥还在，解密照样成功。
+> 光看「能不能解密」永远发现不了这个缺陷（这正是它潜伏至今的原因）。
+>
+> **同理，「新建一个 manager 从磁盘读」也测不出单例不刷新的缺陷** ——
+> 新建实例天然会读到新密钥；真实读取路径是 `decrypt_secret()` → 长驻单例。
+> 两个层次都要覆盖：`_reopen(dir)` 测数据层，打补丁的 `_encryption_manager` 测运行期。
+
 ### 三个入口的分工
 
 | 入口 | 是否需要起服务 | 守什么 |
 |------|----------------|--------|
-| `backend/tests/`（pytest, 1126 条） | 否（进程内 TestClient） | 业务规则、边界、越权、契约 |
+| `backend/tests/`（pytest, 1219 条） | 否（进程内 TestClient） | 业务规则、边界、越权、契约 |
 | `backend/scripts/smoke_backend.py`（32 断言） | 否（TestClient） | 启动链路、迁移、种子 |
 | `backend/scripts/probe_backend_live.py`（65 断言） | **是**（真实 uvicorn + 真实 HTTP） | **用户路径**：全新库 → 全部迁移 → 种子 → 接口真可用 |
 
@@ -126,11 +144,13 @@
 | assistant | 依赖外部 AI API，需 mock |
 | plugins | 插件系统，需隔离测试环境 |
 | avatar | AI 头像生成，依赖外部服务 |
-| workspace / security / sync / logs / events / rules | 文件扫描 / 安全 / 同步 / 日志 / SSE / 领域规则引擎 |
+| workspace / sync / logs / events / rules | 文件扫描 / 同步 / 日志 / SSE / 领域规则引擎 |
 
 > `experience` / `report` 已于**第五轮**补齐（见 P4）。
-> 前端仍为零单元测试（仅 `test-offline-queue.ts` / `test-http-connectivity.ts`
-> 两个 esbuild 脚本，已纳入 `scripts/check_all.py` 第 7、8 项）。
+> `security`（含 `core/encryption.py` 与 `api/security.py`）已于**第七轮**补齐（见 P5）。
+> 前端不再零测试：**vitest 4 spec / 75 用例**已于第六轮落地，纳入
+> `scripts/check_all.py` 第 12 项（另有 `test-offline-queue.ts` / `test-http-connectivity.ts`
+> 两个 esbuild 脚本，为第 7、8 项）。
 
 ## 推进原则
 
@@ -184,6 +204,37 @@
 / `api/logs.py` 既有的 `Query(ge/le)` 约定一致），非法值统一 **400 / code 1001**。
 收紧前已核对：前端 `ExperienceView.vue` 传 `page>=1`、`PAGE_SIZE=50`；
 `ReportService._recent_experience` 直接调 Service 不走 HTTP —— 均不受影响。
+
+## 第七轮修复（2026-10-11，安全面：密钥轮换此前是「假轮换」）
+
+**性质**：不是小 bug，而是**一个持续存在的静默数据丢失窗口**。
+`SecurityService.rotate_key()` 声称轮换三张表，实测**只有 `settings` 真的重加密**。
+
+| # | 位置 | 缺陷 | 后果 |
+|---|------|------|------|
+| 1 | `services/security_service.py` | `users.api_key_encrypted` 落库带 `"fernet:"` 前缀，旧代码拿**整串**去 `mgr.decrypt()` → 必然 `InvalidToken` → 被 `except` 静默 `continue` | 该列**从未被真正轮换**，只靠密钥环兜底；键环只留 5 代，实测**第 4 次轮换后 API Key 永久解不开** |
+| 2 | `services/security_service.py` | `vault_items.secret_encrypted` 本不归本密钥管（由保险箱主密码派生的独立 Fernet 加密），却登记在 `_CIPHER_COLUMNS` | 每轮必定静默跳过，**返回值却谎报「已轮换」**（`tables` 里列着 vault_items） |
+| 3 | `services/security_service.py` | 修好 ①② 后暴露：`rotate_key` 用**局部** `EncryptionManager`，而 `decrypt_secret()` 走 `main.py` 启动时建的**长驻单例**（`_fernet` 只读一次磁盘） | 提示「轮换成功」但 API Key **当场失效，重启服务才恢复**（由冒烟往返断言先测出） |
+| 4 | `services/security_service.py` | 返回值用静态清单 `[t for t, _ in _CIPHER_COLUMNS] + ["settings"]` 当「已轮换表」 | 在列根本轮换不了的情况下**谎报**；现改为按表统计真的解开并重写的行数 |
+| 5 | `core/encryption.py` | `decrypt_file()` 直接 `self._fernet.decrypt(...)`，**绕过历史密钥回退** | 同一份密文 `decrypt()` 能解、`decrypt_file()` 抛 `InvalidToken` —— 两条路径行为不一致 |
+| 6 | `core/encryption.py` | `decrypt_file()` 写成 `... if self._fernet else x` | `_fernet` 为空（cryptography 缺失）时把**密文原样写进目标文件**当明文，静默产出垃圾 |
+| 7 | `api/security.py` | 用裸 `HTTPException`（**全仓唯一**这样写的 API 文件） | 绕过统一信封，前端 `http.ts` 只读 `errBody.message` → 用户只看到 `HTTP 503: Service Unavailable`，看不到真实原因 |
+
+顺带清掉三处死代码：`__init__` 对同一路径的**重复赋值**、`_previous_fernet`（单数）
+的赋值逻辑（**全仓无任何读取方**）、`rotate_key` 里 `for f in [self._fernet]: pass` 的空循环。
+`decrypt_file` / `encrypt_file` 全仓**无生产调用方**，修它们零风险（已核对）。
+
+**修法与验证链**：
+
+1. **探针先行**：`tests/test_zz_probe_security.py`（跑完即删）先打印出
+   「`rotate_key` 返回 rotated=1 但 api_key/vault 密文一字未变」「第 4 次轮换后解不开」
+   —— 拿到实证才动代码，不凭阅读猜。
+2. `_CIPHER_COLUMNS` 登记判据写明（**只有全局 `EncryptionManager` 加出来的列才登记**），
+   `rotate_key` 读时剥前缀 / 写回还原前缀，并改按表统计真实重写行数。
+3. 新增 `EncryptionManager.reload()`，轮换提交成功后刷新**已存在**的单例
+   （不新建：`init_encryption` 会重新解析 data_dir，在测试里会替换掉应用单例）。
+4. 注册表一致性守护：静态扫描 `app/models/*.py` 里所有含 `encrypted` 的列，
+   未登记且不在白名单即失败；**带非空断言**（扫描返回空集不得平凡通过）。
 
 ## 第四轮修复（2026-10-11，日志格式 · 由真机探针发现）
 
@@ -298,24 +349,48 @@
     `test_all_occurred_at_are_comparable`）。**若将来换库或改方言，
     `sort` 之前必须先统一 tz 语义。**
 
+14. **密钥轮换只覆盖 `self.user_id` 自己的行**（第七轮实测）：`rotate_key` 遍历
+    `_rows_of("users")` 时按 `User.id == self.user_id` 过滤，**其它用户的
+    `api_key_encrypted` 不会重加密**，只能靠密钥环的 `KEEP_PREVIOUS=5` 代兜底。
+    当前是本地单用户模型（`default_user`），实际只有一行，无影响；
+    **若将来支持多用户，必须把轮换改成全局遍历**，否则第 6 次轮换就会
+    让其它用户的 API Key 永久失效 —— 与本次修复的失败模式同源。
+15. **`EncryptionManager` 的主密钥模式与 `rotate_key()` 语义不自洽**（第七轮发现）：
+    `_master_key` 非空时 `_initialize()` 由「主密钥 + salt」派生密钥、**忽略
+    `.encryption_key` 文件**；但 `rotate_key(new_master_key=None)` 走的是
+    「生成随机 key 并写进 `.encryption_key`」这条路 —— 于是 `self._fernet`
+    与「reload 后按主密钥派生出来的结果」**不是同一把**。
+    生产不受影响（`main.py` 只调 `init_encryption(data_dir)`，从不传主密钥），
+    但若日后启用主密钥模式，`rotate_key()` 必须改为「用新主密钥派生」而不是生成随机 key。
+
 ## 运行命令
 
 ```bash
 cd backend
-.\.venv\Scripts\python.exe -m pytest tests/ -v                       # 全量（1126 条）
+.\.venv\Scripts\python.exe -m pytest tests/ -v                       # 全量（1219 条）
 .\.venv\Scripts\python.exe -m pytest tests/test_pet_production.py -v  # 单模块
 .\.venv\Scripts\python.exe -m pytest tests/ -k "越权 or ownership"     # 关键词筛选
 .\.venv\Scripts\python.exe -m pytest tests/ --tb=short               # 简短报错
 .\.venv\Scripts\python.exe -m pytest tests/ --collect-only -q        # 各文件用例数清单
 ```
 
-> **注意（沙箱环境）**：在工具沙箱内跑全量时，pytest 收尾清理临时目录会触发
-> 宿主的批量删除保护（`SystemExit: 1`），**这发生在所有用例跑完之后**，
-> 不影响用例结论 —— 但会让终端里的 `N passed` 汇总行丢失。
-> 变通：加 `-p no:cacheprovider --basetemp=<临时目录>` 后把输出重定向到文件，
-> 再统计进度行（`.` / `F` / `E`）核对。本文档的数字即用此法核对。
+> **注意（在 WorkBuddy 工具的 Bash 里跑）**：宿主会通过 `PYTHONPATH` 注入一个
+> `sitecustomize.py` 文件操作钩子，**它让每次文件删除耗时约 1.9 秒**
+> （2026-10-11 实测：50 次 `open/write/unlink` 带钩子 **96.27s**、`env -u PYTHONPATH` 后 **2.05s**）。
+> 连带后果有两个：① 39 张表的建库迁移慢到超过命令超时，进程被 SIGTERM，
+> 表现为「跑 pytest 没有任何输出」；② 收尾清临时目录触发宿主的批量删除保护
+> （`SystemExit: 1`，发生在所有用例跑完之后），把 `N passed` 汇总行吃掉。
+>
+> **一次性解决两者** —— 绕开注入的钩子（只在临时目录里跑测试，无删除风险）：
+>
+> ```bash
+> env -u PYTHONPATH .venv/Scripts/python.exe -m pytest tests/ -q
+> ```
+>
+> 若仍只想在沙箱内核对结论（不绕钩子）：加 `-p no:cacheprovider` 并把输出重定向到
+> 文件，再统计进度行（`.` / `F` / `E`）—— 汇总行丢了但结论有效。本文档的数字即用此法核过。
 
-> 1126 条的主要耗时项是 vault 的 PBKDF2（200 000 轮）与 pet 的多次迁移建库 ——
+> 1219 条的主要耗时项是 vault 的 PBKDF2（200 000 轮）与 pet 的多次迁移建库 ——
 > 每次 `setup` / `unlock` / `change_master_password` 都要真实派生密钥。
 > 这是**刻意保留的真实性**：把它 mock 掉就等于不测加密路径。
 

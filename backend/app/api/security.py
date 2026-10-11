@@ -5,12 +5,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
 from app.core.encryption import get_encryption
+from app.core.exceptions import ServerException, ValidationException
 from app.core.response import success
 from app.services.security_service import SecurityService, audit, list_audit, require_unlocked
 
@@ -48,7 +49,10 @@ def encrypt_data(req: EncryptRequest, db: Session = Depends(get_db), user: User 
     enc = get_encryption()
     if not enc or not enc.is_available:
         audit(db, user.id, "security.encrypt", ok=False, detail="加密后端不可用")
-        raise HTTPException(status_code=503, detail="加密功能不可用")
+        # 原先用裸 HTTPException(503)：会绕过统一信封，前端只能显示
+        # "HTTP 503: Service Unavailable"（http.ts 只读 errBody.message，
+        # 不读 detail）。改走项目异常体系，用户能看到真实原因。
+        raise ServerException("加密功能不可用（加密后端未初始化或 cryptography 缺失）")
     audit(db, user.id, "security.encrypt", ok=True)
     encrypted = enc.encrypt(req.data)
     return success({"encrypted": encrypted.decode("utf-8")})
@@ -60,14 +64,14 @@ def decrypt_data(req: DecryptRequest, db: Session = Depends(get_db), user: User 
     require_unlocked(user.id)
     enc = get_encryption()
     if not enc or not enc.is_available:
-        raise HTTPException(status_code=503, detail="加密功能不可用")
+        raise ServerException("加密功能不可用（加密后端未初始化或 cryptography 缺失）")
     try:
         decrypted = enc.decrypt(req.token)
         audit(db, user.id, "security.decrypt", ok=True)
         return success({"decrypted": decrypted})
     except ValueError as e:
         audit(db, user.id, "security.decrypt", ok=False, detail=str(e)[:200])
-        raise HTTPException(status_code=400, detail=str(e))
+        raise ValidationException(str(e))
 
 
 @router.post("/key/rotate")
