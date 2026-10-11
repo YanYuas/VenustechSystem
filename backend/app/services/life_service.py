@@ -9,7 +9,7 @@ from datetime import date, datetime, timedelta
 from sqlalchemy.orm import Session
 
 from app.core.event_bus import EVENT_HABIT_CHECKIN, EVENT_MOOD_LOGGED, EVENT_DIARY_CREATED, event_bus
-from app.core.exceptions import ValidationException
+from app.core.exceptions import NotFoundException, ValidationException
 from app.repositories import (
     HabitRepository,
     HabitCheckinRepository,
@@ -53,13 +53,13 @@ class LifeService:
         self.logger.info(f"习惯创建: {habit.id}")
         return self._habit_to_dict(habit)
 
-    def update_habit(self, habit_id: str, data: dict) -> dict:
-        habit = self.habit_repo.get_or_404(habit_id)
+    def update_habit(self, user_id: str, habit_id: str, data: dict) -> dict:
+        habit = self._owned_habit(user_id, habit_id)
         updated = self.habit_repo.update(habit, **data)
         return self._habit_to_dict(updated)
 
-    def delete_habit(self, habit_id: str) -> None:
-        habit = self.habit_repo.get_or_404(habit_id)
+    def delete_habit(self, user_id: str, habit_id: str) -> None:
+        habit = self._owned_habit(user_id, habit_id)
         self.habit_repo.delete(habit)
 
     def checkin_habit(self, habit_id: str, checkin_date: date | None = None) -> dict:
@@ -152,8 +152,8 @@ class LifeService:
         event_bus.publish(EVENT_MOOD_LOGGED, mood_id=mood.id, score=mood.score)
         return self._mood_to_dict(mood)
 
-    def delete_mood(self, mood_id: str) -> None:
-        mood = self.mood_repo.get_or_404(mood_id)
+    def delete_mood(self, user_id: str, mood_id: str) -> None:
+        mood = self._owned_mood(user_id, mood_id)
         self.mood_repo.delete(mood)
 
     def get_mood_stats(self, user_id: str, days: int = 30) -> dict:
@@ -196,8 +196,8 @@ class LifeService:
         items, total = self.diary_repo.paginate(page=page, page_size=page_size, user_id=user_id)
         return {"list": [self._diary_to_dict(d) for d in items], "total": total, "page": page, "page_size": page_size}
 
-    def get_diary(self, diary_id: str) -> dict:
-        diary = self.diary_repo.get_or_404(diary_id)
+    def get_diary(self, user_id: str, diary_id: str) -> dict:
+        diary = self._owned_diary(user_id, diary_id)
         return self._diary_to_dict(diary)
 
     def create_diary(self, user_id: str, data: CreateDiaryRequest) -> dict:
@@ -216,14 +216,37 @@ class LifeService:
         self.logger.info(f"日记创建: {diary.id}")
         return self._diary_to_dict(diary)
 
-    def update_diary(self, diary_id: str, data: dict) -> dict:
-        diary = self.diary_repo.get_or_404(diary_id)
+    def update_diary(self, user_id: str, diary_id: str, data: dict) -> dict:
+        diary = self._owned_diary(user_id, diary_id)
         updated = self.diary_repo.update(diary, **data)
         return self._diary_to_dict(updated)
 
-    def delete_diary(self, diary_id: str) -> None:
-        diary = self.diary_repo.get_or_404(diary_id)
+    def delete_diary(self, user_id: str, diary_id: str) -> None:
+        diary = self._owned_diary(user_id, diary_id)
         self.diary_repo.delete(diary)
+
+    # ==================== 归属校验 ====================
+
+    def _owned_habit(self, user_id: str, habit_id: str):
+        """习惯归属校验：越权或不存在统一抛 NotFoundException（不泄露存在性）。"""
+        habit = self.habit_repo.get(habit_id)
+        if habit is None or habit.user_id != user_id or habit.deleted_at is not None:
+            raise NotFoundException("习惯不存在")
+        return habit
+
+    def _owned_mood(self, user_id: str, mood_id: str):
+        """心情记录归属校验。"""
+        mood = self.mood_repo.get(mood_id)
+        if mood is None or mood.user_id != user_id or mood.deleted_at is not None:
+            raise NotFoundException("心情记录不存在")
+        return mood
+
+    def _owned_diary(self, user_id: str, diary_id: str):
+        """日记归属校验。"""
+        diary = self.diary_repo.get(diary_id)
+        if diary is None or diary.user_id != user_id or diary.deleted_at is not None:
+            raise NotFoundException("日记不存在")
+        return diary
 
     # ==================== 序列化辅助 ====================
 

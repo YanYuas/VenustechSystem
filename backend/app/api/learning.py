@@ -79,7 +79,7 @@ async def update_plan(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    return success(_svc(db).update_plan(plan_id, data))
+    return success(_svc(db).update_plan(user.id, plan_id, data))
 
 
 @router.delete("/plans/{plan_id}", summary="删除学习计划")
@@ -88,7 +88,7 @@ async def delete_plan(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    _svc(db).delete_plan(plan_id)
+    _svc(db).delete_plan(user.id, plan_id)
     return success(None)
 
 
@@ -121,7 +121,7 @@ async def update_card(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    return success(_svc(db).update_card(card_id, data))
+    return success(_svc(db).update_card(user.id, card_id, data))
 
 
 @router.delete("/cards/{card_id}", summary="删除知识卡片")
@@ -130,7 +130,7 @@ async def delete_card(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    _svc(db).delete_card(card_id)
+    _svc(db).delete_card(user.id, card_id)
     return success(None)
 
 
@@ -151,7 +151,7 @@ async def submit_review(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    return success(_svc(db).submit_review(card_id, data))
+    return success(_svc(db).submit_review(user.id, card_id, data))
 
 
 # ==================== 学习时长 ====================

@@ -60,17 +60,18 @@ class ReviewService:
     def upsert(self, data: UpsertReviewRequest) -> ReviewOut:
         review = self.repo.get_by_type_date(self.user_id, data.type, data.date)
         identity_id = self._validated_identity_id(data.identity_id)
+        project_id = self._validated_project_id(data.project_id)
         if review is None:
             review = self.repo.create(
                 user_id=self.user_id, type=data.type, review_date=data.date,
-                project_id=data.project_id, identity_id=identity_id,
+                project_id=project_id, identity_id=identity_id,
                 data=data.data.model_dump(),
             )
         else:
             review.data = data.data.model_dump()
             payload = data.model_dump(exclude_unset=True)
             if "project_id" in payload:
-                review.project_id = data.project_id
+                review.project_id = project_id
             if "identity_id" in payload:
                 review.identity_id = identity_id
             self.db.commit()
@@ -178,6 +179,16 @@ class ReviewService:
         if identity is None or identity.user_id != self.user_id or identity.deleted_at is not None:
             raise ValidationException("身份不存在")
         return identity_id
+
+    def _validated_project_id(self, project_id: str | None) -> str | None:
+        """项目轴写入前校验：None/空串=未关联；有值必须归属当前用户。"""
+        if not project_id:
+            return None
+        from app.models.project import Project
+        project = self.db.get(Project, project_id)
+        if project is None or project.user_id != self.user_id or project.deleted_at is not None:
+            raise ValidationException("项目不存在")
+        return project_id
 
     @staticmethod
     def _list_item(r: Review) -> ReviewListItem:

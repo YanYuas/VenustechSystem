@@ -201,5 +201,7 @@ class DashboardDataOut(BaseModel):
 
     # 全局
     quick_actions: QuickActions = Field(default_factory=QuickActions)
+    week_progress: WeekProgress = Field(default_factory=WeekProgress)
+    streak: StreakData = Field(default_factory=StreakData)
     ai_assistant: AIAssistantStatus = Field(default_factory=AIAssistantStatus)
     modules_status: list[ModuleStatusItem] = Field(default_factory=list)

@@ -33,6 +33,7 @@ class CreateDocumentRequest(BaseModel):
     # 身份轴（三期 B）：可空 = 未归类
     identity_id: str | None = None
     content: str | None = None
+    tags: list[str] | None = None
 
 
 class UpdateDocumentRequest(BaseModel):

@@ -7,6 +7,58 @@
 
 ## [Unreleased]
 
+### Added — 后端测试体系分级升级（2026-10-11）
+
+**规模：3 文件 / 103 用例 → 40 文件 / 873 用例**（全量约 32s，两次复跑无抖动）
+
+- **分层基础设施**：`conftest.py` 两层隔离（Service 层函数级事务回滚 /
+  API 层动态清表）+ `factories.py` 数据工厂；新增 `tests/README.md`（规范）
+  与 `tests/ROADMAP.md`（推进路线图）
+- **覆盖铺开**：P0 核心业务 340 条 · P1 系统支撑 149 条 · P2 领域功能 181 条 ·
+  P3 安全面 179 条（vault 主密码生命周期/密文形态/动作白名单 · resource IDOR 契约）
+- **接入一键入口**：`scripts/check_all.py` 从 9 项扩到 **10 项**（新增后端 pytest 全量）
+- **新增质量守护** `scripts/audit_test_quality.py`：静态扫描 5 类「缺陷存在时依然全绿」
+  的写法（永真断言 / 无断言 / 宽泛 raises / 吞异常 / 空函数体），基线 0；
+  已用植入坏用例的样本反向验证确实会报警
+
+### Fixed — 测试暴露的生产缺陷（2026-10-11，共 12 处）
+
+**第一轮（asset / workflow）**
+
+1. `workflow_service` 生成任务 `status="todo"`（非法状态）→ 任何流转报 3001，**任务永久卡死**
+2. `workflow_service` 标签/模板去重未带 `user_id` → 他人同名数据导致本用户**静默不创建**
+3. `asset_service` 详情/更新/删除/使用**只校验存在性** → IDOR
+4. `asset_service` / `workflow_service` PATCH 裸 dict 无差别 `setattr` → mass-assignment
+5. `asset_service` `project_id` 仅靠外键兜底 → 不存在 id 触发 500，他人 id 被静默接受
+6. `api/asset.py` `rating` 查询参数无范围约束
+
+**第二轮（vault / resource）**
+
+7. `resource_service` 构造函数**不收 `user_id`**，11 个单条操作零归属校验 → IDOR
+8. `resource_service` `update_template` / `update_domain` 收裸 dict → mass-assignment
+9. `resource_service` 非法 action 抛裸 `ValueError` → 500（应为 400）
+10. `resource_service` 无 status 白名单 → 写入永不生效的值既不报错也不出现（**静默失败**）
+11. `api/resource.py` + `schemas`：`batch-process` 参数绑定与前端封装契约不符
+    → 按封装接线即恒定 400（页面尚无调用点，未在生产暴露）
+12. `vault_service` `_session_keys` 在模块内被定义两次 → 死代码
+
+### Fixed — 测试套件抖动根因（2026-10-11）
+
+- `journal_mode=WAL` 曾被放进 SQLAlchemy connect 事件（每连接协商一次）→ 与连接池
+  竞争导致「单跑过、全套挂、换新 Session 立刻好」的随机锁死。
+  **修复**：引擎从 NullPool 改为小连接池（pool_size=5），WAL 移到启动时
+  `run_maintenance()` 设一次。**效果：套件 238s → 15s 且不再抖动**
+- `clean_db` 夹具用普通 Session 执行 `PRAGMA foreign_keys=OFF/ON` → PRAGMA 在事务内
+  **静默无效**，OFF 残留在池连接上 → 级联删除失效。
+  **修复**：改用 AUTOCOMMIT 连接，并在归还池前恢复 `foreign_keys=ON`
+
+### 已知限制（已被测试钉死，非缺陷）
+
+- PATCH 传 `null` 不能把字段置空（需传空串）；支持置空属接口语义变更
+- SOP 版本历史取默认 100 条上限（未分页）
+- 收集箱 `content_type` 无白名单，前端取值 `link` 与模型注释 `url` 拼写不一致
+  （当前能正常存取；一旦该字段参与筛选或渲染分支即成静默不匹配）
+
 ### Added — 模块化深度开发 · mod-tools 收口（2026-09-19）
 
 **P0 全部完成（6/6）**

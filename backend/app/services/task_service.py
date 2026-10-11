@@ -128,6 +128,13 @@ class TaskService:
         if identity is None or identity.user_id != user_id or identity.deleted_at is not None:
             raise ValidationException("身份不存在")
 
+    def _ensure_project_owned(self, user_id: str, project_id: str) -> None:
+        """项目写入前校验：project_id 有外键，但提前校验给出友好错误而非 500。"""
+        from app.models.project import Project
+        project = self.db.get(Project, project_id)
+        if project is None or project.user_id != user_id or project.deleted_at is not None:
+            raise ValidationException("项目不存在")
+
     @staticmethod
     def _apply_status(task: Task, new_status: str) -> bool:
         """应用状态流转。返回是否刚变为 completed（供提交后发布事件）。"""
@@ -178,12 +185,17 @@ class TaskService:
         return PaginatedData(list=items, total=total, page=page, page_size=page_size)
 
     def create(self, user_id: str, data: CreateTaskRequest) -> TaskOut:
+        title = data.title.strip()
+        if not title:
+            raise ValidationException("标题不能为空（去除首尾空格后）")
         priority = data.priority if (data.priority and data.priority in VALID_PRIORITIES) else "medium"
         if data.identity_id is not None:
             self._ensure_identity_owned(user_id, data.identity_id)
+        if data.project_id is not None:
+            self._ensure_project_owned(user_id, data.project_id)
         task = self.repo.create(
             user_id=user_id,
-            title=data.title,
+            title=title,
             description=data.description,
             status=data.status or "pending",
             priority=priority,
@@ -224,11 +236,21 @@ class TaskService:
         # 身份轴：写入前校验归属（identity_id 是应用层关联，无外键兜底）
         if payload.get("identity_id") is not None:
             self._ensure_identity_owned(user_id, payload["identity_id"])
+        # 项目轴：写入前校验归属（project_id 有外键，但提前校验给出友好错误而非 500）
+        if payload.get("project_id") is not None:
+            if payload["project_id"] == "":
+                payload["project_id"] = None  # 空串解除关联
+            else:
+                self._ensure_project_owned(user_id, payload["project_id"])
         became_completed = False
         if "status" in payload:
             became_completed = self._apply_status(task, payload.pop("status"))
         for key, value in payload.items():
             if key in self._UPDATABLE_FIELDS:
+                if key == "title" and isinstance(value, str):
+                    value = value.strip()
+                    if not value:
+                        raise ValidationException("标题不能为空（去除首尾空格后）")
                 setattr(task, key, value)
         self.db.commit()
         self.db.refresh(task)
@@ -276,6 +298,9 @@ class TaskService:
     # ---------- 子任务 ----------
     def add_subtask(self, user_id: str, task_id: str, data: CreateSubtaskRequest) -> SubtaskOut:
         task = self._owned(task_id, user_id)
+        # expire_on_commit=False 下关系集合不会自动刷新，手动 refresh 确保
+        # 拿到最新的子任务列表，否则连续添加时 sort_order 会重复为 0
+        self.db.refresh(task, attribute_names=["subtasks"])
         max_order = max((s.sort_order for s in (task.subtasks or [])), default=-1)
         sub = self.sub_repo.create(
             task_id=task.id, title=data.title, sort_order=max_order + 1
@@ -342,6 +367,8 @@ class TaskService:
 
     def focus_start(self, user_id: str, task_id: str) -> FocusSessionOut:
         task = self._owned(task_id, user_id)
+        if task.status == "completed":
+            raise TaskStateException("已完成的任务不能启动专注会话")
         session = FocusSession(
             task_id=task.id, user_id=user_id, start_time=utcnow()
         )
@@ -357,8 +384,13 @@ class TaskService:
         if session.end_time is not None:
             raise TaskStateException("该专注会话已结束")
         session.end_time = utcnow()
+        # SQLite 不存储时区，start_time 读出为 offset-naive；
+        # utcnow() 返回 offset-aware，直接相减会 TypeError。统一补 UTC 时区。
+        start = session.start_time
+        if start.tzinfo is None:
+            start = start.replace(tzinfo=timezone.utc)
         session.duration = max(
-            0, int((session.end_time - session.start_time).total_seconds())
+            0, int((session.end_time - start).total_seconds())
         )
         # 累计到任务总专注时长
         if session.task_id:

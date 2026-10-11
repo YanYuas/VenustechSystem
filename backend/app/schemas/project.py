@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 
 
 class ProjectBase(BaseModel):
-    name: str = Field(..., max_length=200)
+    name: str = Field(..., min_length=1, max_length=200)
     description: Optional[str] = None
     color: str = Field(default="#7c5cff", max_length=20)
     status: str = Field(default="active", max_length=20)

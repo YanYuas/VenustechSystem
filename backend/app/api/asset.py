@@ -1,12 +1,15 @@
 # ============================================================
 # 长期资产库 API（二期 M10 P0）
 # SOP + Prompt模板 + Skill技能 + 项目记忆
+#
+# 归属校验：本层只传 user.id，一切归属判断在 AssetService._owned 内完成
+# （2026-10-11 起，此前详情/更新/删除/使用端点未校验归属，属越权读改删）。
 # ============================================================
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
@@ -41,7 +44,7 @@ async def list_sops(
 
 @router.get("/sops/{sop_id}", summary="SOP详情")
 async def get_sop(sop_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    return success(_svc(db).get_sop(sop_id))
+    return success(_svc(db).get_sop(user.id, sop_id))
 
 
 @router.post("/sops", summary="创建SOP")
@@ -61,23 +64,23 @@ async def update_sop(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    return success(_svc(db).update_sop(sop_id, data, change_note))
+    return success(_svc(db).update_sop(user.id, sop_id, data, change_note))
 
 
 @router.delete("/sops/{sop_id}", summary="删除SOP")
 async def delete_sop(sop_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    _svc(db).delete_sop(sop_id)
+    _svc(db).delete_sop(user.id, sop_id)
     return success(None)
 
 
 @router.post("/sops/{sop_id}/use", summary="使用SOP（计数+返回步骤）")
 async def use_sop(sop_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    return success(_svc(db).use_sop(sop_id))
+    return success(_svc(db).use_sop(user.id, sop_id))
 
 
 @router.get("/sops/{sop_id}/versions", summary="SOP版本历史")
 async def list_sop_versions(sop_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    return success(_svc(db).list_sop_versions(sop_id))
+    return success(_svc(db).list_sop_versions(user.id, sop_id))
 
 
 # ==================== Prompt 模板 ====================
@@ -95,7 +98,7 @@ async def list_prompts(
 
 @router.get("/prompts/{prompt_id}", summary="Prompt详情")
 async def get_prompt(prompt_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    return success(_svc(db).get_prompt(prompt_id))
+    return success(_svc(db).get_prompt(user.id, prompt_id))
 
 
 @router.post("/prompts", summary="创建Prompt模板")
@@ -114,12 +117,12 @@ async def update_prompt(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    return success(_svc(db).update_prompt(prompt_id, data))
+    return success(_svc(db).update_prompt(user.id, prompt_id, data))
 
 
 @router.delete("/prompts/{prompt_id}", summary="删除Prompt模板")
 async def delete_prompt(prompt_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    _svc(db).delete_prompt(prompt_id)
+    _svc(db).delete_prompt(user.id, prompt_id)
     return success(None)
 
 
@@ -130,17 +133,19 @@ async def apply_prompt(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    return success(_svc(db).apply_prompt(prompt_id, variables))
+    return success(_svc(db).apply_prompt(user.id, prompt_id, variables))
 
 
-@router.post("/prompts/{prompt_id}/rate", summary="评分Prompt模板")
+@router.post("/prompts/{prompt_id}/rate", summary="评分Prompt模板（1-5分）")
 async def rate_prompt(
     prompt_id: str,
-    rating: float,
+    rating: float = Query(..., ge=1, le=5, description="评分，1-5"),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    return success(_svc(db).rate_prompt(prompt_id, rating))
+    # 2026-10-11：rating 是**查询参数**（前端 `?rating=`），此前无范围约束，
+    # -99 / 1e9 都能写进 rating 列；补上 ge=1 le=5（越界 → 400/1001）。
+    return success(_svc(db).rate_prompt(user.id, prompt_id, rating))
 
 
 # ==================== Skill 技能库 ====================
@@ -172,18 +177,18 @@ async def update_skill(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    return success(_svc(db).update_skill(skill_id, data))
+    return success(_svc(db).update_skill(user.id, skill_id, data))
 
 
 @router.delete("/skills/{skill_id}", summary="删除技能")
 async def delete_skill(skill_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    _svc(db).delete_skill(skill_id)
+    _svc(db).delete_skill(user.id, skill_id)
     return success(None)
 
 
 @router.post("/skills/{skill_id}/use", summary="使用技能（计数）")
 async def use_skill(skill_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    return success(_svc(db).use_skill(skill_id))
+    return success(_svc(db).use_skill(user.id, skill_id))
 
 
 # ==================== 项目记忆 ====================
@@ -201,7 +206,7 @@ async def list_memories(
 
 @router.get("/memories/{memory_id}", summary="项目记忆详情")
 async def get_memory(memory_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    return success(_svc(db).get_memory(memory_id))
+    return success(_svc(db).get_memory(user.id, memory_id))
 
 
 @router.post("/memories", summary="创建项目记忆")
@@ -220,10 +225,10 @@ async def update_memory(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    return success(_svc(db).update_memory(memory_id, data))
+    return success(_svc(db).update_memory(user.id, memory_id, data))
 
 
 @router.delete("/memories/{memory_id}", summary="删除项目记忆")
 async def delete_memory(memory_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    _svc(db).delete_memory(memory_id)
+    _svc(db).delete_memory(user.id, memory_id)
     return success(None)

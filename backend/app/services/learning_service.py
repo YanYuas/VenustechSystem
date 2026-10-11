@@ -9,6 +9,7 @@ from datetime import date, datetime, timedelta
 from sqlalchemy.orm import Session
 
 from app.core.event_bus import EVENT_FLASHCARD_REVIEWED, EVENT_STUDY_TIME_LOGGED, event_bus
+from app.core.exceptions import NotFoundException
 from app.repositories import (
     StudyPlanRepository, FlashcardRepository, StudyTimeRepository, TaskRepository,
 )
@@ -43,13 +44,13 @@ class LearningService:
         self.logger.info(f"学习计划创建: {plan.id}")
         return self._plan_to_dict(plan)
 
-    def update_plan(self, plan_id: str, data: dict) -> dict:
-        plan = self.plan_repo.get_or_404(plan_id)
+    def update_plan(self, user_id: str, plan_id: str, data: dict) -> dict:
+        plan = self._owned_plan(user_id, plan_id)
         updated = self.plan_repo.update(plan, **data)
         return self._plan_to_dict(updated)
 
-    def delete_plan(self, plan_id: str) -> None:
-        plan = self.plan_repo.get_or_404(plan_id)
+    def delete_plan(self, user_id: str, plan_id: str) -> None:
+        plan = self._owned_plan(user_id, plan_id)
         self.plan_repo.delete(plan)
 
     # ==================== 领域规则引擎生成计划（S6-1）====================
@@ -169,13 +170,13 @@ class LearningService:
         self.logger.info(f"知识卡片创建: {card.id}")
         return self._card_to_dict(card)
 
-    def update_card(self, card_id: str, data: dict) -> dict:
-        card = self.card_repo.get_or_404(card_id)
+    def update_card(self, user_id: str, card_id: str, data: dict) -> dict:
+        card = self._owned_card(user_id, card_id)
         updated = self.card_repo.update(card, **data)
         return self._card_to_dict(updated)
 
-    def delete_card(self, card_id: str) -> None:
-        card = self.card_repo.get_or_404(card_id)
+    def delete_card(self, user_id: str, card_id: str) -> None:
+        card = self._owned_card(user_id, card_id)
         self.card_repo.delete(card)
 
     def get_today_review(self, user_id: str) -> dict:
@@ -188,12 +189,12 @@ class LearningService:
             "date": today.isoformat(),
         }
 
-    def submit_review(self, card_id: str, data: ReviewSubmitRequest) -> dict:
+    def submit_review(self, user_id: str, card_id: str, data: ReviewSubmitRequest) -> dict:
         """
         SM-2 间隔重复算法
         quality: 0-5 (0-2=忘记, 3=困难, 4=良好, 5=容易)
         """
-        card = self.card_repo.get_or_404(card_id)
+        card = self._owned_card(user_id, card_id)
         quality = data.quality
         today = date.today()
 
@@ -291,6 +292,22 @@ class LearningService:
             "trend": trend,
             "days": days,
         }
+
+    # ==================== 归属校验 ====================
+
+    def _owned_plan(self, user_id: str, plan_id: str):
+        """学习计划归属校验：越权或不存在统一抛 NotFoundException（不泄露存在性）。"""
+        plan = self.plan_repo.get(plan_id)
+        if plan is None or plan.user_id != user_id or plan.deleted_at is not None:
+            raise NotFoundException("学习计划不存在")
+        return plan
+
+    def _owned_card(self, user_id: str, card_id: str):
+        """知识卡片归属校验：越权或不存在统一抛 NotFoundException。"""
+        card = self.card_repo.get(card_id)
+        if card is None or card.user_id != user_id or card.deleted_at is not None:
+            raise NotFoundException("知识卡片不存在")
+        return card
 
     # ==================== 序列化辅助 ====================
 

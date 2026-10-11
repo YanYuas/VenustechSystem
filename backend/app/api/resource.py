@@ -11,7 +11,10 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
 from app.core.response import success
-from app.schemas.resource import CreateInboxItemRequest, UpdateInboxItemRequest, CreateTemplateRequest, CreateDomainRequest
+from app.schemas.resource import (
+    BatchProcessRequest, CreateInboxItemRequest, UpdateInboxItemRequest,
+    CreateTemplateRequest, CreateDomainRequest,
+)
 from app.services.resource_service import ResourceService
 
 if TYPE_CHECKING:
@@ -21,8 +24,9 @@ if TYPE_CHECKING:
 router = APIRouter(prefix="/resource", tags=["资源中心"])
 
 
-def _svc(db: Session) -> ResourceService:
-    return ResourceService(db)
+def _svc(db: Session, user: "User") -> ResourceService:
+    # 注入 user.id：Service 层据此做单条操作的归属校验（防 IDOR）
+    return ResourceService(db, user.id)
 
 
 # ==================== 收集箱 ====================
@@ -35,7 +39,7 @@ async def list_inbox(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    return success(_svc(db).list_inbox(user.id, status, page, page_size))
+    return success(_svc(db, user).list_inbox(user.id, status, page, page_size))
 
 
 @router.get("/inbox/{item_id}", summary="收集箱条目详情")
@@ -44,7 +48,7 @@ async def get_inbox_item(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    return success(_svc(db).get_inbox_item(item_id))
+    return success(_svc(db, user).get_inbox_item(item_id))
 
 
 @router.post("/inbox", summary="创建收集箱条目")
@@ -53,7 +57,7 @@ async def create_inbox_item(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    return success(_svc(db).create_inbox_item(user.id, data))
+    return success(_svc(db, user).create_inbox_item(user.id, data))
 
 
 @router.patch("/inbox/{item_id}", summary="更新收集箱条目")
@@ -63,7 +67,7 @@ async def update_inbox_item(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    return success(_svc(db).update_inbox_item(item_id, data))
+    return success(_svc(db, user).update_inbox_item(item_id, data))
 
 
 @router.delete("/inbox/{item_id}", summary="删除收集箱条目")
@@ -72,7 +76,7 @@ async def delete_inbox_item(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    _svc(db).delete_inbox_item(item_id)
+    _svc(db, user).delete_inbox_item(item_id)
     return success(None)
 
 
@@ -84,17 +88,16 @@ async def process_inbox_item(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    return success(_svc(db).process_inbox_item(item_id, action, target_id))
+    return success(_svc(db, user).process_inbox_item(item_id, action, target_id))
 
 
 @router.post("/inbox/batch-process", summary="批量处理收集箱条目")
 async def batch_process_inbox(
-    item_ids: list[str],
-    action: str,
+    data: BatchProcessRequest,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    return success(_svc(db).batch_process(user.id, item_ids, action))
+    return success(_svc(db, user).batch_process(user.id, data.item_ids, data.action))
 
 
 # ==================== 模板库 ====================
@@ -107,7 +110,7 @@ async def list_templates(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    return success(_svc(db).list_templates(user.id, category, page, page_size))
+    return success(_svc(db, user).list_templates(user.id, category, page, page_size))
 
 
 @router.post("/templates", summary="创建模板")
@@ -116,7 +119,7 @@ async def create_template(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    return success(_svc(db).create_template(user.id, data))
+    return success(_svc(db, user).create_template(user.id, data))
 
 
 @router.patch("/templates/{template_id}", summary="更新模板")
@@ -126,7 +129,7 @@ async def update_template(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    return success(_svc(db).update_template(template_id, data))
+    return success(_svc(db, user).update_template(template_id, data))
 
 
 @router.delete("/templates/{template_id}", summary="删除模板")
@@ -135,7 +138,7 @@ async def delete_template(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    _svc(db).delete_template(template_id)
+    _svc(db, user).delete_template(template_id)
     return success(None)
 
 
@@ -146,7 +149,7 @@ async def apply_template(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    return success(_svc(db).apply_template(template_id, variables))
+    return success(_svc(db, user).apply_template(template_id, variables))
 
 
 # ==================== 领域库 ====================
@@ -156,7 +159,7 @@ async def list_domains(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    return success(_svc(db).list_domains(user.id))
+    return success(_svc(db, user).list_domains(user.id))
 
 
 @router.post("/domains", summary="创建领域")
@@ -165,7 +168,7 @@ async def create_domain(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    return success(_svc(db).create_domain(user.id, data))
+    return success(_svc(db, user).create_domain(user.id, data))
 
 
 @router.patch("/domains/{domain_id}", summary="更新领域")
@@ -175,7 +178,7 @@ async def update_domain(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    return success(_svc(db).update_domain(domain_id, data))
+    return success(_svc(db, user).update_domain(domain_id, data))
 
 
 @router.delete("/domains/{domain_id}", summary="删除领域")
@@ -184,5 +187,5 @@ async def delete_domain(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    _svc(db).delete_domain(domain_id)
+    _svc(db, user).delete_domain(domain_id)
     return success(None)

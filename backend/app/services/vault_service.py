@@ -390,7 +390,3 @@ class VaultService:
             "action_type": row.action_type, "action_host": row.action_host,
             "action_user": row.action_user, "action_port": row.action_port,
         }
-
-
-# 解锁期间的工作密钥缓存（仅进程内存；重启即失效=自动上锁）
-_session_keys: dict[str, bytes] = {}

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import Text, cast, func, or_, select
 
 from app.models.document import Backlink, Document, DocumentVersion
 from app.repositories.base import BaseRepository
@@ -22,7 +22,9 @@ class DocumentRepository(BaseRepository[Document]):
         if folder_id:
             q = q.where(Document.folder_id == folder_id)
         if tag:
-            q = q.where(Document.tags.like(f'%"{tag}"%'))
+            # cast 到 Text：StringListType 的 process_bind_param 会把 LIKE 模式
+            # 字符串拆成字符列表再 json.dumps，导致模式被污染。cast 后走原生 Text 比较。
+            q = q.where(cast(Document.tags, Text).like(f'%"{tag}"%'))
         if search:
             like = f"%{search}%"
             q = q.where(or_(Document.title.like(like), Document.content.like(like)))
@@ -40,7 +42,9 @@ class DocumentRepository(BaseRepository[Document]):
         if folder_id:
             q = q.where(Document.folder_id == folder_id)
         if tag:
-            q = q.where(Document.tags.like(f'%"{tag}"%'))
+            # cast 到 Text：StringListType 的 process_bind_param 会把 LIKE 模式
+            # 字符串拆成字符列表再 json.dumps，导致模式被污染。cast 后走原生 Text 比较。
+            q = q.where(cast(Document.tags, Text).like(f'%"{tag}"%'))
         if search:
             like = f"%{search}%"
             q = q.where(or_(Document.title.like(like), Document.content.like(like)))

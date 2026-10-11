@@ -54,7 +54,7 @@ async def update_habit(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    return success(_svc(db).update_habit(habit_id, data))
+    return success(_svc(db).update_habit(user.id, habit_id, data))
 
 
 @router.delete("/habits/{habit_id}", summary="删除习惯")
@@ -63,7 +63,7 @@ async def delete_habit(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    _svc(db).delete_habit(habit_id)
+    _svc(db).delete_habit(user.id, habit_id)
     return success(None)
 
 
@@ -126,7 +126,7 @@ async def delete_mood(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    _svc(db).delete_mood(mood_id)
+    _svc(db).delete_mood(user.id, mood_id)
     return success(None)
 
 
@@ -157,7 +157,7 @@ async def get_diary(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    return success(_svc(db).get_diary(diary_id))
+    return success(_svc(db).get_diary(user.id, diary_id))
 
 
 @router.post("/diaries", summary="创建日记")
@@ -176,7 +176,7 @@ async def update_diary(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    return success(_svc(db).update_diary(diary_id, data))
+    return success(_svc(db).update_diary(user.id, diary_id, data))
 
 
 @router.delete("/diaries/{diary_id}", summary="删除日记")
@@ -185,5 +185,5 @@ async def delete_diary(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    _svc(db).delete_diary(diary_id)
+    _svc(db).delete_diary(user.id, diary_id)
     return success(None)

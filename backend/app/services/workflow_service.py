@@ -55,9 +55,18 @@ class WorkflowService:
         self.logger.info(f"工作流创建: {wf.id}")
         return self._wf_to_dict(wf)
 
+    # PATCH 允许修改的字段白名单（2026-10-11 补测发现）。
+    # 原实现把请求体裸 dict 无差别 setattr，客户端可改 id / is_preset / use_count：
+    #   · 改 id → 记录"消失"（主键被改）；
+    #   · 改 is_preset → 自建工作流伪装成官方预设；
+    #   · 改 use_count → 伪造使用数据。
+    # 理由与写法对齐 task_service._UPDATABLE_FIELDS / asset_service._pick。
+    _WF_FIELDS = {"name", "description", "icon", "category", "scenario", "config", "is_active"}
+
     def update_workflow(self, workflow_id: str, data: dict) -> dict:
         wf = self.wf_repo.get_or_404(workflow_id)
-        update_data = {k: v for k, v in data.items() if v is not None}
+        update_data = {k: v for k, v in data.items()
+                       if k in self._WF_FIELDS and v is not None}
         updated = self.wf_repo.update(wf, **update_data)
         return self._wf_to_dict(updated)
 
@@ -91,7 +100,11 @@ class WorkflowService:
             for category, tags in tag_system.items():
                 for tag in tags:
                     try:
-                        existing = self.domain_repo.list(name=tag)
+                        # 去重必须带 user_id（修复 2026-10-11）：原为
+                        # `list(name=tag)`，是**跨用户**的全局查询 —— 只要库里
+                        # 任何一个人有同名领域（如"阅读"），当前用户应用该工作流
+                        # 时就会被"别人已有"挡掉，标签静默不创建。
+                        existing = self.domain_repo.list(user_id=user_id, name=tag)
                         if not existing:
                             self.domain_repo.create(
                                 user_id=user_id,
@@ -108,7 +121,7 @@ class WorkflowService:
         doc_templates = config.get("doc_templates", [])
         for tpl_name in doc_templates:
             try:
-                existing = self.template_repo.list(name=tpl_name)
+                existing = self.template_repo.list(user_id=user_id, name=tpl_name)
                 if not existing:
                     self.template_repo.create(
                         user_id=user_id,
@@ -132,7 +145,14 @@ class WorkflowService:
                     user_id=user_id,
                     title=title,
                     description=f"由「{wf.name}」工作流自动创建\n步骤: {' → '.join(steps)}",
-                    status="todo",
+                    # 合法任务状态只有 pending/in_progress/waiting/completed
+                    # （见 task_service.STATUS_TRANSITIONS）。
+                    # 修复（2026-10-11）：原为 status="todo"，与 pet_service.py
+                    # 2026-09-15 修过的是同一类缺陷 —— "todo" 不是合法状态，
+                    # 后果更重：STATUS_TRANSITIONS.get("todo", set()) 为空集，
+                    # 导致工作流生成的任务**任何状态流转都被判非法**（3001），
+                    # 任务永久卡死，且按状态过滤的列表永远查不到它。
+                    status="pending",
                     priority="medium",
                     project_tag=wf.category or "workflow",
                 )

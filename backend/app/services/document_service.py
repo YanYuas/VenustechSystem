@@ -172,6 +172,7 @@ class DocumentService:
             title=data.title,
             content=data.content,
             folder_id=folder_id,
+            tags=data.tags or [],
             project_id=data.project_id,
             identity_id=self._validated_identity_id(user_id, data.identity_id),
             word_count=count_words(data.content),
@@ -196,6 +197,7 @@ class DocumentService:
                 version=doc.version,
                 word_count=count_words(doc.content),
             )
+            doc.content = payload["content"]
             doc.version += 1
             doc.word_count = count_words(payload["content"])
             self.ver_repo.delete_oldest(doc.id, keep=MAX_VERSIONS)

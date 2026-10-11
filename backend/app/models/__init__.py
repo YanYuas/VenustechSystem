@@ -10,7 +10,7 @@ from app.models.panel import QuickTodo, Reminder
 from app.models.project import Project
 from app.models.review import Review
 from app.models.settings import Setting
-from app.models.task import Subtask, Task
+from app.models.task import FocusSession, Subtask, Task
 from app.models.user import User
 
 from app.models.asset import SOP, SOPVersion, PromptTemplate, Skill, ProjectMemory
