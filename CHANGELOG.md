@@ -7,6 +7,42 @@
 
 ## [Unreleased]
 
+### Added — 前端单元测试体系（vitest + jsdom，2026-10-11）
+
+**前端不再「零单元测试」**：新增 `frontend/vitest.config.ts` + `src/test/setup.ts`，
+4 个 spec / **75 条用例**（实测 4 passed / 75 passed），并纳入一键入口
+（`check_all.py` 第 12 项，11 项 → **12 项**）。
+
+| 套件 | 用例 | 守什么 |
+|------|------|--------|
+| `src/utils/__tests__/reportHtml.spec.ts` | 29 | 人生报告单文件 HTML：零外链 / 零脚本 / 全量转义（XSS）/ 三轴渲染 / 体积格式化 / 下载行为 |
+| `src/composables/__tests__/useTheme.spec.ts` | 22 | data-theme 映射表（4 包 × 明暗，逐行钉死）/ 冷启动读存储 / 跟随系统 / 循环切换 |
+| `src/constants/__tests__/constants.spec.ts` | 12 | 常量与类型的一致性（THEME_PACKS ↔ ThemePack）/ 状态与优先级映射 / 存储键与路由 |
+| `src/composables/__tests__/useQueryAction.spec.ts` | 12 | `?action=` 消费与清参 / 同页重复触发 / 未知 action 不动 URL / 异常不吞 |
+
+- 新增 npm 脚本 `npm run test`（单次）/ `npm run test:watch`
+- 新增 devDependencies：`vitest@^3` / `@vue/test-utils@^2` / `jsdom`
+
+### Fixed — 前端单元测试暴露的 3 处缺陷（2026-10-11）
+
+1. **`useTheme` 的 `isDark` 不响应系统明暗变化**（`composables/useTheme.ts`）
+   `isDark = computed(() => resolveMode(config.value.mode) === 'dark')`，而 `resolveMode`
+   直接读 `media.matches` —— 依赖里只有 `config`，**系统切换时 computed 不会重算**。
+   症状：`mode=system` 下用户切换 OS 主题，`data-theme` 变了（监听器里 `apply` 了），
+   但组件读到的 `isDark` 仍是旧值 → 月亮/太阳图标与依赖明暗的文案不跟着变。
+   修法：把系统明暗收进 `const systemDark = ref(media.matches)`，`resolveMode` 读 ref，
+   监听器里先更新 ref 再 `apply`。已写成回归用例（`第3组` 两条）。
+2. **`THEME_PACKS` 漏了第 4 套主题**（`constants/index.ts`）
+   常量里只有 cream / guofeng / abyss，而 `ThemePack` 联合类型、`useTheme.cyclePack`
+   顺序、`SettingsView.vue` 的主题选择器**都是 4 套**（缺 `epic` 史诗典藏）。
+   因为该常量当时无消费方，漏项不报错也没人发现 —— 现补 `epic` 并由
+   `constants.spec.ts` 第 1 组钉死「常量必须与类型一一对应」。
+3. **`useQueryAction` 的处理器抛错会变成未捕获的 Promise rejection**
+   （`composables/useQueryAction.ts`）`consume` 是 async，调用处是 `void consume(v)`，
+   处理器抛错 → rejected promise，Vue 的 errorHandler 接不住（watch 回调返回 undefined），
+   只在控制台留一条无上下文的报错。修法：捕获 + `console.error` 记录，
+   **保留 `action` 参数**（用户可重试），而不是既没打开弹窗又清掉了参数。
+
 ### Added — 测试覆盖第五轮：experience / report（2026-10-11）
 
 **规模：45 文件 / 1012 用例 → 49 文件 / 1126 用例**（新增 114 条，全量实测 1126 passed / 0 failed）

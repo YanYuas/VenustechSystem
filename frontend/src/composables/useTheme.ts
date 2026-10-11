@@ -1,14 +1,13 @@
 // ============================================================
-// 主题切换 —— 三套内置主题包 × 明暗模式
+// 主题切换 —— 内置主题包 × 明暗模式
 // 主题包: cream(奶油糖果) / guofeng(国风雅集) / abyss(深渊档案) / epic(史诗典藏)
 // 模式: light / dark / system
-// 映射:
+// 映射（完整表见 src/composables/__tests__/useTheme.spec.ts，用例逐行钉死）:
 //   cream+light   → :root（默认，不设 data-theme）
 //   cream+dark    → data-theme="dark"
-//   guofeng+light → data-theme="guofeng"
-//   guofeng+dark  → data-theme="guofeng-dark"
-//   abyss+light   → data-theme="abyss-light"
-//   abyss+dark    → data-theme="abyss"
+//   guofeng+light → data-theme="guofeng"      guofeng+dark → "guofeng-dark"
+//   abyss+light   → data-theme="abyss-light"  abyss+dark   → "abyss"
+//   epic+light    → data-theme="epic"         epic+dark    → "epic-dark"
 // ============================================================
 import { computed, ref } from 'vue'
 import type { ThemeConfig, ThemeMode, ThemePack } from '@/types/common'
@@ -16,6 +15,14 @@ import type { ThemeConfig, ThemeMode, ThemePack } from '@/types/common'
 const STORAGE_KEY = 'qm-star-theme'
 
 const media = window.matchMedia('(prefers-color-scheme: dark)')
+
+// 系统明暗必须进 ref：此前 resolveMode 直接读 `media.matches`，
+// 而 isDark 是 `computed(() => resolveMode(config.value.mode) === 'dark')`
+// —— 依赖里只有 config，系统切换时 computed **不会重算**。
+// 症状：mode=system 下用户切换 OS 主题，data-theme 变了（监听器里 apply 了），
+// 但组件读到的 isDark 仍是旧值 → 月亮/太阳图标、依赖明暗的文案不跟着变。
+// （2026-10-11 由前端首个 vitest 套件测出）
+const systemDark = ref(media.matches)
 
 const config = ref<ThemeConfig>(load())
 
@@ -34,7 +41,7 @@ function load(): ThemeConfig {
 }
 
 function resolveMode(mode: ThemeMode): 'light' | 'dark' {
-  if (mode === 'system') return media.matches ? 'dark' : 'light'
+  if (mode === 'system') return systemDark.value ? 'dark' : 'light'
   return mode
 }
 
@@ -89,7 +96,9 @@ function cyclePack() {
 apply(config.value)
 
 // 系统明暗变化监听：模块级只注册一次，避免多组件挂载/卸载互相覆盖导致泄漏
-const onMediaChange = () => {
+const onMediaChange = (e: MediaQueryListEvent) => {
+  // 先更新 ref（让 isDark 等派生状态失效重算），再按需落到 DOM
+  systemDark.value = e.matches
   if (config.value.mode === 'system') apply(config.value)
 }
 media.addEventListener('change', onMediaChange)

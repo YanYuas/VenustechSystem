@@ -332,5 +332,5 @@ cd backend && .venv\Scripts\python.exe scripts\probe_backend_live.py
 ```
 
 一键入口（架构守护 / pytest / 冒烟 / 版本 / 令牌 / 类型检查 / 离线队列 /
-连通性 / 交付物守护 / 测试质量审计 / **日志格式审计**，共 11 项）：
+连通性 / 交付物守护 / 测试质量审计 / 日志格式审计 / **前端单元测试(vitest)**，共 12 项）：
 仓库根目录 `python scripts/check_all.py`

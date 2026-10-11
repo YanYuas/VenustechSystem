@@ -24,7 +24,17 @@ export function useQueryAction(handlers: Record<string, () => void>) {
     const handler = handlers[action]
     if (!handler) return
 
-    handler()
+    try {
+      handler()
+    } catch (err) {
+      // 动作失败：**不清参数**（刷新/重进可重试），但必须把错误抛到明面上。
+      // 为什么不能让它自然冒泡：consume 是 async，而调用处是 `void consume(v)`，
+      // 异常会变成**未捕获的 Promise rejection** —— Vue 的 errorHandler 接不住它
+      // （watch 回调返回 undefined），控制台只会多一条无上下文的报错。
+      // 2026-10-11 由前端 vitest 套件（useQueryAction.spec.ts 第 3 组）测出。
+      console.error('[useQueryAction] 路由动作执行失败:', action, err)
+      return
+    }
 
     // 清掉 action 参数，避免刷新/回退时重复触发
     const rest: LocationQueryRaw = {}

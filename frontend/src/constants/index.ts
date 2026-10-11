@@ -54,11 +54,19 @@ export const SHORTCUTS = {
   escape: 'Esc',
 } as const
 
-/** 主题包列表 */
+/** 主题包列表（唯一真源：必须与 types/common.ts 的 ThemePack 联合类型一一对应）
+ *
+ * 2026-10-11 修正：此前只有 3 项，漏了 `epic`（史诗典藏）——而
+ * `ThemePack` 类型、`composables/useTheme.ts` 的 cyclePack 顺序、
+ * `SettingsView.vue` 的主题选择器**都是 4 套**。
+ * 这个常量当时没有任何消费方，所以漏项不会报错、也没人发现；
+ * 现由 src/constants/__tests__/constants.spec.ts 第 1 组钉死一致性。
+ */
 export const THEME_PACKS = [
   { id: 'cream', name: '奶油糖果', desc: '治愈软萌 · 薄荷绿' },
   { id: 'guofeng', name: '国风雅集', desc: '中国古典 · 朱砂红' },
   { id: 'abyss', name: '深渊档案', desc: '海洋神秘 · 磷火青' },
+  { id: 'epic', name: '史诗典藏', desc: '金琥珀传说，史诗质感' },
 ] as const
 
 /** 自动化档位 */
