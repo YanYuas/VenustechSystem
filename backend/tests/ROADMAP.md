@@ -2,13 +2,13 @@
 
 > 从零搭建测试体系的分阶段计划。task 模块已完成样板，后续按此推进。
 >
-> **2026-10-11**：全量清点 + 分级升级，共**四轮**。P0/P1/P2/P3（安全面）全部补齐，
-> 过程中修复 **18 处生产代码缺陷**（前三轮各 6 处）+ **50 处日志写法失真**
+> **2026-10-11**：全量清点 + 分级升级，共**五轮**。P0/P1/P2/P3（安全面）全部补齐，
+> 过程中修复 **19 处生产代码缺陷**（前三轮各 6 处 + 第五轮 1 处）+ **50 处日志写法失真**
 > （16 文件，第四轮由真机探针发现），并新增**真机端到端探针**
 > `scripts/probe_backend_live.py`（65 项断言，打真实 uvicorn + 真实 SQLite）。
 > 所有数字均来自本次实际 `pytest` / 探针输出，非估算。
 
-## 当前状态（2026-10-11 实测：**45 文件 / 1012 用例**，全量 44.6s）
+## 当前状态（2026-10-11 实测：**49 文件 / 1126 用例**，全量 0 failed）
 
 ### 基础设施与守护
 
@@ -80,6 +80,22 @@
 | test_resource_production.py | 44 | Service 单元（收集箱 / 模板库 / 领域库 / content_type 白名单） |
 | test_resource_api.py | 33 | API 集成（含 IDOR 与 mass-assignment 契约） |
 
+### P4 聚合视图与报告（第五轮 · 只读面）
+
+| 文件 | 用例数 | 层级 |
+|------|--------|------|
+| test_experience_production.py | 44 | Service 单元（四源归并 / 归一 occurred_at / 内存分页 / 身份过滤 / **只读不建表**） |
+| test_experience_api.py | 20 | API 集成（含分页边界 400 契约） |
+| test_report_production.py | 35 | Service 单元（三轴计数写后查库对拍 / 归档身份 / 工作区开关） |
+| test_report_api.py | 15 | API 集成（三轴结构完整性 + 副作用如实记录） |
+
+> **这两个模块的关键测试点不在「功能」，而在「不变量」**：
+> experience 是**只读视图**（铁律：不建表），所以断言里有「调用前后
+> 四张源表行数不变 + `sqlite_master` 表集合不变」；
+> report 是**聚合读**，但实测**首次生成会写一行 `growth_states` 并 commit**
+> —— 与类注释「不新增任何写入」不符，已如实钉成用例（见第 6 组）。
+> 两份测试都不满足于「计数等于我造的数据」，而是**与 `SELECT count(*)` 对拍**。
+
 > **vault 测试的两条安全纪律**（写入用例注释，勿放宽）：
 > 1. **绝不制造「密钥文件真实存在」的场景** —— `run_action` 会真的
 >    `Popen("cmd.exe", "/K", "ssh ...")`。只测拒绝路径，并用
@@ -95,7 +111,7 @@
 
 | 入口 | 是否需要起服务 | 守什么 |
 |------|----------------|--------|
-| `backend/tests/`（pytest, 1012 条） | 否（进程内 TestClient） | 业务规则、边界、越权、契约 |
+| `backend/tests/`（pytest, 1126 条） | 否（进程内 TestClient） | 业务规则、边界、越权、契约 |
 | `backend/scripts/smoke_backend.py`（32 断言） | 否（TestClient） | 启动链路、迁移、种子 |
 | `backend/scripts/probe_backend_live.py`（65 断言） | **是**（真实 uvicorn + 真实 HTTP） | **用户路径**：全新库 → 全部迁移 → 种子 → 接口真可用 |
 
@@ -110,9 +126,9 @@
 | assistant | 依赖外部 AI API，需 mock |
 | plugins | 插件系统，需隔离测试环境 |
 | avatar | AI 头像生成，依赖外部服务 |
-| experience / report | 四源聚合与报告导出（纯读取，易测，优先候补） |
 | workspace / security / sync / logs / events / rules | 文件扫描 / 安全 / 同步 / 日志 / SSE / 领域规则引擎 |
 
+> `experience` / `report` 已于**第五轮**补齐（见 P4）。
 > 前端仍为零单元测试（仅 `test-offline-queue.ts` / `test-http-connectivity.ts`
 > 两个 esbuild 脚本，已纳入 `scripts/check_all.py` 第 7、8 项）。
 
@@ -140,10 +156,34 @@
 2. [ ] 读 models/<模块>.py 的**列注释**（枚举/长度/可空性往往只写在注释里）
 3. [ ] 编写 test_xxx_production.py（CRUD + 业务规则 + 异常 + 越权）
 4. [ ] 编写 test_xxx_api.py（路由 + 参数校验 + 端到端）
-5. [ ] 运行该模块测试全部通过
-6. [ ] 运行全量测试确认无回归
-7. [ ] 更新本文档进度（数字取自本次实际输出）
+5. [ ] **若模块自称「只读」→ 必须断言副作用**：源表行数不变、`sqlite_master` 表集合不变
+       （第五轮：experience 用此法守住「经历视图不建表」铁律）；
+       反之若发现实际有写入，**如实记录**并把与注释的矛盾写清（第五轮：report 的
+       `growth_states`）——不要为了「符合注释」而隐藏事实
+6. [ ] **聚合/统计类模块的计数必须与 `SELECT count(*)` 对拍**，不能只断言「等于我造的数」
+7. [ ] 运行该模块测试全部通过
+8. [ ] 运行全量测试确认无回归
+9. [ ] 更新本文档进度（数字取自本次实际输出）
 ```
+
+## 参数校验的通用要求（第五轮补）
+
+列表类端点一律用 `Query(默认值, ge=1, le=上限)` 声明边界，**不要写裸 `int`**。
+
+原因（实测）：裸 `int` + Python 切片会让非法值变成**静默空结果**而不是错误 ——
+`page=0` → `rows[-30:0]` = `[]` → 200 但空列表。这类缺陷**不会让任何既有测试变红**
+（既有用例只会测合法值），只能靠「专门为非法值写用例」发现。
+
+## 第五轮修复（2026-10-11，experience 分页参数无范围约束）
+
+| # | 位置 | 缺陷 | 后果 |
+|---|------|------|------|
+| 1 | `api/experience.py` | `page` / `page_size` 为裸 `int`，无 `ge` / `le` 约束 | 实测 `page=0` → `start=(0-1)*30=-30` → Python 负索引切片 `rows[-30:0]` = `[]` → **HTTP 200 但 `items` 空**（`total` 却 >0），页面表现「明明有数一条都不显示」；`page_size=0`/负数同理；`page_size=100000` 则一路拉满 4×500 条做内存归并 |
+
+修法：`Query(1, ge=1)` / `Query(30, ge=1, le=500)`（与 `api/events.py` / `api/growth.py`
+/ `api/logs.py` 既有的 `Query(ge/le)` 约定一致），非法值统一 **400 / code 1001**。
+收紧前已核对：前端 `ExperienceView.vue` 传 `page>=1`、`PAGE_SIZE=50`；
+`ReportService._recent_experience` 直接调 Service 不走 HTTP —— 均不受影响。
 
 ## 第四轮修复（2026-10-11，日志格式 · 由真机探针发现）
 
@@ -241,19 +281,41 @@
     全新库 `GET /workflows/presets` 返回空 `list`）：种子只覆盖
     文件夹/任务/文档/复盘/对话/面板/通知。完整演示数据走 `scripts/seed_demo.py`
     这条独立路径。若前端工作流页假设「开箱即有预设」，需要先确认。
+12. **`ReportService` 不是零写入**（第五轮实测）：类注释写「只读聚合 …… 不新增任何
+    写入」，但 `_growth_axis → GrowthService.get_state → get_or_create_state`
+    在新用户上会 `db.add(GrowthState)` 并 **`db.commit()`** ——
+    ① 首次生成报告会多一行 `growth_states`；② **`commit()` 会提前结束调用方的
+    事务**。当前 `GET /report` 请求内没有其它待提交写入，故无实际影响；
+    但若日后有人把 `ReportService.get()` 接进一个「先生成报告、再写其它表」的
+    事务里，前半段的 commit 会把那笔写入一起提交掉。
+    修法（未做，属接口变更）：把 `get_or_create_state` 的 `refresh` 换成
+    `flush`，由调用方决定何时 commit。
+13. **`ExperienceService` 的 `occurred_at` 依赖「SQLite 读回即 naive」这一前提**
+    （第五轮探针实证）：`diary_date` / `review_date` 归一产出 naive datetime，
+    而 `created_at` 默认是 **aware** `utcnow()`；两者若同时为 aware/naive 会在
+    `rows.sort(...)` 处抛 `TypeError`。实测 SQLAlchemy 2.0 的 SQLite 方言把 aware
+    值按 UTC 存、读回为 naive，故实际可排序（已写成契约用例
+    `test_all_occurred_at_are_comparable`）。**若将来换库或改方言，
+    `sort` 之前必须先统一 tz 语义。**
 
 ## 运行命令
 
 ```bash
 cd backend
-.\.venv\Scripts\python.exe -m pytest tests/ -v                       # 全量（1012 条，约 45s）
+.\.venv\Scripts\python.exe -m pytest tests/ -v                       # 全量（1126 条）
 .\.venv\Scripts\python.exe -m pytest tests/test_pet_production.py -v  # 单模块
 .\.venv\Scripts\python.exe -m pytest tests/ -k "越权 or ownership"     # 关键词筛选
 .\.venv\Scripts\python.exe -m pytest tests/ --tb=short               # 简短报错
 .\.venv\Scripts\python.exe -m pytest tests/ --collect-only -q        # 各文件用例数清单
 ```
 
-> 1012 条的主要耗时项是 vault 的 PBKDF2（200 000 轮）与 pet 的多次迁移建库 ——
+> **注意（沙箱环境）**：在工具沙箱内跑全量时，pytest 收尾清理临时目录会触发
+> 宿主的批量删除保护（`SystemExit: 1`），**这发生在所有用例跑完之后**，
+> 不影响用例结论 —— 但会让终端里的 `N passed` 汇总行丢失。
+> 变通：加 `-p no:cacheprovider --basetemp=<临时目录>` 后把输出重定向到文件，
+> 再统计进度行（`.` / `F` / `E`）核对。本文档的数字即用此法核对。
+
+> 1126 条的主要耗时项是 vault 的 PBKDF2（200 000 轮）与 pet 的多次迁移建库 ——
 > 每次 `setup` / `unlock` / `change_master_password` 都要真实派生密钥。
 > 这是**刻意保留的真实性**：把它 mock 掉就等于不测加密路径。
 

@@ -375,3 +375,238 @@ def seed_document_fixture(db: "Session", user_id: str) -> dict:
 FIXTURE_DOCUMENT_COUNT = 5
 FIXTURE_DOCUMENT_FOLDER_COUNT = 2  # 自定义文件夹（不含收集箱）
 FIXTURE_DOCUMENT_TAGS_COUNT = 3    # 有标签的文档数
+
+
+# ============================================================
+# 身份 / 经历视图（S6-4）/ 人生报告（S6-5）工厂
+#
+# 四源：日记 diaries / 复盘 reviews / 分身记忆 avatar_memories /
+#       项目记忆 project_memories —— 都不建「经历表」，只在读取时聚合。
+# 工厂用**显式 naive datetime**（SQLite 落库后回来就是 naive UTC，见
+# test_zz 探针实证），避免测试里混入 aware 造成不可比。
+# ============================================================
+def make_identity(
+    db: "Session",
+    user_id: str,
+    *,
+    name: str = "测试身份",
+    slug: str | None = None,
+    color_token: str = "primary",
+    icon: str = "star",
+    description: str | None = None,
+    sort_order: int = 0,
+    is_active: bool = True,
+):
+    """创建一条 Identity（默认启用）。slug 不传则用随机值避免唯一约束冲突。"""
+    import uuid as _uuid
+
+    from app.models.identity import Identity
+
+    row = Identity(
+        user_id=user_id, name=name, slug=slug or f"id-{_uuid.uuid4().hex[:8]}",
+        color_token=color_token, icon=icon, description=description,
+        sort_order=sort_order, is_active=is_active,
+    )
+    db.add(row)
+    db.flush()
+    return row
+
+
+def make_diary(
+    db: "Session",
+    user_id: str,
+    *,
+    title: str | None = "测试日记",
+    content: str | None = "日记正文",
+    diary_date=None,
+    dimension: str | None = None,
+    identity_id: str | None = None,
+):
+    """创建一条 Diary（四维日记）。diary_date 不传则用今天。"""
+    from datetime import date
+
+    from app.models.life import Diary
+
+    row = Diary(
+        user_id=user_id, title=title, content=content,
+        diary_date=diary_date or date.today(), dimension=dimension,
+        identity_id=identity_id, tags=[],
+    )
+    db.add(row)
+    db.flush()
+    return row
+
+
+def make_review(
+    db: "Session",
+    user_id: str,
+    *,
+    type_: str = "daily",
+    review_date=None,
+    data: dict | None = None,
+    identity_id: str | None = None,
+):
+    """创建一条 Review。(user_id, type, review_date) 有唯一约束，注意别撞。"""
+    from datetime import date
+
+    from app.models.review import Review
+
+    row = Review(
+        user_id=user_id, type=type_, review_date=review_date or date.today(),
+        data=data if data is not None else {"summary": "复盘摘要"},
+        identity_id=identity_id,
+    )
+    db.add(row)
+    db.flush()
+    return row
+
+
+def make_avatar_memory(
+    db: "Session",
+    user_id: str,
+    *,
+    title: str = "分身记忆",
+    content: str | None = "记忆内容",
+    memory_type: str = "event",
+    category: str | None = None,
+    identity_id: str | None = None,
+    created_at=None,
+):
+    """创建一条 AvatarMemory。created_at 不传则用模型默认（utcnow）。"""
+    from app.models.avatar import AvatarMemory
+
+    kwargs = dict(
+        user_id=user_id, title=title, content=content, memory_type=memory_type,
+        category=category, identity_id=identity_id, tags=[],
+    )
+    if created_at is not None:
+        kwargs["created_at"] = created_at
+    row = AvatarMemory(**kwargs)
+    db.add(row)
+    db.flush()
+    return row
+
+
+def make_project_memory(
+    db: "Session",
+    user_id: str,
+    *,
+    name: str = "项目记忆",
+    summary: str | None = "项目摘要",
+    identity_id: str | None = None,
+    project_id: str | None = None,
+    created_at=None,
+):
+    """创建一条 ProjectMemory。created_at 不传则用模型默认（utcnow）。"""
+    from app.models.asset import ProjectMemory
+
+    kwargs = dict(
+        user_id=user_id, name=name, summary=summary, identity_id=identity_id,
+        project_id=project_id, tags=[], key_metrics={}, extracted_assets=[],
+    )
+    if created_at is not None:
+        kwargs["created_at"] = created_at
+    row = ProjectMemory(**kwargs)
+    db.add(row)
+    db.flush()
+    return row
+
+
+def seed_four_sources(
+    db: "Session", user_id: str, *, identity_id: str | None = None, day_offset: int = 0,
+):
+    """四源各造一条（用于经历视图/报告的聚合断言），返回各条引用。
+
+    形状契约（断言靠它）：
+      · diary           occurred_at = base+0 00:00（取 diary_date）
+      · review          occurred_at = base+1 00:00（取 review_date）
+      · avatar_memory   occurred_at = base+2 12:00（取 created_at）
+      · project_memory  occurred_at = base+3 12:00（取 created_at）
+    归并降序应为：project_memory → avatar_memory → review → diary
+
+    `day_offset` 用来给同一用户的多次调用错开日期 —— reviews 上有
+    `UniqueConstraint(user_id, type, review_date)`，同一天同类型会直接
+    撞唯一约束（实测 IntegrityError）。
+    """
+    from datetime import date, datetime, time, timedelta
+
+    base = date(2026, 3, 1) + timedelta(days=day_offset)
+    return {
+        "diary": make_diary(
+            db, user_id, title="日记标题", content="日记正文内容",
+            diary_date=base, identity_id=identity_id,
+        ),
+        "review": make_review(
+            db, user_id, type_="weekly", review_date=base + timedelta(days=1),
+            data={"summary": "复盘摘要内容"}, identity_id=identity_id,
+        ),
+        "avatar_memory": make_avatar_memory(
+            db, user_id, title="分身记忆标题", content="分身记忆内容",
+            identity_id=identity_id,
+            created_at=datetime.combine(base + timedelta(days=2), time(12, 0)),
+        ),
+        "project_memory": make_project_memory(
+            db, user_id, name="项目记忆标题", summary="项目记忆摘要",
+            identity_id=identity_id,
+            created_at=datetime.combine(base + timedelta(days=3), time(12, 0)),
+        ),
+    }
+
+
+# 四源归并降序的期望顺序（形状契约）
+FIXTURE_EXPERIENCE_DESC_ORDER = ["project_memory", "avatar_memory", "review", "diary"]
+
+
+def make_sop(db: "Session", user_id: str, *, name: str = "测试SOP", category: str | None = None):
+    """创建一条 SOP（资产库 · 档案轴计数用）。"""
+    from app.models.asset import SOP
+
+    row = SOP(user_id=user_id, name=name, category=category,
+              steps=[], checklist=[], tags=[])
+    db.add(row)
+    db.flush()
+    return row
+
+
+def make_prompt(db: "Session", user_id: str, *, name: str = "测试Prompt"):
+    """创建一条 PromptTemplate。"""
+    from app.models.asset import PromptTemplate
+
+    row = PromptTemplate(user_id=user_id, name=name, variables=[])
+    db.add(row)
+    db.flush()
+    return row
+
+
+def make_skill(db: "Session", user_id: str, *, name: str = "测试Skill",
+               proficiency: str = "beginner"):
+    """创建一条 Skill。"""
+    from app.models.asset import Skill
+
+    row = Skill(user_id=user_id, name=name, proficiency=proficiency, tags=[])
+    db.add(row)
+    db.flush()
+    return row
+
+
+def make_workspace_root(
+    db: "Session",
+    user_id: str,
+    *,
+    path: str = "D:/tmp/ws-test",
+    label: str | None = "测试根",
+    identity_id: str | None = None,
+    enabled: bool = True,
+    file_count: int = 0,
+    total_size: int = 0,
+):
+    """创建一条 WorkspaceRoot（不触发任何磁盘扫描）。"""
+    from app.models.workspace import WorkspaceRoot
+
+    row = WorkspaceRoot(
+        user_id=user_id, path=path, label=label, identity_id=identity_id,
+        enabled=enabled, file_count=file_count, total_size=total_size,
+    )
+    db.add(row)
+    db.flush()
+    return row

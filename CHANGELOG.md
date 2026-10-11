@@ -7,6 +7,49 @@
 
 ## [Unreleased]
 
+### Added — 测试覆盖第五轮：experience / report（2026-10-11）
+
+**规模：45 文件 / 1012 用例 → 49 文件 / 1126 用例**（新增 114 条，全量实测 1126 passed / 0 failed）
+
+- **新增 `experience`**（S6-4 经历视图：日记 / 复盘 / 分身记忆 / 项目记忆四源归并）：
+  Service 44 + API 20 = **64 条**
+  - 归一语义：日记取 `diary_date`、复盘取 `review_date`、两种记忆取 `created_at`；
+    `None → created_at` 的兜底分支单独成测（`_as_datetime` 三个分支）
+  - 跨源降序（而非按源分块拼接）、内存分页（切片只影响 items，`total` 始终全量）、
+    身份过滤（`identity_id` 优先于 `identity_unassigned`）、`source_counts` 是**过滤后**计数
+  - **只读铁律被测试守住**：调用前后四张源表行数不变 + `sqlite_master` 表集合不变
+    （不存在 `experiences` 之类的新表）
+  - 单源上限 `_PER_SOURCE_CAP=500` 钉成契约（含「上限按源而非全局」）
+- **新增 `report`**（S6-5 人生报告：身份 × 成长 × 档案 三轴 + 近期经历）：
+  Service 35 + API 15 = **50 条**
+  - 身份轴六项计数全部**写后查库交叉验证**（与 `SELECT count(*)` 对拍），
+    含归档身份（`is_archived=True` 而非被丢弃）、软删除身份排除、未归类桶
+  - 成长轴：award 后 level/exp 同步、技能树计数为 0 的分类被过滤、
+    分类被移除时名称退化为 id（历史计数不丢弃）
+  - 档案轴：`workspace.enabled` 默认 false → **不读磁盘、roots 为空**；开启后列出根
+  - 近期经历：上限 10 条、降序、`identity_name` 解析为身份名（未归类为 `null`）
+  - **如实钉住一个反直觉事实**：报告自称「只读聚合」，但首次生成会经
+    `GrowthService.get_or_create_state` **写入一行 `growth_states` 并 `commit()`**
+    —— 已写成用例（不是 bug，但接进别的事务前必须知道）
+- `tests/factories.py` 新增 9 个工厂：identity / diary / review / avatar_memory /
+  project_memory / sop / prompt / skill / workspace_root，以及四源复合夹具
+  `seed_four_sources(day_offset=...)`（`reviews` 上有 `(user_id,type,review_date)`
+  唯一约束，同日同类型会撞 —— 工厂用参数错开日期）
+
+### Fixed — 第五轮修复的生产缺陷（2026-10-11，1 处）
+
+`api/experience.py`：`page` / `page_size` 是**裸 int 参数，无任何范围约束**。
+实测 `page=0` → `start = (0-1)*30 = -30` → Python 负索引切片 `rows[-30:0]` = 空列表 →
+**HTTP 200 但 `items` 为空**（`total` 却 > 0），前端表现为「明明有数却一条都不显示」；
+`page_size=0` / 负数同理，`page_size=100000` 则一路拉满 4×500 条做内存归并。
+
+修法：`Query(1, ge=1)` / `Query(30, ge=1, le=500)`，与既有约定对齐
+（`api/events.py` 的 `limit`、`api/growth.py` 的 `limit`、`api/logs.py` 的 `tail`
+都是 `Query(..., ge=, le=)`）。非法值现在统一映射为 **400 / code 1001**。
+已核对前端实际传值（`ExperienceView.vue`：`page` 从 1 起、`PAGE_SIZE=50`）
+与内部调用方（`ReportService._recent_experience` 直接调 Service，不走 HTTP），
+确认不打断任何现有路径。
+
 ### Added — 真机端到端探针 + 日志格式守护（2026-10-11 第四轮）
 
 **规模：44 文件 / 1006 用例 → 45 文件 / 1012 用例**（全量 44.6s）
