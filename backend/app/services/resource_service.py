@@ -22,6 +22,12 @@ logger = logging.getLogger("app.resource")
 # 收集箱状态白名单：模型注释即权威（pending/processed/archived）。
 # 不加白名单的话，写入任意字符串既不报错也永不出现在任何筛选结果里 —— 静默失败。
 INBOX_STATUSES = {"pending", "processed", "archived"}
+# 内容类型白名单（唯一真源）：与前端 types/resource.ts 的
+# `'text' | 'link' | 'image' | 'file'` 及演示数据 demo_seed_data.INBOX_ITEMS 对齐。
+# 原模型注释写的是 `text/url/image/file`（`url` 是笔误），而前端选项与种子数据
+# 用的都是 `link` —— 两端此前都无枚举约束，所以能"正常"存取；一旦该字段参与
+# 筛选或渲染分支，这个拼写差就会变成**静默不匹配**。此处钉死，写入非法值直接 400。
+INBOX_CONTENT_TYPES = {"text", "link", "image", "file"}
 # 处理动作白名单（原实现落到 else 分支抛裸 ValueError → 500，这里改为 400）
 PROCESS_ACTIONS = {"archive", "delete", "convert_task", "convert_doc"}
 
@@ -86,6 +92,10 @@ class ResourceService:
 
     def create_inbox_item(self, user_id: str, data: CreateInboxItemRequest) -> dict:
         """创建收集箱条目，发布事件"""
+        # 参数先于落库校验：非法 content_type 是 400，不要等到读取侧才发现不匹配
+        if data.content_type not in INBOX_CONTENT_TYPES:
+            raise ValidationException(
+                f"非法内容类型: {data.content_type}（白名单: {sorted(INBOX_CONTENT_TYPES)}）")
         item = self.inbox_repo.create(user_id=user_id, **data.model_dump(exclude_none=True))
         event_bus.publish(EVENT_INBOX_ITEM_CREATED, item_id=item.id, user_id=user_id,
                        content_type=item.content_type)

@@ -7,7 +7,7 @@ from datetime import datetime
 
 from sqlalchemy.orm import Session
 
-from app.core.exceptions import NotFoundException
+from app.core.exceptions import NotFoundException, ValidationException
 from app.core.utils import WEEKDAYS, format_date_cn, greeting_by_hour
 from app.models.base import utcnow
 from app.models.panel import QuickTodo, Reminder
@@ -23,6 +23,29 @@ from app.schemas.panel import (
     UpdateQuickTodoRequest,
     UpdateReminderRequest,
 )
+
+# 提醒类型 / 重复规则白名单：`models/panel.py` 的列注释即权威。
+# 不加白名单时任意字符串都能入库 —— 前端按 type 渲染图标的分支会静默落到默认分支
+# （写 `meetting` 不报错、也永远显示不出对应图标）。
+REMINDER_TYPES = {"meeting", "study", "health", "custom"}
+REMINDER_REPEATS = {"none", "daily", "weekly"}
+
+# NOT NULL 列清单：`UpdateXxxRequest` 的字段都写成 `T | None = None`，因此客户端
+# **显式**传 `null` 时 `exclude_unset=True` 仍会带上它；直接 setattr 会在 commit 时
+# 撞数据库约束 → IntegrityError 未被捕获 → 500。必须在 Service 层提前拦成 400。
+_TODO_NOT_NULL = {"title"}
+_REMINDER_NOT_NULL = {"title", "remind_at", "type", "repeat"}
+
+
+def _reject_null(payload: dict, not_null: set[str]) -> None:
+    for key in sorted(not_null):
+        if key in payload and payload[key] is None:
+            raise ValidationException(f"{key} 不能为空")
+
+
+def _validate_choice(field: str, value: str, allowed: set[str]) -> None:
+    if value not in allowed:
+        raise ValidationException(f"非法的 {field}: {value}（白名单: {sorted(allowed)}）")
 
 
 class PanelService:
@@ -75,6 +98,7 @@ class PanelService:
     def update_todo(self, todo_id: str, data: UpdateQuickTodoRequest) -> QuickTodoOut:
         todo = self._get_todo(todo_id)
         payload = data.model_dump(exclude_unset=True)
+        _reject_null(payload, _TODO_NOT_NULL)
         if "completed" in payload:
             todo.completed = payload["completed"]
             # 与 models.base 的 aware utcnow() 保持一致（datetime.utcnow 已废弃且返回 naive）
@@ -111,6 +135,8 @@ class PanelService:
         return [self._reminder_out(r) for r in self.reminder_repo.list_user(self.user.id)]
 
     def create_reminder(self, data: CreateReminderRequest) -> ReminderOut:
+        _validate_choice("type", data.type, REMINDER_TYPES)
+        _validate_choice("repeat", data.repeat, REMINDER_REPEATS)
         reminder = self.reminder_repo.create(
             user_id=self.user.id,
             title=data.title,
@@ -124,6 +150,11 @@ class PanelService:
     def update_reminder(self, reminder_id: str, data: UpdateReminderRequest) -> ReminderOut:
         reminder = self._get_reminder(reminder_id)
         payload = data.model_dump(exclude_unset=True)
+        _reject_null(payload, _REMINDER_NOT_NULL)
+        if payload.get("type") is not None:
+            _validate_choice("type", payload["type"], REMINDER_TYPES)
+        if payload.get("repeat") is not None:
+            _validate_choice("repeat", payload["repeat"], REMINDER_REPEATS)
         for key, value in payload.items():
             setattr(reminder, key, value)
         self.db.commit()

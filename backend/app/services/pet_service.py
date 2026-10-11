@@ -8,12 +8,14 @@ import logging
 from datetime import date, datetime
 from sqlalchemy.orm import Session
 
+from app.core.exceptions import NotFoundException
 from app.models.base import utcnow
 from app.repositories.pet_repo import PetConfigRepository, PetAvatarRepository
 from app.repositories.task_repo import TaskRepository
 from app.repositories.mood_repo import MoodRepository
 from app.schemas.pet import (
     CreatePetAvatarRequest,
+    UpdatePetAvatarRequest,
     UpdatePetConfigRequest,
     UpdatePetStatsRequest,
 )
@@ -54,6 +56,16 @@ MOOD_SCORE_MAP = {
     1: "sad",
 }
 
+# 形象可更新字段白名单（mass-assignment 防线）。
+# 原实现 `update_avatar(avatar_id, data: dict)` 直接 `setattr` 展开客户端传的 dict，
+# `user_id` / `id` / `avatar_type` 均可被覆盖 —— 前者等于**把形象送给别人**。
+# 注意 `avatar_type` 也不可改：它是 builtin/custom 的语义标签，改掉会让默认形象脱管。
+_AVATAR_UPDATABLE = {
+    "name", "description", "image_url", "mode",
+    "eye_position", "mouth_position", "action_frames", "tags",
+    "is_active", "sort_order",
+}
+
 
 class PetService:
     """桌宠 业务逻辑层"""
@@ -79,8 +91,10 @@ class PetService:
         if not config:
             config = self.config_repo.create(user_id=user_id)
         update_data = {k: v for k, v in data.model_dump(exclude_none=True).items()}
-        # 如果切换了当前形象，更新is_active
+        # 如果切换了当前形象，先校验归属再同步 is_active。
+        # 不校验的话可把自己的 current_avatar_id 指向**他人形象** → 跨用户引用。
         if "current_avatar_id" in update_data and update_data["current_avatar_id"]:
+            self._owned_avatar(user_id, update_data["current_avatar_id"])
             self._set_active_avatar(user_id, update_data["current_avatar_id"])
         updated = self.config_repo.update(config, **update_data)
         self.logger.info(f"桌宠配置更新: {user_id}")
@@ -168,21 +182,41 @@ class PetService:
         avatar = self.avatar_repo.create(user_id=user_id, **data.model_dump(exclude_none=True))
         return self._avatar_to_dict(avatar)
 
-    def update_avatar(self, avatar_id: str, data: dict) -> dict:
+    def _owned_avatar(self, user_id: str, avatar_id: str):
+        """按 id 取形象并校验归属；不符或不存在都抛 404（同一文案，不泄漏存在性）。
+
+        原实现三个方法一律走 `get_or_404`（只查存在性）—— 任何登录用户拿到
+        avatar_id 即可改 / 删他人形象，并可把自己的 current_avatar_id 指向他人形象。
+        """
         avatar = self.avatar_repo.get_or_404(avatar_id)
-        update_data = {k: v for k, v in data.items() if v is not None}
-        updated = self.avatar_repo.update(avatar, **update_data)
+        if avatar.user_id != user_id:
+            raise NotFoundException("形象不存在")
+        return avatar
+
+    def update_avatar(self, user_id: str, avatar_id: str, data: UpdatePetAvatarRequest) -> dict:
+        avatar = self._owned_avatar(user_id, avatar_id)
+        payload = {
+            k: v for k, v in data.model_dump(exclude_unset=True).items()
+            if k in _AVATAR_UPDATABLE and v is not None
+        }
+        updated = self.avatar_repo.update(avatar, **payload)
         return self._avatar_to_dict(updated)
 
-    def delete_avatar(self, avatar_id: str) -> None:
-        avatar = self.avatar_repo.get_or_404(avatar_id)
+    def delete_avatar(self, user_id: str, avatar_id: str) -> None:
+        avatar = self._owned_avatar(user_id, avatar_id)
         self.avatar_repo.delete(avatar)
 
     def set_active_avatar(self, user_id: str, avatar_id: str) -> dict:
+        # 先校验归属：不允许把**他人形象**设为自己的当前形象（跨用户引用）
+        self._owned_avatar(user_id, avatar_id)
         self._set_active_avatar(user_id, avatar_id)
+        # 与 update_config 同语义：配置不存在就建一条。
+        # 若此处直接 `if config:` 跳过，会出现 avatar.is_active=True 而
+        # config.current_avatar_id 仍为 None 的不一致窗口。
         config = self.config_repo.get_by_user(user_id)
-        if config:
-            self.config_repo.update(config, current_avatar_id=avatar_id)
+        if not config:
+            config = self.config_repo.create(user_id=user_id)
+        self.config_repo.update(config, current_avatar_id=avatar_id)
         return self.get_config(user_id)
 
     # ==================== 状态感知引擎 ====================

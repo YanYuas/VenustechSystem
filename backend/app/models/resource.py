@@ -22,7 +22,11 @@ class InboxItem(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
     user_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
-    content_type: Mapped[str] = mapped_column(String(20), nullable=False)  # text/url/image/file
+    # 内容类型：text / link / image / file
+    # 唯一真源是 ResourceService.INBOX_CONTENT_TYPES（与前端 types/resource.ts 对齐）。
+    # 曾错写为 `text/url/image/file` —— 前端选项与演示数据用的都是 `link`，
+    # 两端当时都没有枚举约束，故能"正常"存取，一旦参与筛选即成静默不匹配。
+    content_type: Mapped[str] = mapped_column(String(20), nullable=False)
     # 身份轴（三期 B）：横切标签，可空 = 未归类；应用层关联，不加外键
     identity_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     content: Mapped[str | None] = mapped_column(Text, nullable=True)

@@ -2,11 +2,11 @@
 
 > 从零搭建测试体系的分阶段计划。task 模块已完成样板，后续按此推进。
 >
-> **2026-10-11**：全量清点 + 分级升级，共两轮。P0/P1/P2/P3（安全面）全部补齐，
-> 过程中修复 **12 处生产代码缺陷**（两轮各 6 处，详见文末）。
+> **2026-10-11**：全量清点 + 分级升级，共三轮。P0/P1/P2/P3（安全面）全部补齐，
+> 过程中修复 **18 处生产代码缺陷**（三轮各 6 处，详见文末）。
 > 所有数字均来自本次实际 `pytest --collect-only` / `pytest tests/` 输出，非估算。
 
-## 当前状态（2026-10-11 实测：**40 文件 / 873 用例**，全量 31.7s）
+## 当前状态（2026-10-11 实测：**44 文件 / 1006 用例**，全量 36.8s）
 
 ### 基础设施与守护
 
@@ -47,6 +47,8 @@
 | test_conversation_api.py | 11 | API 集成 |
 | test_dashboard_production.py | 10 | Service 单元 |
 | test_dashboard_api.py | 5 | API 集成 |
+| test_panel_production.py | 41 | Service 单元（第三轮：快速待办/提醒/聚合） |
+| test_panel_api.py | 24 | API 集成（NOT NULL → 400 · 枚举白名单） |
 
 ### P2 领域功能
 
@@ -63,15 +65,17 @@
 | test_workflow_production.py | 20 | Service 单元（含应用引擎） |
 | test_workflow_api.py | 13 | API 集成 |
 | test_health_api.py | 5 | API 集成 |
+| test_pet_production.py | 43 | Service 单元（第三轮：配置/形象/四维数值/状态引擎） |
+| test_pet_api.py | 20 | API 集成（IDOR 契约 · mass-assignment） |
 
-### P3 安全面与资源独立端点（第二轮补齐）
+### P3 安全面与资源独立端点
 
 | 文件 | 用例数 | 层级 |
 |------|--------|------|
 | test_vault_production.py | 79 | Service 单元（主密码生命周期 / 不落盘 / 白名单 / 归属） |
 | test_vault_api.py | 28 | API 集成 |
-| test_resource_production.py | 41 | Service 单元（收集箱 / 模板库 / 领域库） |
-| test_resource_api.py | 31 | API 集成（含 IDOR 与 mass-assignment 契约） |
+| test_resource_production.py | 44 | Service 单元（收集箱 / 模板库 / 领域库 / content_type 白名单） |
+| test_resource_api.py | 33 | API 集成（含 IDOR 与 mass-assignment 契约） |
 
 > **vault 测试的两条安全纪律**（写入用例注释，勿放宽）：
 > 1. **绝不制造「密钥文件真实存在」的场景** —— `run_action` 会真的
@@ -90,9 +94,9 @@
 |------|------|
 | assistant | 依赖外部 AI API，需 mock |
 | plugins | 插件系统，需隔离测试环境 |
-| pet | 桌面宠物，逻辑薄、偏前端交互 |
 | avatar | AI 头像生成，依赖外部服务 |
-| workspace / panel / mood / diary 等零散端点 | 由 dashboard 与 life 间接覆盖 |
+| experience / report | 四源聚合与报告导出（纯读取，易测，优先候补） |
+| workspace / security / sync / logs / events / rules | 文件扫描 / 安全 / 同步 / 日志 / SSE / 领域规则引擎 |
 
 > 前端仍为零单元测试（仅 `test-offline-queue.ts` / `test-http-connectivity.ts`
 > 两个 esbuild 脚本，已纳入 `scripts/check_all.py` 第 7、8 项）。
@@ -107,19 +111,36 @@
 6. **回归断言要写清「原缺陷是什么」**：只断言现象会被后人当成"设计如此"而删掉
 7. **按前端真实契约写 API 测试**：先读 `frontend/src/api/*.ts` 核对参数位置
    （query / body / 路径），不要凭后端签名猜 —— 本轮即因此发现 `batch-process` 契约错配
+8. **改生产代码前先证明缺陷存在**：第三轮采用「探针先跑一次拿到实证，再动手」，
+   例：pet 的 IDOR 探针打印出了「他人形象 user_id 被改成当前用户」才动代码
 
 ## 每模块执行 Checklist
 
 ```
 1. [ ] 读 frontend/src/api/<模块>.ts，核对每个端点的参数传递方式
-2. [ ] 编写 test_xxx_production.py（CRUD + 业务规则 + 异常 + 越权）
-3. [ ] 编写 test_xxx_api.py（路由 + 参数校验 + 端到端）
-4. [ ] 运行该模块测试全部通过
-5. [ ] 运行全量测试确认无回归
-6. [ ] 更新本文档进度（数字取自本次实际输出）
+2. [ ] 读 models/<模块>.py 的**列注释**（枚举/长度/可空性往往只写在注释里）
+3. [ ] 编写 test_xxx_production.py（CRUD + 业务规则 + 异常 + 越权）
+4. [ ] 编写 test_xxx_api.py（路由 + 参数校验 + 端到端）
+5. [ ] 运行该模块测试全部通过
+6. [ ] 运行全量测试确认无回归
+7. [ ] 更新本文档进度（数字取自本次实际输出）
 ```
 
-## 本轮修复（第二轮 · 2026-10-11，vault / resource 模块）
+## 第三轮修复（2026-10-11，panel / pet / resource content_type）
+
+| # | 位置 | 缺陷 | 后果 |
+|---|------|------|------|
+| 1 | `services/resource_service.py` + `models/resource.py` | 收集箱 `content_type` 无白名单，模型注释写 `url` 而前端/种子数据用 `link` | 写入 `url` 既不报错、也读得回来，但该字段一旦参与筛选/渲染分支就是**静默不匹配** |
+| 2 | `services/panel_service.py` | `update_todo` / `update_reminder` 显式传 `null` 时直接 `setattr` 到 `NOT NULL` 列 | `IntegrityError` 未捕获 → **500**（应为 400）。实证：`NOT NULL constraint failed: quick_todos.title` |
+| 3 | `services/panel_service.py` | `reminder.type` / `repeat` 有注释枚举（meeting/study/health/custom、none/daily/weekly）但无校验 | 写 `meetting` 不报错，前端按类型渲染的分支永远落到默认 —— **静默失败** |
+| 4 | `services/pet_service.py` + `api/pet.py` | `update_avatar(avatar_id, data: dict)` 收裸 dict 无白名单 | **mass-assignment**：客户端可改 `user_id` —— **把形象送给别人**（探针实证） |
+| 5 | `services/pet_service.py` | `update_avatar` / `delete_avatar` / `set_active_avatar` / `update_config` 四入口零归属校验 | **IDOR**：拿到 avatar_id 即可改 / 删他人形象，或把他人形象设为自己当前形象（探针实证：他人形象被成功删除） |
+| 6 | `services/pet_service.py` | `set_active_avatar` 在配置不存在时跳过写 `current_avatar_id` | 出现 `avatar.is_active=True` 而 `config.current_avatar_id=None` 的**不一致窗口** |
+
+修法对齐既有约定：白名单常量（`INBOX_CONTENT_TYPES` / `REMINDER_TYPES` / `_AVATAR_UPDATABLE`）、
+`_reject_null` 守卫、`_owned_avatar → 404`、API 层用显式 Pydantic 模型替代裸 `dict`。
+
+## 第二轮修复（2026-10-11，vault / resource 模块）
 
 | # | 位置 | 缺陷 | 后果 |
 |---|------|------|------|
@@ -130,7 +151,7 @@
 | 5 | `api/resource.py` + `schemas/resource.py` | `batch-process` 参数绑定与前端封装契约不符 | FastAPI 把 `item_ids: list[str]` 当裸 body 数组、`action` 当 query，而前端封装发的是 `{item_ids, action}` → **任何按封装接线的调用方都会恒定收到「参数错误」**。当前 `batchProcessInbox` 在页面里**尚无调用点**，故未在生产暴露 —— 但接线那天就会踩 |
 | 6 | `services/vault_service.py` | `_session_keys` 在模块内被定义两次 | 死代码（后定义覆盖前者）；运行期无影响，但极易误导维护者 |
 
-## 上轮修复（第一轮 · 2026-10-11，asset / workflow 模块）
+## 第一轮修复（2026-10-11，asset / workflow 模块）
 
 | # | 位置 | 缺陷 | 后果 |
 |---|------|------|------|
@@ -150,6 +171,8 @@
 5. **PATCH 不支持把字段置空**：`{k: v for k, v in data.items() if v is not None}` 会丢弃 `null`，
    语义已被测试钉死（需要清空请传空串）。若要支持置空需引入 `exclude_unset` 语义，属接口变更。
    同类语义也存在于 vault（`update_item(secret=None)` = 不改，不是清空）。
+   注意与 `panel`/`pet` 的区别：那两个模块是 `T | None = None` **显式**传 null 的路径，
+   已由 `_reject_null` 拦成 400（不是静默丢弃）。
 6. **SOP 版本历史取默认 100 条上限**：`sop_ver_repo.list(sop_id=...)` 未分页，超过 100 版会被截断（已被测试记录）
 7. **`ResourceService` 的归属校验依赖调用方注入 `user_id`**：不传则为旧语义（只查存在性）。
    `dashboard_service` 已构造但从未调用；`assistant_service` 走的是带 `user_id` 的
@@ -157,24 +180,21 @@
 8. **vault 的 `_owned_item` 不要求解锁态**（`list_items` / `create_item` 等要求）：
    `test_action_connection` 依赖它 —— TCP 探测不接触密文，故未收紧。若日后该端点
    增加了任何读取密文的行为，必须同时加 `_require_unlocked()`。
-9. **收集箱 `content_type` 无白名单，且前端取值与模型注释不一致**：
-   `InboxItem.content_type` 注释写 `text/url/image/file`，但 `ResourceCenterView.vue`
-   的选项是 `text/link/image/file`（**link vs url**）。因为两端都没有白名单/枚举约束，
-   目前能正常存取 —— 但该字段一旦被用于筛选或渲染分支，这个拼写差就会变成静默不匹配。
-   （`create_inbox_item` 只校验 `content_type` 长度 1-20，见 `schemas/resource.py`）
+9. **`PetConfig` 未使用 `TimestampMixin`**：自建了 `updated_at`（无 `created_at`），
+   与其余模型不一致；若要纳入统一时间轴需补列（属迁移变更）。
 
 ## 运行命令
 
 ```bash
 cd backend
-.\.venv\Scripts\python.exe -m pytest tests/ -v                       # 全量（873 条，约 32s）
-.\.venv\Scripts\python.exe -m pytest tests/test_vault_production.py -v  # 单模块
+.\.venv\Scripts\python.exe -m pytest tests/ -v                       # 全量（1006 条，约 37s）
+.\.venv\Scripts\python.exe -m pytest tests/test_pet_production.py -v  # 单模块
 .\.venv\Scripts\python.exe -m pytest tests/ -k "越权 or ownership"     # 关键词筛选
 .\.venv\Scripts\python.exe -m pytest tests/ --tb=short               # 简短报错
 .\.venv\Scripts\python.exe -m pytest tests/ --collect-only -q        # 各文件用例数清单
 ```
 
-> 873 条比上一轮的 694 条慢（15s → 32s），瓶颈是 vault 的 PBKDF2（200 000 轮）——
+> 1006 条的主要耗时项是 vault 的 PBKDF2（200 000 轮）与 pet 的多次迁移建库 ——
 > 每次 `setup` / `unlock` / `change_master_password` 都要真实派生密钥。
 > 这是**刻意保留的真实性**：把它 mock 掉就等于不测加密路径。
 

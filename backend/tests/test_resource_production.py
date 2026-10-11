@@ -6,6 +6,7 @@
 #   D2 更新端点收裸 dict 直传 repo.update → mass-assignment（可改 user_id/id/use_count）
 #   D3 非法 process action 抛裸 ValueError → 500，且批量场景被静默记成"失败"
 #   D4 非法 status/title 等参数无白名单 → 静默写入永不生效的值
+#   D5 content_type 无白名单，且模型注释 `url` 与前端/种子数据的 `link` 拼写不一致
 # ============================================================
 from __future__ import annotations
 
@@ -108,6 +109,39 @@ class TestInboxCrud:
     def test_get_unknown_inbox_404(self, db_session, test_user):
         with pytest.raises(NotFoundException):
             _svc(db_session, test_user).get_inbox_item("no-such-id")
+
+    # ---- D5 回归：content_type 白名单（原模型注释写 url，前端与种子数据用 link）----
+
+    def test_create_accepts_all_whitelisted_content_types(self, db_session, test_user):
+        """四种合法值都能建；`link` 尤其重要 —— 它是前端实际提交的值。"""
+        svc = _svc(db_session, test_user)
+        for ct in ("text", "link", "image", "file"):
+            assert _inbox(svc, test_user, content_type=ct)["content_type"] == ct
+        assert svc.list_inbox(test_user.id)["total"] == 4
+
+    def test_create_rejects_unknown_content_type(self, db_session, test_user):
+        """回归：原实现只校验长度 1-20，`url` / 任意字符串都能入库。
+
+        原缺陷是什么：模型注释写 `text/url/image/file`，而前端选项
+        （types/resource.ts）与演示数据（demo_seed_data.INBOX_ITEMS）用的都是
+        `link` —— 两端当时都没有枚举约束，写入 `url` 既不报错、也读得回来，
+        但一旦该字段参与筛选或渲染分支，`url`/`link` 的拼写差就是**静默不匹配**。
+        修复后非法值在写库之前就被 400 拦下。
+        """
+        svc = _svc(db_session, test_user)
+        for bad in ("url", "video", "TEXT", "text ", "音频"):
+            with pytest.raises(ValidationException) as ei:
+                _inbox(svc, test_user, content_type=bad)
+            assert "非法内容类型" in str(ei.value)
+        # 白名单必须在落库之前生效 —— 拒绝 = 零副作用
+        assert svc.list_inbox(test_user.id)["total"] == 0
+
+    def test_create_empty_content_type_rejected_by_schema(self):
+        """空串由 Pydantic `min_length=1` 拦下，进不到 Service。"""
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError):
+            CreateInboxItemRequest(content_type="")
 
 
 # ============================================================

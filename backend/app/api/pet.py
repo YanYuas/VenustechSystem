@@ -12,7 +12,8 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user, get_db
 from app.core.response import success
 from app.schemas.pet import (
-    CreatePetAvatarRequest, UpdatePetConfigRequest, UpdatePetStatsRequest,
+    CreatePetAvatarRequest, UpdatePetAvatarRequest,
+    UpdatePetConfigRequest, UpdatePetStatsRequest,
 )
 from app.services.pet_service import PetService
 
@@ -62,16 +63,16 @@ async def create_avatar(
 @router.patch("/avatars/{avatar_id}", summary="更新形象")
 async def update_avatar(
     avatar_id: str,
-    data: dict,
+    data: UpdatePetAvatarRequest,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    return success(_svc(db).update_avatar(avatar_id, data))
+    return success(_svc(db).update_avatar(user.id, avatar_id, data))
 
 
 @router.delete("/avatars/{avatar_id}", summary="删除形象")
 async def delete_avatar(avatar_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    _svc(db).delete_avatar(avatar_id)
+    _svc(db).delete_avatar(user.id, avatar_id)
     return success(None)
 
 

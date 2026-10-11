@@ -7,6 +7,34 @@
 
 ## [Unreleased]
 
+### Added — 测试覆盖第三轮：panel / pet（2026-10-11）
+
+**规模：40 文件 / 873 用例 → 44 文件 / 1006 用例**（全量 36.8s）
+
+- **新增 `panel`**（快速待办 / 系统提醒 / 左侧面板聚合）：Service 41 + API 24 = 65 条
+- **新增 `pet`**（桌宠配置 / 形象 / 四维陪伴数值 / 状态感知引擎）：Service 43 + API 20 = 63 条
+- **`resource` 补 5 条**：`content_type` 白名单与契约回归
+- 质量审计：44 文件 / 954 函数 / 2731 断言，**0 违规**
+
+### Fixed — 第三轮修复的生产缺陷（2026-10-11，共 6 处）
+
+1. `resource_service` + `models/resource.py`：收集箱 `content_type` 无白名单，
+   模型注释写 `url` 而前端与种子数据用 `link` → 一旦参与筛选/渲染分支即**静默不匹配**。
+   统一为 `text/link/image/file` 并加白名单（非法值 400）
+2. `panel_service`：`update_todo` / `update_reminder` 显式传 `null` 直接写 `NOT NULL` 列
+   → `IntegrityError` 未捕获 → **500**（实证：`NOT NULL constraint failed: quick_todos.title`）。
+   加 `_reject_null` 守卫 → 400
+3. `panel_service`：`reminder.type` / `repeat` 有注释枚举（meeting/study/health/custom、
+   none/daily/weekly）但无校验 → 写错值不报错、前端渲染分支静默落到默认。
+   加白名单（create + update 双侧）
+4. `pet_service` + `api/pet.py`：`update_avatar` 收裸 `dict` 无白名单 → **mass-assignment**，
+   客户端可改 `user_id`（**把形象送给别人**；探针实证 `user_id` 真被改写）
+5. `pet_service`：形象四入口（update / delete / activate / `update_config.current_avatar_id`）
+   零归属校验 → **IDOR**（探针实证：他人形象被成功删除）。
+   加 `_owned_avatar → 404`，API 层改用显式 `UpdatePetAvatarRequest`
+6. `pet_service`：`set_active_avatar` 在配置不存在时跳过写 `current_avatar_id`
+   → 与 `avatar.is_active=True` 不一致。改为「不存在则创建」
+
 ### Added — 后端测试体系分级升级（2026-10-11）
 
 **规模：3 文件 / 103 用例 → 40 文件 / 873 用例**（全量约 32s，两次复跑无抖动）

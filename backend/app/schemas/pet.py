@@ -105,6 +105,26 @@ class CreatePetAvatarRequest(BaseModel):
     tags: list = []
 
 
+class UpdatePetAvatarRequest(BaseModel):
+    """形象更新请求（显式字段，替代原来的 `data: dict`）。
+
+    原实现 API 层直接收 `dict` 并透传到 Service 的 `setattr`，客户端可改
+    `user_id`（**把形象送给别人**）/ `id` / `created_at`。此处把可改字段钉死；
+    `user_id` / `id` / `avatar_type` 不在白名单内，因此天然不可被覆盖。
+    """
+
+    name: str | None = Field(default=None, min_length=1, max_length=50)
+    description: str | None = None
+    image_url: str | None = None
+    mode: str | None = None
+    eye_position: dict | None = None
+    mouth_position: dict | None = None
+    action_frames: dict | None = None
+    tags: list | None = None
+    is_active: bool | None = None
+    sort_order: int | None = None
+
+
 class PetStateOut(BaseModel):
     """桌宠当前状态（状态感知）"""
     time_state: str  # morning/work/noon/afternoon/evening/night/late_night

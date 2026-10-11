@@ -117,6 +117,23 @@ class TestInboxApi:
         assert r.status_code == 404
         assert r.json()["code"] == 1002
 
+    def test_create_inbox_rejects_unknown_content_type_400(self, client):
+        """回归：`content_type` 原无白名单 → `url` 能入库，但与前端 `link` 不匹配。
+
+        断言「拒绝 + 零副作用」两件事，避免把「返回 400 但已经写了一半」当通过。
+        """
+        r = client.post(f"{BASE}/inbox", json={"content_type": "url", "title": "参考"})
+        assert r.status_code == 400
+        assert r.json()["code"] == 1001
+        assert "非法内容类型" in r.json()["message"]
+        assert client.get(f"{BASE}/inbox").json()["data"]["total"] == 0
+
+    def test_create_inbox_accepts_link(self, client):
+        """`link` 是前端提交的真实值 —— 修复不得打断它。"""
+        r = client.post(f"{BASE}/inbox", json={"content_type": "link", "title": "参考链接"})
+        assert r.status_code == 200, r.text
+        assert r.json()["data"]["content_type"] == "link"
+
     def test_process_invalid_action_400_not_500(self, client):
         """回归：原实现 `raise ValueError` → 未捕获 → 500。
 
