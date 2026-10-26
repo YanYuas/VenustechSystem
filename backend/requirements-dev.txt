@@ -1,0 +1,14 @@
+# ============================================================
+# 开发/测试依赖（运行时依赖见 requirements.txt）
+#
+# 为什么不合并进 requirements.txt：
+#   运行时不装 pytest/ruff；生产镜像只装 requirements.txt 即可。
+#   历史问题：pytest 曾被注释在 requirements.txt 里，导致 CI/新机器
+#   "测试写了却跑不起来"（《一期模块考校报告》E-01）。
+#
+# 安装：backend\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+# ============================================================
+-r requirements.txt
+
+pytest==8.3.3
+ruff==0.6.2

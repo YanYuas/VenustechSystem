@@ -27,7 +27,14 @@ def _default_data_dir() -> Path:
         else:
             base = os.environ.get("XDG_DATA_HOME") or str(Path.home() / ".local" / "share")
         return Path(base) / "VenustechSystem"
-    return Path("./data")
+    # 开发/源码运行：**相对 backend/ 目录解析，而不是相对当前工作目录**。
+    #
+    # 为什么不能写 Path("./data")：它相对 CWD。从仓库根执行
+    # `uvicorn app.main:app` 或在 IDE 里指定别的 working directory 时，
+    # 会静默创建第二份数据库（仓库根 ./data），用户看到"数据全没了"。
+    # 这是真实事故来源（2026-10 审计发现根目录已出现 data/ 残留）。
+    # 现约定：默认数据目录恒为 backend/data，与启动方式无关。
+    return Path(__file__).resolve().parents[1] / "data"
 
 
 class Settings(BaseSettings):

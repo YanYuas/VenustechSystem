@@ -1,13 +1,30 @@
+# ============================================================
+# 后端工具配置（不是依赖清单！）
+#
+# 依赖的唯一事实来源是 requirements.txt（运行时）与 requirements-dev.txt
+# （开发/测试），原因见 docs/architecture/ADR/0005-version-and-dependency-single-source.md。
+# 本文件只放工具链配置：pytest / ruff / 静态检查。
+#
+# version 必须与仓库根 VERSION 文件一致，由 scripts/check_versions.py 校验。
+# ============================================================
 [project]
 name = "qimingxing-backend"
-version = "0.1.0"
-description = "启明星系统后端（FastAPI 子进程 + SQLite）"
+version = "0.7.0"
+description = "启明星系统后端（FastAPI + SQLAlchemy + SQLite，本地优先）"
 requires-python = ">=3.11"
+
+# 说明：这里刻意不声明 [project.dependencies]。
+#   - 依赖由 requirements.txt 管理（setup.bat / CI 都按它安装，已锁定精确版本）；
+#   - 若在此重复声明，两份清单必然漂移（当前 pyproject 曾与 requirements 完全脱节）。
+#   若将来迁移到 uv/pyproject 管理，须同时删除 requirements.txt 并更新
+#   setup.bat、CI、docs/guides/development.md 三处引用，一步到位。
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
 addopts = "-q"
+# 不把运行期数据库写进仓库；测试用独立临时目录（见 tests/conftest.py）
+norecursedirs = ["data*", "var", ".venv", "migrations"]
 
 [tool.ruff]
 line-length = 110

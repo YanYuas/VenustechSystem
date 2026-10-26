@@ -1,0 +1,791 @@
+# 启明星系统（Venustech System）后端开发说明
+
+> 版本：v1.12 | 更新日期：2026-10-11 | 适用范围：一期及后续迭代
+> 本文档面向后端开发人员、全栈开发人员及 AI 开发助手，作为后端骨架的权威参考。
+
+---
+
+## 一、项目概述
+
+启明星系统后端采用 **FastAPI + SQLAlchemy + SQLite** 技术栈，是一款本地优先的个人知识管理与人生推演工具的服务端。
+
+### 核心特性
+- **本地优先**：SQLite 单文件数据库，WAL 模式，无网络也可运行
+- **分层架构**：API → Service → Repository → Model，职责清晰
+- **统一响应**：所有接口返回 `{code, message, data, timestamp}` 格式
+- **AI 集成**：DeepSeek 兼容 OpenAI 格式，支持用户自带 API Key
+- **SSE 流式**：第二分身对话采用 Server-Sent Events 流式响应
+- **数据加密**：API Key 等敏感字段加密存储
+- **备份恢复**：支持全量数据导出/导入（ZIP 格式）
+
+### 技术栈
+| 类别 | 技术 | 版本 |
+|------|------|------|
+| Web 框架 | FastAPI | ≥0.110 |
+| ORM | SQLAlchemy | ≥2.0 |
+| 数据库 | SQLite | 3.x（WAL 模式） |
+| 数据校验 | Pydantic | ≥2.0 |
+| 迁移 | Alembic | ≥1.13 |
+| AI 客户端 | httpx | 异步 HTTP |
+| 加密 | cryptography | Fernet 对称加密 |
+
+---
+
+## 二、目录结构
+
+```
+backend/
+├── pyproject.toml          # 项目配置
+├── requirements.txt        # 依赖清单
+├── .env                    # 环境变量（可选）
+├── app/
+│   ├── main.py             # FastAPI 应用入口（app factory + lifespan）
+│   ├── config.py           # 配置管理（pydantic-settings）
+│   ├── database.py         # 数据库连接（SQLite WAL + PRAGMA 调优）
+│   ├── migrate.py          # Alembic 迁移执行
+│   ├── seed.py             # 演示数据种子
+│   ├── api/                # 路由层（Controller）
+│   │   ├── __init__.py     # 路由聚合（/api/v1）
+│   │   ├── deps.py         # 依赖注入（DB Session / 当前用户）
+│   │   ├── auth.py         # 认证 & 用户配置
+│   │   ├── task.py         # 任务模块
+│   │   ├── folder.py       # 文件夹模块
+│   │   ├── document.py     # 文档模块 + 标签 + 搜索
+│   │   ├── conversation.py # 第二分身 + AI 接口
+│   │   ├── review.py       # 复盘模块
+│   │   ├── dashboard.py    # 仪表盘聚合（主内容区）
+│   │   ├── panel.py        # 左侧信息面板（待办+提醒+状态）
+│   │   ├── notification.py # 统一通知（PRD §12.4）
+│   │   ├── backup.py       # 备份 + 数据统计
+│   │   └── health.py       # 健康检查
+│   ├── core/               # 核心组件
+│   │   ├── response.py     # 统一响应格式
+│   │   ├── exceptions.py   # 业务异常基类
+│   │   ├── logger.py       # 日志配置
+│   │   ├── security.py     # 加密/解密
+│   │   ├── event_bus.py    # 事件总线（解耦）
+│   │   └── event_handlers.py # 事件订阅者（文档保存→AI摘要，任务完成→通知）
+│   ├── models/             # 数据模型（SQLAlchemy ORM）
+│   │   ├── base.py         # Base + Mixin（UUID/时间戳/软删除）
+│   │   ├── types.py        # 自定义类型（JSONType）
+│   │   ├── user.py         # 用户表
+│   │   ├── task.py         # 任务 + 子任务表
+│   │   ├── folder.py       # 文件夹表
+│   │   ├── document.py     # 文档 + 版本表
+│   │   ├── conversation.py # 对话 + 消息表
+│   │   ├── review.py       # 复盘表
+│   │   ├── panel.py        # 快速待办 + 系统提醒表
+│   │   ├── notification.py # 统一通知表
+│   │   └── settings.py     # 设置表
+│   ├── repositories/       # 数据访问层（DAO）
+│   │   ├── base.py         # 泛型 BaseRepository
+│   │   ├── user_repo.py
+│   │   ├── task_repo.py
+│   │   ├── folder_repo.py
+│   │   ├── document_repo.py
+│   │   ├── conversation_repo.py
+│   │   ├── review_repo.py
+│   │   ├── panel_repo.py
+│   │   └── notification_repo.py
+│   ├── schemas/            # Pydantic 模式（请求/响应）
+│   │   ├── common.py       # 分页泛型
+│   │   ├── auth.py
+│   │   ├── task.py
+│   │   ├── folder.py
+│   │   ├── document.py
+│   │   ├── conversation.py
+│   │   ├── review.py
+│   │   ├── panel.py        # 左侧面板（待办+提醒+聚合）
+│   │   ├── notification.py # 统一通知
+│   │   └── dashboard.py    # 仪表盘聚合（含待开发模块占位）
+│   ├── services/           # 业务逻辑层
+│   │   ├── task_service.py
+│   │   ├── document_service.py
+│   │   ├── conversation_service.py
+│   │   ├── review_service.py
+│   │   ├── dashboard_service.py
+│   │   ├── panel_service.py
+│   │   ├── notification_service.py
+│   │   ├── backup_service.py
+│   │   └── ai/             # AI 服务
+│   │       ├── client.py       # LLM 客户端（DeepSeek 兼容）
+│   │       ├── prompt_builder.py # Prompt 构建器
+│   │       └── ai_service.py   # AI 业务编排
+│   └── tests/
+├── migrations/             # Alembic 迁移
+│   ├── env.py
+│   └── versions/
+│       └── 0001_initial.py
+├── scripts/
+│   └── smoke_backend.py    # 冒烟测试
+└── tests/                  # pytest 测试
+    ├── conftest.py            # 共享夹具（client/db_session/test_user/clean_db）
+    ├── factories.py           # 测试数据工厂
+    ├── README.md              # 测试规范
+    ├── ROADMAP.md             # 测试推进路线图
+    ├── test_architecture.py   # 架构守护
+    ├── test_smoke.py          # 冒烟测试
+    ├── test_task_service.py   # Task Service 单元测试（样板）
+    └── test_task_api.py       # Task API 集成测试（样板）
+```
+
+---
+
+## 三、开发环境搭建
+
+### 3.1 前置要求
+- Python ≥ 3.11
+- pip 或 uv
+
+### 3.2 安装与启动
+```bash
+cd backend
+pip install -r requirements.txt
+# 或 uv pip install -r requirements.txt
+
+# 启动开发服务器（热重载）
+python -m app.main
+# 或
+uvicorn app.main:app --reload --port 8765
+```
+
+### 3.3 环境变量
+所有配置可通过环境变量覆盖，前缀 `VENUSTECH_`：
+
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `VENUSTECH_DEV` | `true` | 开发模式（热重载） |
+| `VENUSTECH_HOST` | `127.0.0.1` | 监听地址 |
+| `VENUSTECH_PORT` | `8765` | 监听端口 |
+| `VENUSTECH_DATA_DIR` | `./data` | 数据目录（DB/日志/备份） |
+| `VENUSTECH_LOG_LEVEL` | `INFO` | 日志级别 |
+| `VENUSTECH_AI_BASE_URL` | `https://api.deepseek.com/v1` | AI API 地址 |
+| `VENUSTECH_AI_MODEL` | `deepseek-chat` | AI 模型 |
+| `VENUSTECH_AI_TIMEOUT` | `30.0` | AI 超时（秒） |
+| `VENUSTECH_DEMO_SEED` | `true` | 首次启动灌演示数据 |
+| `VENUSTECH_CORS_ORIGINS` | `http://localhost:5173,http://127.0.0.1:5173` | CORS 允许来源（逗号分隔） |
+
+### 3.4 数据库迁移
+```bash
+# 生成新迁移
+alembic revision --autogenerate -m "描述"
+
+# 执行迁移
+alembic upgrade head
+
+# 回滚
+alembic downgrade -1
+```
+
+---
+
+## 四、架构设计
+
+### 4.1 分层架构
+
+```
+┌─────────────────────────────────────────┐
+│  API 层 (app/api/)                      │
+│  路由定义 + 请求参数校验 + 响应封装       │
+├─────────────────────────────────────────┤
+│  Service 层 (app/services/)             │
+│  业务逻辑 + 状态机 + 事务控制            │
+├─────────────────────────────────────────┤
+│  Repository 层 (app/repositories/)      │
+│  数据访问 + 查询封装 + 泛型基类          │
+├─────────────────────────────────────────┤
+│  Model 层 (app/models/)                 │
+│  SQLAlchemy ORM + 表结构 + Mixin        │
+├─────────────────────────────────────────┤
+│  Core 层 (app/core/)                    │
+│  响应/异常/日志/加密/事件总线            │
+└─────────────────────────────────────────┘
+```
+
+### 4.2 数据流
+```
+请求 → API路由 → Service业务 → Repository查询 → Model(DB)
+                                              ↓
+响应 ← 统一封装 ← Service返回 ← Repository返回 ←
+```
+
+### 4.3 核心设计决策
+
+#### 单用户模式
+一期为单用户桌面应用，`deps.get_current_user` 自动创建/返回 `default_user`，无需登录认证。用户对象缓存在 `request.state.current_user`，同一请求内多次注入只查一次数据库。二期多用户时扩展为 JWT。
+
+#### SQLite WAL 模式
+- 读写并发支持
+- 崩溃恢复
+- PRAGMA 调优：`busy_timeout=5000` / `cache_size=-20000` / `temp_store=MEMORY`
+
+#### 事件总线
+`app/core/event_bus.py` 提供发布订阅机制，用于解耦（如任务完成触发桌宠庆祝）。
+
+**已注册订阅者**（`app/core/event_handlers.py`，lifespan 启动时注册）：
+- `document.saved` → AI 自动摘要 + 标签建议（异步，并发上限 2，仅当用户配置 API Key）
+- `task.completed` → 创建"任务已完成"系统通知（异步）
+
+异步事件通过 `_loop.create_task()` 调度，异常由 `add_done_callback` 自动记录，不阻塞主请求。
+
+#### 任务状态机
+`STATUS_TRANSITIONS` 白名单控制状态流转，非法流转抛出 `TaskStateException`。
+
+---
+
+## 五、统一响应格式
+
+### 5.1 成功响应
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": { ... },
+  "timestamp": 1234567890
+}
+```
+
+### 5.2 错误响应
+```json
+{
+  "code": 1001,
+  "message": "参数错误: title: 字段必填",
+  "data": null,
+  "timestamp": 1234567890
+}
+```
+
+### 5.3 错误码规范
+| 错误码 | 含义 | HTTP 状态 |
+|--------|------|-----------|
+| 0 | 成功 | 200 |
+| 1001 | 参数错误 | 400 |
+| 1002 | 资源不存在 | 404 |
+| 2001 | 未授权 | 401 |
+| 3001 | 业务冲突 | 409 |
+| 4001 | AI 服务异常 | 502 |
+| 5000 | 服务器内部错误 | 500 |
+
+### 5.4 分页格式
+```json
+{
+  "list": [...],
+  "total": 100,
+  "page": 1,
+  "page_size": 20
+}
+```
+
+---
+
+## 六、API 接口清单
+
+### 6.1 认证 & 用户配置 `/api/v1/auth`
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/auth/init` | 初始化用户（昵称+API Key） |
+| GET | `/auth/me` | 获取当前用户配置 |
+| PATCH | `/auth/me` | 更新用户配置 |
+| POST | `/auth/verify-api` | 校验 API Key 有效性 |
+
+### 6.2 任务 `/api/v1/tasks`
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/tasks` | 任务列表（分页+筛选） |
+| POST | `/tasks` | 创建任务 |
+| GET | `/tasks/focus` | 当前聚焦任务 |
+| GET | `/tasks/today/stats` | 今日统计 |
+| POST | `/tasks/{id}/focus` | 设为聚焦 |
+| DELETE | `/tasks/{id}/focus` | 取消聚焦 |
+| GET | `/tasks/{id}` | 任务详情（含子任务） |
+| PATCH | `/tasks/{id}` | 更新任务 |
+| DELETE | `/tasks/{id}` | 删除任务 |
+| POST | `/tasks/{id}/subtasks` | 添加子任务 |
+| PATCH | `/tasks/{id}/subtasks/{subId}` | 更新子任务 |
+| DELETE | `/tasks/{id}/subtasks/{subId}` | 删除子任务 |
+
+### 6.3 文件夹 `/api/v1/folders`
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/folders` | 文件夹树 |
+| POST | `/folders` | 创建文件夹 |
+| PATCH | `/folders/{id}` | 重命名文件夹 |
+| DELETE | `/folders/{id}` | 删除文件夹 |
+
+### 6.4 文档 `/api/v1/documents`
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/documents` | 文档列表（分页+筛选） |
+| POST | `/documents` | 创建文档 |
+| GET | `/documents/{id}` | 文档详情 |
+| PATCH | `/documents/{id}` | 更新文档 |
+| DELETE | `/documents/{id}` | 删除文档 |
+| GET | `/documents/{id}/versions` | 版本列表 |
+| GET | `/documents/{id}/versions/{ver}` | 版本详情 |
+| POST | `/documents/{id}/versions/{ver}/restore` | 恢复版本 |
+| GET | `/documents/{id}/backlinks` | 反向链接 |
+
+### 6.5 标签 & 搜索
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/tags` | 所有标签 |
+| GET | `/search?q=...` | 全局搜索 |
+
+### 6.6 第二分身 `/api/v1/conversations`
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/conversations` | 对话列表 |
+| POST | `/conversations` | 创建对话 |
+| GET | `/conversations/{id}/messages` | 消息列表 |
+| POST | `/conversations/{id}/messages` | 发送消息（SSE 流式） |
+| DELETE | `/conversations/{id}` | 删除对话 |
+
+### 6.7 AI 接口 `/api/v1/ai`
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/ai/summarize` | 文档摘要 |
+| POST | `/ai/suggest-tags` | 标签建议 |
+| POST | `/ai/inspiration` | 灵感生成 |
+| POST | `/ai/reflection-questions` | 复盘问题 |
+
+### 6.8 复盘 `/api/v1/reviews`
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/reviews` | 复盘列表（分页） |
+| PUT | `/reviews` | 创建/更新复盘（upsert） |
+| GET | `/reviews/{date}` | 按日期获取复盘 |
+| DELETE | `/reviews/{id}` | 删除复盘 |
+| GET | `/reviews/{date}/auto-fill` | 复盘自动填充数据 |
+| POST | `/reviews/{id}/convert-task` | 复盘转任务 |
+
+### 6.9 仪表盘 `/api/v1/dashboard`
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/dashboard` | 首页主内容区聚合数据（含10+模块） |
+
+### 6.10 左侧信息面板 `/api/v1/panel`
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/panel` | 左侧面板聚合（问候+日期+5项统计+待办+提醒） |
+| GET | `/quick-todos` | 快速待办列表 |
+| POST | `/quick-todos` | 创建快速待办 |
+| PATCH | `/quick-todos/{id}` | 更新快速待办（勾选/重命名） |
+| DELETE | `/quick-todos/{id}` | 删除快速待办 |
+| GET | `/reminders` | 系统提醒列表 |
+| POST | `/reminders` | 创建系统提醒 |
+| PATCH | `/reminders/{id}` | 更新系统提醒 |
+| DELETE | `/reminders/{id}` | 删除系统提醒 |
+
+### 6.11 备份 `/api/v1/backup` & `/api/v1/data`
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/backup/export` | 导出备份 ZIP |
+| POST | `/backup/import` | 导入备份（恢复数据库，需重启） |
+| GET | `/data/stats` | 数据统计 |
+
+### 6.12 统一通知 `/api/v1/notifications`（PRD §12.4）
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/notifications` | 通知列表（支持 unread_only 筛选+分页） |
+| GET | `/notifications/stats` | 通知统计（总数+未读数） |
+| POST | `/notifications` | 创建通知 |
+| PATCH | `/notifications/{id}/read` | 标记已读/未读 |
+| POST | `/notifications/read-all` | 全部标记已读 |
+
+---
+
+## 七、SSE 流式响应规范
+
+第二分身对话使用 SSE（Server-Sent Events）：
+
+### 请求
+```
+POST /api/v1/conversations/{id}/messages
+Content-Type: application/json
+
+{
+  "content": "你好",
+  "referenced_doc_ids": ["doc-uuid-1"]
+}
+```
+
+### 响应（text/event-stream）
+```
+data: {"type":"content","content":"你","tokens":1}
+
+data: {"type":"content","content":"好","tokens":2}
+
+data: {"type":"done","tokens":42}
+```
+
+### 事件类型
+| type | 说明 | 字段 |
+|------|------|------|
+| `content` | 文本片段 | `content`, `tokens` |
+| `done` | 流式结束 | `tokens` |
+| `error` | 发生错误 | `error` |
+
+---
+
+## 八、数据库设计
+
+### 8.1 表清单
+| 表名 | 说明 | 关键字段 |
+|------|------|----------|
+| `users` | 用户 | username, nickname, api_key_encrypted, theme |
+| `tasks` | 任务 | title, status, priority, project_tag, is_focus |
+| `subtasks` | 子任务 | task_id, title, completed, sort_order |
+| `folders` | 文件夹 | name, parent_id, is_inbox |
+| `documents` | 文档 | title, content, folder_id, tags, version |
+| `document_versions` | 文档版本 | document_id, content, version |
+| `conversations` | 对话 | title, scene |
+| `messages` | 消息 | conversation_id, role, content, tokens |
+| `reviews` | 复盘 | type, review_date, data(JSON) |
+| `quick_todos` | 快速待办（左侧面板） | title, completed, sort_order, completed_at |
+| `reminders` | 系统提醒（左侧面板） | title, remind_at, type, dismissed, repeat |
+| `notifications` | 统一通知 | type, title, content, is_read, source_type, source_id |
+| `settings` | 设置 | key, value |
+
+### 8.2 通用 Mixin
+所有模型继承以下 Mixin：
+- `UUIDMixin`：`id` 字段（UUID v4）
+- `TimestampMixin`：`created_at`, `updated_at`
+- `SoftDeleteMixin`：`deleted_at`（软删除）
+
+### 8.3 索引策略
+- 任务：`user_id+status`, `user_id+due_date`, `user_id+project_tag`
+- 聚焦任务：部分唯一索引 `user_id WHERE is_focus=1`（同一用户同时只能一个聚焦）
+
+---
+
+## 九、编码规范
+
+### 9.1 命名规范
+- 文件名：`snake_case.py`
+- 类名：`PascalCase`
+- 函数/变量：`snake_case`
+- 常量：`UPPER_SNAKE_CASE`
+
+### 9.2 API 层规范
+```python
+@router.get("")
+def list_tasks(
+    status: str | None = None,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    return success(TaskService(db).list(user.id, status=status))
+```
+- 路由函数只做参数接收和响应封装
+- 业务逻辑全部在 Service 层
+- 统一使用 `success()` 封装响应
+- **禁止运行时导入 models**：类型注解用 `TYPE_CHECKING` 条件导入（架构测试强制）
+
+### 9.3 Service 层规范
+```python
+class TaskService:
+    def __init__(self, db: Session):
+        self.db = db
+        self.repo = TaskRepository(db)
+
+    def list(self, user_id: str, status: str | None = None) -> PaginatedData[TaskOut]:
+        tasks = self.repo.list_user_tasks(user_id, status=status)
+        # 业务逻辑...
+        return PaginatedData(list=[...], total=..., page=..., page_size=...)
+```
+- 接收 `Session`，不管理事务生命周期
+- 复杂操作使用 `self.db.commit()`
+- 返回 Pydantic Schema 对象
+- **更新操作必须使用字段白名单**：定义 `_UPDATABLE_FIELDS` 集合，防止通过 `setattr` 越权修改 `user_id`/`is_focus` 等内部字段
+
+### 9.4 Repository 层规范
+```python
+class TaskRepository(BaseRepository[Task]):
+    model = Task
+
+    def list_user_tasks(self, user_id: str, status: str | None = None) -> list[Task]:
+        q = select(Task).where(Task.user_id == user_id)
+        if status:
+            q = q.where(Task.status == status)
+        return list(self.db.scalars(q))
+```
+- 只做数据查询，不包含业务逻辑
+- 继承 `BaseRepository[T]` 获得通用 CRUD
+
+### 9.5 Model 层规范
+```python
+class Task(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
+    __tablename__ = "tasks"
+    title: Mapped[str] = mapped_column(String(500), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="pending")
+```
+- 使用 SQLAlchemy 2.0 风格 `Mapped[]` + `mapped_column`
+- 字段类型与数据库列类型对应
+
+---
+
+## 十、AI 服务
+
+### 10.1 架构
+```
+AIService (业务编排)
+    ↓
+LLMClient (HTTP 客户端)
+    ↓
+DeepSeek API (OpenAI 兼容)
+```
+
+### 10.2 Prompt 构建
+`app/services/ai/prompt_builder.py` 集中管理所有 Prompt：
+- `summary_prompt(title, content)` — 文档摘要
+- `tag_prompt(title, content, existing_tags)` — 标签建议
+- `inspiration_prompt(title, content)` — 灵感生成
+- `reflection_prompt(data)` — 复盘问题
+
+### 10.3 API Key 管理
+- 用户 API Key 加密存储（Windows DPAPI，缺失时安全降级为 base64 混淆）
+- 加密前缀标记：`dpapi:` / `plain:`，解密时按前缀路由
+- `verify_api` 方法真实调用一次极短对话校验有效性
+
+### 10.4 网络重试机制
+`DeepSeekClient` 内置指数退避重试：
+- 最多重试 2 次，延迟 1s → 2s
+- 仅对网络错误（`httpx.HTTPError`）重试，HTTP 业务错误不重试
+- 流式对话（`stream_chat`）不重试（中断后无法续传）
+
+---
+
+## 十一、仪表盘模块设计
+
+### 11.1 模块丰富度
+仪表盘返回 10+ 模块数据，对齐参考 UI（BetterLife AI）：
+
+| 模块 | 状态 | 说明 |
+|------|------|------|
+| 今日最重要 | ready | 聚焦任务大卡片 |
+| 今日状态 | ready | 4项统计（必须完成/进行中/等待/已完成） |
+| 今日执行 | ready | 按状态分组任务 |
+| 当前项目 | beta | 基于 project_tag 聚合 |
+| 最近沉淀 | ready | 最近5篇文档 |
+| 资源中心 | planned | 收集箱/领域库/模板库（占位） |
+| 学习与成长 | planned | 学习计划/知识卡片（占位） |
+| 生活与自我 | planned | 健康/精力/习惯（占位） |
+| 长期资产库 | planned | SOP/Prompt/Skill（占位） |
+| 快速入口 | ready | 新建任务/笔记/项目等 |
+| AI助手 | ready | 连接状态+快捷Prompt |
+
+### 11.2 模块状态机制
+每个模块包含 `status` 字段（`ready`/`beta`/`planned`），前端根据状态决定：
+- `ready`：正常显示
+- `beta`：显示"内测"标签
+- `planned`：灰度显示（降低亮度+标注"待开发"）
+
+### 11.3 扩展新模块
+1. 在 `schemas/dashboard.py` 定义模块数据结构
+2. 在 `services/dashboard_service.py` 实现聚合逻辑
+3. 在 `MODULES_STATUS` 中注册模块状态
+4. 前端 `types/dashboard.ts` 对齐类型
+5. 前端 `DashboardView.vue` 添加展示组件
+
+---
+
+## 十二、布局架构（对齐参考UI）
+
+### 12.1 三栏布局
+```
+┌──────────────────────────────────────────────────────┐
+│  顶部导航栏（固定6标签，不下拉）                        │
+│  [首页] [今天] [项目] [学习] [工作台] [复盘]            │
+├──────────┬───────────────────────────────────────────┤
+│          │                                           │
+│  左侧    │        主内容区（随顶部标签切换）            │
+│  信息    │                                           │
+│  面板    │   首页：11个模块卡片网格                    │
+│          │   今天：今日任务时间线                      │
+│  - 日期  │   项目：项目列表+详情                       │
+│  - 状态  │   学习：学习计划+知识卡片                   │
+│  - 待办  │   工作台：快速入口+工具集                   │
+│  - 提醒  │   复盘：复盘列表+编辑器                     │
+│          │                                           │
+└──────────┴───────────────────────────────────────────┘
+```
+
+### 12.2 数据接口对应
+| 区域 | 接口 | 说明 |
+|------|------|------|
+| 左侧信息面板 | `GET /api/v1/panel` | 聚合返回问候+日期+5项统计+待办+提醒 |
+| 快速待办CRUD | `/api/v1/quick-todos` | 左侧面板待办事项增删改查 |
+| 系统提醒CRUD | `/api/v1/reminders` | 左侧面板提醒增删改查 |
+| 首页主内容 | `GET /api/v1/dashboard` | 11个模块聚合数据 |
+| 今天 | `GET /api/v1/tasks` | 任务列表（按日期筛选） |
+| 项目 | `GET /api/v1/tasks?project_tag=` | 按项目标签聚合 |
+| 学习 | 待开发（planned） | 二期实现 |
+| 工作台 | 待开发（planned） | 二期实现 |
+| 复盘 | `GET /api/v1/reviews` | 复盘列表 |
+
+### 12.3 顶部导航模块状态
+| 标签 | 后端模块 | 一期状态 |
+|------|----------|----------|
+| 首页 | dashboard | ready |
+| 今天 | tasks | ready |
+| 项目 | tasks (project_tag聚合) | beta |
+| 学习 | learning | planned |
+| 工作台 | workspace | planned |
+| 复盘 | reviews | ready |
+
+---
+
+## 十三、测试
+
+### 13.1 运行测试
+```bash
+cd backend
+.\.venv\Scripts\python.exe -m pytest tests/ -v          # 全量
+.\.venv\Scripts\python.exe -m pytest tests/test_task_service.py -v  # 单模块
+.\.venv\Scripts\python.exe -m pytest tests/ -k "focus"  # 关键词筛选
+```
+
+### 13.2 测试分层体系
+
+| 层级 | 文件命名 | 隔离方式 | 覆盖目标 |
+|------|----------|----------|----------|
+| 架构守护 | `test_architecture.py` | 只读源码 | 分层依赖不漂移 |
+| Service 单元 | `test_xxx_service.py` | 函数级事务回滚 | 业务规则、状态机、边界条件、异常路径 |
+| API 集成 | `test_xxx_api.py` | 函数级清表 | HTTP 路由、参数校验、响应格式 |
+| 冒烟 | `test_smoke.py` | 清表 | 核心链路不挂（CI 最小集） |
+
+**原则**：业务规则优先写 Service 单元测试（快、隔离好、定位准）；API 测试只验证「路由是否正确调用 Service + 响应格式是否正确」，不重复测业务逻辑。
+
+### 13.3 测试基础设施
+
+- `tests/conftest.py`：共享夹具（client / db_session / test_user / other_user / clean_db）
+- `tests/factories.py`：测试数据工厂（make_task / make_subtask / make_task_via_api 等）
+- `tests/README.md`：测试规范文档（命名、断言风格、fixture 用法）
+- `tests/ROADMAP.md`：后续模块测试推进路线图
+
+### 13.4 当前覆盖（2026-10-11 实测：52 文件 / 1219 用例，0 failed）
+
+| 分组 | 文件数 | 用例数 | 覆盖内容 |
+|------|--------|--------|----------|
+| 基础设施与守护 | 4 | 30 | 架构分层 5 · 数据库连接/WAL/级联 12 · 冒烟 7 · 日志契约 6 |
+| P0 核心业务 | 12 | 340 | task / document / folder / project / review / identity |
+| P1 系统支撑 | 12 | 214 | settings / notification / backup / conversation / dashboard / panel |
+| P2 领域功能 | 13 | 244 | learning / life / growth / asset / workflow / health / pet |
+| P3 安全面 | 4 | 184 | vault（主密码/密文/白名单）· resource（IDOR 与契约） |
+| P4 聚合视图与报告 | 4 | 114 | experience（四源归并 · 只读不建表）· report（三轴对拍） |
+| P5 加密与密钥轮换 | 3 | 93 | `EncryptionManager`（派生/密钥环/`reload`）· `rotate_key` 真重加密 · security API 信封 |
+| **合计** | **52** | **1219** | 逐文件求和复核 = 1219，与 `pytest tests/` 一致 |
+
+> 详细分文件清单见 `tests/ROADMAP.md`。前端已引入 **vitest + jsdom 单元测试**
+> （2026-10-11 起，`frontend/src/**/__tests__/*.spec.ts`，`npm run test`；
+> 已纳入 `check_all.py` 第 12 项），另有 2 个 esbuild 脚本
+> `test-offline-queue.ts` / `test-http-connectivity.ts`（check_all 第 7、8 项）。
+>
+> **真机探针**（需先起服务，65 项断言）：`backend/scripts/probe_backend_live.py` ——
+> 打真实 uvicorn + 真实 SQLite 库，验证「全新库 → 20 个迁移 → 种子 → 接口可用」
+> 这条**用户路径**，补足 pytest 与冒烟脚本都在进程内跑的空档。用法见文件头。
+>
+> **在 WorkBuddy 的 Bash 里跑全量的两个坑（同源，一次解决）**：宿主通过
+> `PYTHONPATH` 注入了 `sitecustomize.py` 文件操作钩子，**每次文件删除约 1.9 秒**
+> （实测 50 次 `open/write/unlink`：带钩子 **96.27s** vs `env -u PYTHONPATH` **2.05s**）。
+> 后果：① 39 张表的建库迁移慢到被超时 SIGTERM，表现为「pytest 毫无输出」；
+> ② 收尾清临时目录触发宿主批量删除保护（`SystemExit: 1`），吃掉 `N passed` 汇总行。
+> **绕开钩子即可**（只在临时目录里跑测试，无删除风险）：
+>
+> ```bash
+> cd backend && env -u PYTHONPATH .venv/Scripts/python.exe -m pytest tests/ -q
+> ```
+
+### 13.5 冒烟脚本
+```bash
+python scripts/smoke_backend.py
+```
+
+### 13.6 测试中发现的已知技术债
+
+完整清单（含根因与是否已修）见 `tests/ROADMAP.md` 文末。要点：
+
+1. `expire_on_commit=False` 导致关系缓存不刷新（task.add_subtask 已修，其他模块需排查）
+2. SQLite DateTime 时区丢失（focus_stop 已修）
+3. **PATCH 不支持把字段置空**：`{k: v for k, v in data.items() if v is not None}` 会丢弃
+   `null`，需清空请传空串；支持置空须引入 `exclude_unset` 语义（属接口变更）
+4. SOP 版本历史取默认 100 条上限（未分页）
+5. **API 测试必须按前端真实契约写**：先读 `frontend/src/api/<模块>.ts` 核对参数位置
+   （query / body / 路径）。实证：`resource/inbox/batch-process` 后端把 `item_ids` 当裸
+   body 数组、`action` 当 query，而前端发 `{item_ids, action}` 对象体 —— 端点恒定 400，
+   vue-tsc 与后端自测都发现不了
+6. **日志写法必须匹配 loguru**（2026-10-11 已修，16 文件 / 50 处）：后端用 loguru，
+   占位符是 `{}`；`%s` / `%d` / `%.Nf` 与标准库 `exc_info=` 都会**静默丢失参数与堆栈**
+   （真机启动日志曾打印出「插件路由已挂载: %s」）。现由
+   `scripts/audit_log_format.py`（check_all 第 11 项，基线 0）+
+   `tests/test_logging_contract.py` 双重守护
+7. **vault 无单条「详情」端点**：`GET /vault/items/{id}` → 405，只有列表 `/items`、
+   `PATCH`/`DELETE`、`/items/{id}/secret`。与资源中心/资产库的「列表 + 详情」模式不一致
+   （当前无调用点，属接口一致性观察，非缺陷）
+8. **启动种子 `app/seed.py` 不灌工作流/资产库预设**：全新库 `GET /workflows/presets`
+   返回空 `list`。种子只覆盖 文件夹/任务/文档/复盘/对话/面板/通知；完整演示数据走
+   `backend/scripts/seed_demo.py` 这条独立路径。前端若假设「开箱即有预设」需先确认
+9. **`ReportService` 并非零写入**（第五轮实测）：类注释写「只读聚合 …… 不新增任何写入」，
+   但 `_growth_axis → GrowthService.get_state → get_or_create_state` 会
+   `db.add(GrowthState)` 并 **`commit()`** —— 首次生成报告多一行 `growth_states`，
+   且该 `commit()` 会**提前结束调用方事务**。当前 `GET /report` 请求内无其它待提交
+   写入，故无影响；把 `ReportService.get()` 接进别的事务时需注意
+10. **`ExperienceService` 的排序依赖「SQLite 读回即 naive」**：`diary_date` 归一产出
+    naive，而 `created_at` 默认是 aware `utcnow()`；混排会在 `sort` 处 `TypeError`。
+    实测 SQLAlchemy 2.0 的 SQLite 方言按 UTC 存、读回为 naive，故可排序
+    （已写成契约用例）。**换库或改方言时必须先统一 tz 语义**
+11. **密钥轮换只覆盖当前用户的行**（第七轮实测）：`rotate_key` 按
+    `User.id == self.user_id` 过滤，**其它用户的 `api_key_encrypted` 不会重加密**，
+    只能靠密钥环 5 代兜底。本地单用户模型下无影响；**若支持多用户必须改成全局遍历**，
+    否则第 6 次轮换就会让别人的 API Key 永久失效
+12. **`EncryptionManager` 主密钥模式与 `rotate_key()` 不自洽**（第七轮发现）：
+    `_master_key` 非空时密钥由「主密钥 + salt」派生并**忽略 `.encryption_key` 文件**，
+    而 `rotate_key(None)` 写的是随机 key 到该文件 —— 两条路得出的不是同一把密钥。
+    生产不受影响（`main.py` 从不传主密钥）；**若启用主密钥模式必须改成「用新主密钥派生」**
+
+> **第七轮另有一条通用纪律**（值得写进每个加密相关模块的测试注释）：
+> **「还能解开」不等于「轮换生效」**。旧代码里 API Key 列从未被重写，但因为密钥环
+> 兜底，读数一直正常 —— 核回归必须断言**密文本身变了**，否则缺陷可以潜伏数年。
+
+---
+
+## 十四、常见问题
+
+### Q1: 数据库文件在哪里？
+A: 默认在 `backend/data/app.db`，可通过 `VENUSTECH_DATA_DIR` 环境变量修改。
+
+### Q2: 如何重置数据库？
+A: 删除 `data/app.db` 和 `data/app.db-wal`，重启服务会自动迁移并灌演示数据。
+
+### Q3: AI 功能不工作？
+A: 检查 `VENUSTECH_AI_BASE_URL` 和 `VENUSTECH_AI_MODEL` 配置，确保用户已设置 API Key（`POST /auth/init`）。
+
+### Q4: 如何添加新的 API 接口？
+A: 1. 在 `schemas/` 定义请求/响应模式；2. 在 `services/` 实现业务逻辑；3. 在 `api/` 添加路由；4. 在 `api/__init__.py` 注册路由。
+
+### Q5: 如何添加新的数据库表？
+A: 1. 在 `models/` 定义模型；2. 在 `repositories/` 添加 Repository；3. 运行 `alembic revision --autogenerate` 生成迁移；4. 执行 `alembic upgrade head`。
+
+---
+
+## 十五、迭代记录
+
+| 版本 | 日期 | 说明 |
+|------|------|------|
+| v1.0 | 2026-08-28 | 初始版本，后端骨架深度优化后沉淀 |
+| v1.1 | 2026-08-28 | 对齐参考UI布局：新增左侧信息面板（quick_todos + reminders + /panel聚合），迁移0002 |
+| v1.2 | 2026-08-29 | 第三轮细节优化：①deps用户请求级缓存（request.state）②TaskService更新字段白名单防越权 ③CORS可配置化 ④DeepSeekClient指数退避重试 ⑤panel_service延迟导入修复 ⑥API层models导入全部改为TYPE_CHECKING（架构分层合规，12项测试全通过） |
+| v1.3 | 2026-08-29 | 第四轮对标进度评估：①统一通知系统（模型+Schema+Repository+Service+API+迁移0003）②事件总线订阅者激活（文档保存→AI摘要/标签，任务完成→通知）③备份导入真正恢复数据（原库备份+替换+需重启）④数据目录跨平台（Windows/macOS/Linux）⑤0003迁移幂等化（兼容0001 create_all）⑥conftest环境变量修复 |
+| v1.4 | 2026-08-29 | 第五轮细节优化：①event_handlers异步安全重写（信号量并发控制+task异常回调+全异步化）②通知Schema长度限制（content 2000/source_type 30/source_id 36）③备份文件大小限制（100MB）+版本兼容性校验 ④清理所有函数内延迟导入 |
+| v1.5 | 2026-09-04 | 一期打磨收尾：①Alembic警告修复（添加path_separator=os）②Windows控制台UTF-8编码保障（sys.stdout/stderr.reconfigure）③后端12项测试全通过验证 ④一期工程100%完成确认 |
+| v1.6 | 2026-10-10 | 测试体系从零搭建：①修复venv Python trampoline（uv管理Python被清理）②安装pytest 8.3.3 ③搭建两层隔离测试基础设施（Service层事务回滚 + API层清表）④编写测试数据工厂与规范文档 ⑤Task模块完成91个用例（67 Service + 24 API）⑥发现并修复2个Service bug（add_subtask sort_order缓存、focus_stop时区类型不匹配）⑦补全FocusSession模型导出 ⑧全量103个测试通过 |
+| v1.7 | 2026-10-11 | 测试体系分级升级：①规模 3 文件/103 用例 → **40 文件/873 用例**（P0/P1/P2/P3 全铺开）②修复套件抖动根因（WAL 移出 connect 事件 + 小连接池；clean_db 改 AUTOCOMMIT）——238s → 15s 且不再随机失败 ③接入 `check_all.py`（9→10 项）④新增 `audit_test_quality.py` 质量守护（基线 0，植入坏样本反向验证有效）⑤测试暴露并修复 **12 处生产缺陷**（IDOR / mass-assignment / 状态机 / 契约错配）⑥`workflow_service` 发现任务永久卡死缺陷 |
+| v1.8 | 2026-10-11 | 测试覆盖第三轮 + 修复：①规模 40 文件/873 用例 → **44 文件/1006 用例** ②新增 panel（65 条）与 pet（63 条）两模块测试 ③修复 **6 处生产缺陷**：`content_type` 契约不一致（url/link）、panel 的显式 null → 500、panel 提醒枚举无白名单、pet 形象的 mass-assignment（可改 user_id）与 IDOR（四入口零归属校验）、`set_active_avatar` 状态不一致 ④首次采用「探针先实证再动手」流程（pet IDOR 由探针打印出他人数据被改写的证据） |
+| v1.9 | 2026-10-11 | 真机端到端验证 + 日志格式修复：①新增 `backend/scripts/probe_backend_live.py`（65 项断言，打**真实 uvicorn + 真实 SQLite 库**，验证「全新库 → 20 个迁移 → 种子 → 接口可用」；实测 65/65、就绪 21.4s、库 0.79MB）②真机探针发现并修复 **50 处日志写法失真**（16 文件：loguru 占位符是 `{}`，项目写成 `%s`/`exc_info=` → 参数与堆栈静默丢失；真机日志曾打印「插件路由已挂载: %s」）③新增 `scripts/audit_log_format.py` 守护（check_all 10→11 项）与 `tests/test_logging_contract.py`（6 条契约测试）④规模 44 文件/1006 用例 → **45 文件/1012 用例**，全量 44.6s，质量审计 0 违规 ⑤确认 3 项**非缺陷观察**：vault 无单条详情端点、启动种子不含工作流预设、`setup` 后即处于解锁态（设计行为） |
+| v1.10 | 2026-10-11 | 测试覆盖第五轮（聚合视图与报告）：①规模 45 文件/1012 用例 → **49 文件/1126 用例**（experience 64 条 + report 50 条，各含 Service 与 API 两层；实测 1126 passed / 0 failed）②**修复 1 处生产缺陷**：`api/experience.py` 的 `page`/`page_size` 是无约束裸 `int`，实测 `page=0` → Python 负索引切片 → **200 但 `items` 空**（`total` 却 >0）；改为 `Query(ge=1)` / `Query(ge=1, le=500)`，与 events/growth/logs 既有约定一致 ③**只读铁律落成测试**：experience 断言调用前后四张源表行数不变 + `sqlite_master` 表集合不变（守「经历视图不建表」）④报告三轴计数全部与 `SELECT count(*)` 对拍；如实钉住「报告自称只读但首次会写 `growth_states` 并 commit」⑤`factories.py` 新增 9 个工厂 + 四源复合夹具（含 `reviews` 唯一约束的日期错开处理） |
+| v1.11 | 2026-10-11 | 前端单元测试试点（vitest）+ 一键入口扩到 12 项：①新增 `frontend/vitest.config.ts` / `src/test/setup.ts`，4 个 spec / **75 条用例**（reportHtml 29 · useTheme 22 · constants 12 · useQueryAction 12），`check_all.py` 11 项 → **12 项**（实测 12/12 全绿）②前端测试**测出并修复 3 处缺陷**：`useTheme` 的 `isDark` 不随系统明暗变化重算、`THEME_PACKS` 漏 `epic`（常量 3 套 vs 类型/useTheme/设置页 4 套）、`useQueryAction` 处理器抛错变成未捕获 Promise rejection ③`package.json` 增 `npm run test` / `test:watch` 与三个 devDependencies；`docs/guides/frontend.md` 补 §4.1.1 测试约定（v1.2） |
+| v1.12 | 2026-10-11 | 安全面测试覆盖（第七轮）**并修掉一个静默数据丢失窗口**：①规模 49 文件/1126 用例 → **52 文件/1219 用例**（+93：encryption 33 · security Service 42 · security API 18；实测 1219 passed / 0 failed；`check_all.py` 12/12、冒烟 236 断言全绿）②**密钥轮换此前是「假轮换」**：`rotate_key` 声称轮换三表，实测只有 `settings` 真重加密 —— `users.api_key_encrypted` 带 `"fernet:"` 前缀却被整串喂给 `mgr.decrypt()` → 必然 `InvalidToken` → 被 `except` 静默 `continue`，该列只靠密钥环兜底，**实测第 4 次轮换后 API Key 永久解不开**；`vault_items.secret_encrypted` 本不归全局密钥管却登记在册、每轮静默跳过并**谎报「已轮换」** ③修好 ①② 后暴露第三个：`rotate_key` 用局部 `EncryptionManager` 换密钥，而 `decrypt_secret()` 走 `main.py` 建的**长驻单例**（`_fernet` 只在启动读一次磁盘）→ 提示「轮换成功」但 API Key **当场失效、重启才恢复**（由冒烟往返断言先测出）；新增 `EncryptionManager.reload()` 在提交成功后刷新已存在的单例 ④`decrypt_file()` 两处静默错误（绕过历史密钥回退、无密钥时**把密文当明文写出**）+ 清三处死代码（重复赋值 / `_previous_fernet` 单数 / 空循环）⑤`api/security.py` 由裸 `HTTPException`（全仓唯一）改走项目异常体系，用户能看到真实原因而非 `HTTP 503` ⑥新增注册表一致性守护（扫描模型内所有 `*encrypted*` 列，未登记即失败，**带非空断言**）⑦纪律沉淀：「还能解开」≠「轮换生效」，核回归必须断言**密文本身变了** |
+
+---
+
+> 本文档随项目迭代持续更新。如有疑问，请参考 `docs/product/` 下的设计文档和 PRD。

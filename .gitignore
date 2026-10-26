@@ -54,13 +54,29 @@ desktop.ini
 logs/
 
 # ---------- 运行期数据（避免切分支时覆盖本地数据库） ----------
-backend/data/
-backend/data_test/
-backend/data_smoke/
-backend/data_diag/
+# 目标约定：所有运行期数据都在 var/ 下（见 ARCHITECTURE.md §7）。
+# 用 var/* + 例外保留 .gitkeep，这样目录结构进仓库、数据不进。
+var/*
+!var/.gitkeep
+# 下面同时保留历史目录名，防止旧路径的数据被误提交。
+data/
 data-fusion/
 data-*/
 data_*/
+backend/data/
+backend/data_*/
+backend/.smoke-tmp/
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
+# ---------- 审计/分析临时产物（不是项目源码） ----------
+.arch-audit/
+.pytest-tmp*/
+.pytest-tmp/
+.pytest-tmp2/
 
 # ---------- 本地工具状态（智能体记忆/会话数据，非项目源码） ----------
 .workbuddy/

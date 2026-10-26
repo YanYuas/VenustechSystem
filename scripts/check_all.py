@@ -1,5 +1,5 @@
 # ============================================================
-# 一键验证入口（2026-09-15 新增，2026-10-11 扩到 12 项）
+# 一键验证入口（2026-09-15 新增，2026-10-11 扩到 12 项、2026-10-26 扩到 13 项）
 #
 # 为什么需要它：
 #   《一期模块考校报告》记录过 E-01：本机 venv 未安装 pytest，导致
@@ -34,12 +34,18 @@ NODE = shutil.which('node') or 'node'
 VUE_TSC = FRONTEND / "node_modules" / ".bin" / ("vue-tsc.cmd" if sys.platform == "win32" else "vue-tsc")
 VITEST = FRONTEND / "node_modules" / ".bin" / ("vitest.cmd" if sys.platform == "win32" else "vitest")
 
+# 严格模式：由 --strict 置 True。False 时"缺依赖 → 跳过"不算失败（本地开发友好）；
+# True 时跳过视为失败，防止干净环境下 12 项守护集体"假绿"（CI 必须开）。
+STRICT = False
+
 
 def _run(label: str, cmd: list[str], cwd: Path) -> tuple[bool, str]:
     print(f"\n{'=' * 62}\n▶ {label}\n{'=' * 62}")
     if not Path(cmd[0]).exists() and not shutil_which(cmd[0]):
         print(f"⏭  跳过：找不到可执行文件 {cmd[0]}")
-        return True, "skipped"
+        # 注意：默认（本地开发）跳过 = 不阻断；CI 必须用 --strict，
+        # 否则"未安装依赖"会变成假绿 —— 这正是 E-01 的翻版。
+        return (not STRICT), "skipped"
     try:
         proc = subprocess.run(
             cmd, cwd=str(cwd), capture_output=True, text=True,
@@ -83,9 +89,13 @@ def shutil_which(name: str) -> bool:
 
 
 def main() -> int:
+    global STRICT
     ap = argparse.ArgumentParser(description="启明星系统一键验证")
     ap.add_argument("--skip-frontend", action="store_true", help="跳过前端类型检查（更快）")
+    ap.add_argument("--strict", action="store_true",
+                    help="严格模式：缺依赖而跳过的检查视为失败（CI 必须开启）")
     args = ap.parse_args()
+    STRICT = args.strict
 
     print("启明星系统 · 一键验证")
     print(f"  仓库: {ROOT}")
@@ -93,16 +103,16 @@ def main() -> int:
 
     results: list[tuple[str, bool, str]] = []
 
-    ok, st = _run("1/12 架构守护（分层依赖）",
-                  [PYTHON, "tests/test_architecture.py"], BACKEND)
+    ok, st = _run("1/13 架构守护（分层依赖 / 领域归属 / 根目录契约）",
+                  [PYTHON, "scripts/audit_architecture.py"], ROOT)
     results.append(("架构守护", ok, st))
 
-    # 2/12 后端 pytest 套件（Service 单元 + API 集成 + 数据库基础设施守护）
+    # 2/13 后端 pytest 套件（Service 单元 + API 集成 + 数据库基础设施守护）
     # 为什么必须有这一项：这批用例（2026-10-11 实测 1126 条）此前**从未进入本入口**，
     # 「写了却跑不了/没人跑」正是 E-01 的翻版。这里用 venv 解释器跑全量
     # pytest；若环境未装 pytest，则优雅跳过（不误报失败）。
     if _has_module(PYTHON, "pytest"):
-        ok, st = _run("2/12 后端 pytest 套件（单元 + 集成）",
+        ok, st = _run("2/13 后端 pytest 套件（单元 + 集成）",
                       [PYTHON, "-m", "pytest", "tests/",
                        "-p", "no:cacheprovider", "-p", "no:warnings",
                        "--tb=line", "-rf"], BACKEND)
@@ -111,15 +121,15 @@ def main() -> int:
         print("\n⏭  跳过 2/12：当前解释器未安装 pytest（pip install pytest 后可启用）")
         results.append(("后端 pytest 套件", True, "skipped"))
 
-    ok, st = _run("3/12 后端冒烟（端到端 + 迁移 + 回归断言）",
+    ok, st = _run("3/13 后端冒烟（端到端 + 迁移 + 回归断言）",
                   [PYTHON, "scripts/smoke_backend.py"], BACKEND)
     results.append(("后端冒烟", ok, st))
 
-    ok, st = _run("4/12 版本一致性（F1.4）", [PYTHON, "scripts/check_versions.py"], ROOT)
+    ok, st = _run("4/13 版本一致性（F1.4）", [PYTHON, "scripts/check_versions.py"], ROOT)
     results.append(("版本一致性", ok, st))
 
-    # 5/12 设计令牌存在性：用了不存在的 var(--x) 会让样式静默失效
-    ok, st = _run("5/12 设计引用存在性（令牌 + 图标）", [PYTHON, "scripts/audit-tokens.py"], FRONTEND)
+    # 5/13 设计令牌存在性：用了不存在的 var(--x) 会让样式静默失效
+    ok, st = _run("5/13 设计引用存在性（令牌 + 图标）", [PYTHON, "scripts/audit-tokens.py"], FRONTEND)
     results.append(("设计引用审计", ok, st))
 
     if args.skip_frontend:
@@ -128,11 +138,11 @@ def main() -> int:
         results.append(("连通性测试", True, "skipped"))
         results.append(("前端单元测试(vitest)", True, "skipped"))
     else:
-        ok, st = _run("6/12 前端类型检查（vue-tsc）",
+        ok, st = _run("6/13 前端类型检查（vue-tsc）",
                       [str(VUE_TSC), "--noEmit"], FRONTEND)
         results.append(("前端类型检查", ok, st))
 
-        # 7/12 离线队列核心测试（esbuild 转译 TS → node 跑；见 mod-tools F4.3）
+        # 7/13 离线队列核心测试（esbuild 转译 TS → node 跑；见 mod-tools F4.3）
         esbuild = FRONTEND / "node_modules/.bin/esbuild.cmd"
         if not esbuild.exists():
             esbuild = FRONTEND / "node_modules/.bin/esbuild"
@@ -144,7 +154,7 @@ def main() -> int:
             FRONTEND,
         )
         if ok_build:
-            ok, st = _run("7/12 离线队列核心测试（node）", [NODE, ".tq.mjs"], FRONTEND)
+            ok, st = _run("7/13 离线队列核心测试（node）", [NODE, ".tq.mjs"], FRONTEND)
         else:
             ok, st = False, st_build
         try:
@@ -153,7 +163,7 @@ def main() -> int:
             pass
         results.append(("离线队列测试(15)", ok, st))
 
-        # 8/12 HTTP 连通性行为测试（mod-tools：不可达识别 / 入队 / 重试 / 提示收敛）
+        # 8/13 HTTP 连通性行为测试（mod-tools：不可达识别 / 入队 / 重试 / 提示收敛）
         ok_build, st_build = _run(
             "8/12a 连通性测试打包（esbuild）",
             [str(esbuild), "--bundle", "scripts/test-http-connectivity.ts",
@@ -162,7 +172,7 @@ def main() -> int:
             FRONTEND,
         )
         if ok_build:
-            ok, st = _run("8/12 连通性行为测试（node）", [NODE, ".tc.mjs"], FRONTEND)
+            ok, st = _run("8/13 连通性行为测试（node）", [NODE, ".tc.mjs"], FRONTEND)
         else:
             ok, st = False, st_build
         try:
@@ -171,41 +181,47 @@ def main() -> int:
             pass
         results.append(("连通性测试(16)", ok, st))
 
-        # 12/12 前端单元测试（vitest + jsdom）
+        # 12/13 前端单元测试（vitest + jsdom）
         # 为什么新增：此前前端**零单元测试**，只有两个 esbuild 脚本覆盖
         # 离线队列与连通性 —— 报告导出、主题解析、路由参数消费这些纯逻辑
         # 全靠手点页面验证。本项把 src/**/__tests__/ 下的用例纳入一键入口，
         # 同样守「写了却跑不了 = 等于没有测试」。
         # 未装 vitest 时优雅跳过（不误报失败）。
-        ok, st = _run("12/12 前端单元测试（vitest + jsdom）",
+        ok, st = _run("12/13 前端单元测试（vitest + jsdom）",
                       [str(VITEST), "run"], FRONTEND)
         results.append(("前端单元测试(vitest)", ok, st))
 
-    # 9/12 交付物守护：一键脚本能不能真的把服务起起来 + 冒烟有没有水分断言
+    # 9/13 交付物守护：一键脚本能不能真的把服务起起来 + 冒烟有没有水分断言
     # 为什么必须有这一项：其余项都不需要「真实启动服务」，出现过
     # 全绿但用户双击脚本后后端起不来的情况（裸 python / 错误 CWD）。
     # 这一项守的是「用户路径」，不是「代码路径」。
-    ok, st = _run("9/12 交付物守护（一键脚本 + 冒烟水分）",
+    ok, st = _run("9/13 交付物守护（一键脚本 + 冒烟水分）",
                   [PYTHON, "scripts/audit_delivery.py"], ROOT)
     results.append(("交付物守护", ok, st))
 
-    # 10/12 测试质量审计：用例数不是质量指标。
+    # 10/13 测试质量审计：用例数不是质量指标。
     # 守着 5 类「缺陷存在时依然全绿」的写法：永真断言 / 无断言用例 /
     # 宽泛 pytest.raises(Exception) / 吞异常 / 空函数体。
     # 本项目历史教训：考察报告称"已删除"的 `or True` 永真断言实际还在代码里，
     # 没有任何东西会因此变红 —— 于是它活到了下一轮。
-    ok, st = _run("10/12 测试质量审计（永真断言 / 无断言 / 宽泛异常）",
+    ok, st = _run("10/13 测试质量审计（永真断言 / 无断言 / 宽泛异常）",
                   [PYTHON, "scripts/audit_test_quality.py"], ROOT)
     results.append(("测试质量审计", ok, st))
 
-    # 11/12 日志格式审计：后端日志后端是 **loguru**（占位符 `{}`），但项目里有
+    # 11/13 日志格式审计：后端日志后端是 **loguru**（占位符 `{}`），但项目里有
     # 50 处写成 printf 风格 `%s` / 标准库 `exc_info=`。实测（2026-10-11 真机
     # 启动日志为证）参数与异常堆栈**静默丢失**，日志里留下裸 `%s`
     # （如「插件路由已挂载: %s」）。这类失真不会让任何测试变红 —— 正是
     # 「没有东西会因此变红」的典型，故落成基线 0 的守护。
-    ok, st = _run("11/12 日志格式审计（loguru 占位符 / exc_info）",
+    ok, st = _run("11/13 日志格式审计（loguru 占位符 / exc_info）",
                   [PYTHON, "scripts/audit_log_format.py"], ROOT)
     results.append(("日志格式审计", ok, st))
+
+    # 13/13 文档链接与内联路径：docs/ 会随架构调整搬迁，失效链接必须由机器守
+    # （2026-10 审计：正文承诺的 10 个路径根本不存在）。
+    ok, st = _run("13/13 文档链接与路径（docs/ 全量）",
+                  [PYTHON, "scripts/audit_docs_links.py"], ROOT)
+    results.append(("文档链接", ok, st))
 
     print(f"\n{'=' * 62}\n汇总\n{'=' * 62}")
     for name, ok, st in results:

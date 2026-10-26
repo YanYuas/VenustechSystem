@@ -1,0 +1,18 @@
+# 运行期数据目录（占位文件）
+
+本目录用于存放**运行期数据**，整体被 `.gitignore` 忽略（仅本文件入库）：
+
+```
+var/
+├── data/        # 默认数据目录（app.db / logs / backups / documents / plugins / .encryption_key）
+├── demo/        # 演示数据库（start-demo）
+├── logs/
+├── tmp/
+└── secrets/     # 令牌、密钥等（备份时与 app.db 一起保存）
+```
+
+约定与原因见仓库根 `ARCHITECTURE.md §7`。
+
+> ⚠️ 迁移提示：现有数据默认仍在 `backend/data`（历史路径）。
+> 迁移到 `var/data` 需停服 + 备份 + 修改 `start-*.bat` 中的 `VENUSTECH_DATA_DIR`，
+> 步骤见 `docs/runbooks/backup.md`。**不要只改目录不改环境变量**，否则后端会新建空库。

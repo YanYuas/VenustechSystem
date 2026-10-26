@@ -1,0 +1,120 @@
+# ============================================================
+# 仓库守护 CI（GitHub Actions）
+#
+# 为什么需要（证据：.arch-audit/reports/ops-docs.md §7）：
+#   这些守护脚本（版本一致性 / 日志格式 / 测试质量 / 交付物 / 文档链接）
+#   全部写在 scripts/ 下、由 check_all.py 串起来，但**只有人手动跑才会跑**。
+#   本项目最重要的工程教训是：一条铁律如果不能变成「CI 上会变红」的检查，
+#   它一定会被再犯（永真断言 or True 曾被称已删除却仍在代码里）。
+#
+# 本 job 里所有脚本都是 **纯 Python 标准库、零第三方依赖**（见 scripts/check_all.py
+# 顶部注释），因此不需要 pip install，也不需要缓存。
+#
+# 跨平台说明（Linux runner 上能不能跑）：
+#   - check_versions.py / audit_log_format.py / audit_test_quality.py / audit_docs_links.py
+#     都是纯文本/AST 扫描，天然跨平台；
+#   - audit_delivery.py 检查的是仓库根 *.bat 的**文本**（read_bytes 读取、从不执行），
+#     以及 backend/scripts/smoke_backend.py 的源码，因此在 ubuntu-latest 上可正常运行，
+#     不属于「仅 Windows」步骤，故直接执行而不跳过（本机已验证退出码 0）。
+# ============================================================
+name: repo-guard
+
+on:
+  workflow_dispatch:
+  # 所有分支的 push 与所有 PR 都跑：仓库守护不该有触发盲区
+  # （android-build.yml 只在 main + frontend/** 触发，那类窄触发正是漏检来源）
+  push:
+  pull_request:
+
+# 最小权限：只读仓库内容
+permissions:
+  contents: read
+
+concurrency:
+  group: repo-guard-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  guards:
+    name: 守护脚本 + 敏感文件门禁
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      # 守护脚本会打印中文与 ✅/❌；固定 UTF-8，避免非 UTF-8 locale 下 UnicodeEncodeError
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: utf-8
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # 下面每一步都加了 if: always()：一次运行看全所有守护的结果，
+      # 而不是「修好第一个才能看到第二个」。任意一步非 0 退出，job 仍然判定失败。
+
+      - name: 版本一致性（VERSION 为唯一事实来源）
+        if: always()
+        run: python scripts/check_versions.py
+
+      - name: 日志格式审计（loguru 占位符 / exc_info 误用）
+        if: always()
+        run: python scripts/audit_log_format.py
+
+      - name: 测试质量审计（永真断言 / 无断言 / 宽泛异常 / 吞异常）
+        if: always()
+        run: python scripts/audit_test_quality.py
+
+      - name: 交付物守护（一键脚本规范 / 冒烟水分）
+        if: always()
+        run: python scripts/audit_delivery.py
+
+      # ⚠️ 依赖 Lead 待交付脚本 scripts/audit_docs_links.py（文档 IA 重组配套产物）。
+      # 缺失时显式失败是**预期行为**：门禁不可以「脚本不在就悄悄跳过」。
+      # 若需临时放宽，把 else 分支改成 echo "::warning::…" 并 exit 0（并明确接受空跑）。
+      - name: 文档链接审计（相对链接 0 失效）
+        if: always()
+        run: |
+          if [ ! -f scripts/audit_docs_links.py ]; then
+            echo "::error::缺少 scripts/audit_docs_links.py（Lead 待交付）——文档链接门禁未就绪"
+            exit 1
+          fi
+          python scripts/audit_docs_links.py
+
+      # 敏感文件门禁：数据库 / 私钥 / 令牌 / .env 一律不得入库。
+      # 只查 **git 已跟踪** 的文件：被 .gitignore 忽略的文件本来就推不上来，
+      # 这里守的是「已经 git add 进索引」的那一类（历史上最容易误提交）。
+      - name: 敏感文件门禁（*.db / .qm-token / *.pem / *.key / .env）
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          violations=()
+
+          # 1) 数据库与密钥/令牌文件：git pathspec 中不含斜杠的模式匹配任意层级
+          while IFS= read -r f; do
+            [ -n "$f" ] && violations+=("$f")
+          done < <(git ls-files -- '*.db' '*.db-wal' '*.db-shm' \
+                     '*.sqlite' '*.sqlite3' '*.pem' '*.key' \
+                     '.qm-token' '*.qm-token' || true)
+
+          # 2) 真正的 .env（无后缀）。模板不算违规：
+          #    backend/.env.example、frontend/.env.development、frontend/.env.production
+          #    都是公开配置（不含密钥），且已被仓库长期跟踪。
+          while IFS= read -r f; do
+            [ -z "$f" ] && continue
+            case "$f" in
+              *.example|*.env.example) continue ;;
+            esac
+            violations+=("$f")
+          done < <(git ls-files | grep -E '(^|/)\.env$' || true)
+
+          if [ ${#violations[@]} -gt 0 ]; then
+            echo "::error::检测到不应入库的敏感/运行期文件（数据库、私钥、令牌、.env）："
+            printf '  - %s\n' "${violations[@]}"
+            echo "修复：git rm --cached <file>，并确认 .gitignore 覆盖了该模式"
+            exit 1
+          fi
+          echo "✅ git ls-files 未发现 *.db / *.qm-token / *.pem / *.key / .env"

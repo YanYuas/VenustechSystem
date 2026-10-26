@@ -1,0 +1,113 @@
+# ============================================================
+# 后端 CI（GitHub Actions）
+#
+# 为什么需要（证据：.arch-audit/reports/ops-docs.md §7）：
+#   .github/workflows 里此前只有 android-build.yml，后端 pytest（1164 条）、
+#   架构守护、端到端冒烟全部只靠本地手工执行，从未进过门禁。
+#   历史教训（《一期模块考校报告》E-01）：tests/test_architecture.py 写好却
+#   从未执行，分层违规悄悄累积到 7 处 ——「写了却跑不了 = 等于没有测试」。
+#
+# 下面每条命令都已在本机验证可直接执行，且都不依赖 Windows，Linux runner 上一致：
+#   backend/tests/test_architecture.py  自带免 pytest 入口（自行把 backend 注入 sys.path）
+#   backend/scripts/smoke_backend.py    FastAPI TestClient 端到端，数据落系统临时目录
+#   python -m pytest tests -q           backend/pyproject.toml 已配 testpaths/pythonpath，
+#                                       工作目录设为 backend 即可
+# ============================================================
+name: backend-ci
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "scripts/**"
+      - "docs/architecture/**"
+      - ".github/workflows/backend.yml"
+  pull_request:
+    paths:
+      - "backend/**"
+      - "scripts/**"
+      - "docs/architecture/**"
+      - ".github/workflows/backend.yml"
+
+# 最小权限：只读仓库内容（本 workflow 不写回、不发版）
+permissions:
+  contents: read
+
+# 同一分支/PR 的新提交取消旧运行，省 runner 分钟
+concurrency:
+  group: backend-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: pytest + 架构守护 + 冒烟
+    runs-on: ubuntu-latest
+    # 防止某个用例挂死把 6 小时的默认上限烧完
+    timeout-minutes: 30
+    env:
+      # 兜底：任何步骤都不许把运行期数据写进仓库工作区（一律写 runner 临时目录）。
+      # 注：tests/conftest.py 与 scripts/smoke_backend.py 内部会各自覆写这个变量
+      #     （它们指向 <tmp>/venustech_pytest 与 <tmp>/venustech_smoke），此处只是抛点。
+      VENUSTECH_DATA_DIR: ${{ runner.temp }}/venustech-data
+      VENUSTECH_DEV: "false"
+      # 守护脚本会打印中文与 ✅/❌；固定 UTF-8，避免非 UTF-8 locale 下 UnicodeEncodeError
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: utf-8
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          # 依赖文件未变则复用 pip 缓存
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
+
+      - name: Install backend dependencies
+        working-directory: backend
+        timeout-minutes: 10
+        run: |
+          python -m pip install --upgrade pip
+          # requirements-dev.txt 内已含 `-r requirements.txt`；两者都显式写出，
+          # 是为了让「运行时依赖 / 测试依赖」的边界在 CI 里一眼可见（与 setup.bat 同源）。
+          python -m pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Show toolchain versions
+        run: |
+          python -V
+          python -m pytest --version
+
+      # 免 pytest 入口：即使 pytest 装不上也要能把分层守护跑起来（E-01 的直接对策）
+      - name: Architecture guard (tests/test_architecture.py)
+        run: python backend/tests/test_architecture.py
+
+      # ⚠️ 依赖 Lead 交付脚本 scripts/audit_architecture.py（AST 版架构守护，R1–R10）。
+      # 用 --strict：基线内的技术债也算失败 —— 脚本作者标注「CI 收口用」就是这个口径，
+      # 否则基线会变成只增不减的免死金牌。
+      # 脚本缺失时本步骤显式失败是**预期行为**：门禁不可以「脚本不在就悄悄跳过」，
+      # 那正是本项目反复踩过的「写了却没人跑」。若需临时放宽，改成
+      #   if [ -f scripts/audit_architecture.py ]; then python …; fi  （并且明确接受空跑）
+      - name: Architecture audit (scripts/audit_architecture.py --strict)
+        run: |
+          if [ ! -f scripts/audit_architecture.py ]; then
+            echo "::error::缺少 scripts/audit_architecture.py（Lead 待交付）——架构审计门禁未就绪"
+            exit 1
+          fi
+          python scripts/audit_architecture.py --strict
+
+      - name: Backend test suite (pytest)
+        working-directory: backend
+        timeout-minutes: 20
+        # -p no:cacheprovider：不写 .pytest_cache（runner 上无意义且会弄脏工作区）
+        run: python -m pytest tests -q -p no:cacheprovider --tb=short
+
+      - name: Backend smoke (end-to-end + migration + regression)
+        working-directory: backend
+        timeout-minutes: 8
+        run: python scripts/smoke_backend.py

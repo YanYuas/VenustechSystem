@@ -25,8 +25,8 @@ from fastapi.responses import JSONResponse
 
 from app.api import api_router
 from app.config import get_settings
-from app.core.event_handlers import register_event_handlers, set_event_loop
-from app.core.growth_handlers import register_growth_handlers
+from app.bootstrap.event_handlers import register_event_handlers, set_event_loop
+from app.bootstrap.growth_handlers import register_growth_handlers
 from app.core.exceptions import AppException
 from app.core.logger import get_logger, setup_logger
 from app.core.response import error

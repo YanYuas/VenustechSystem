@@ -1,0 +1,6 @@
+{
+  "$comment": "架构守护的已知债务基线。规则：① 只登记「已确认但本次不修」的违规；② 新增违规不在基线内 → 守护立即失败；③ 修掉后必须从本文件删除对应条目（否则债务会静默复活且无人知）。字段：rule = scripts/audit_architecture.py 的规则号；detail = 该规则输出的 detail 原文（必须逐字一致）。",
+  "schema_version": 1,
+  "updated": "2026-10-26",
+  "violations": []
+}

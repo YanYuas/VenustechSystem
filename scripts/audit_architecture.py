@@ -1,0 +1,417 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""架构守护（Architecture as Code）
+
+把《docs/architecture/ARCHITECTURE.md》里的分层规则变成可执行断言。
+旧的 tests/test_architecture.py 只有 5 条"文本包含"规则，抓不到真实违规
+（2026-10 审计：core 曾反向依赖 services，文本规则仍全绿）。本脚本改用
+**AST 解析真实 import 图**，并按 docs/architecture/domains.json 校验领域归属。
+
+检查项
+  R1  分层依赖方向（只算运行时 import，TYPE_CHECKING 内的类型引用豁免）
+  R2  core 隔离（不得依赖 services / repositories / api / schemas）
+  R3  services 不得依赖 FastAPI（保持与框架解耦，可单测）
+  R4  api 不得直接创建 Session（SessionLocal / create_engine）
+  R5  每个 api 模块都必须在 api/__init__.py 注册到 /api/v1
+  R6  每个 models 模块都必须在 models/__init__.py 导入（否则不建表）
+  R7  命名规范：services/*_service.py、repositories/*_repo.py
+  R8  领域归属完整：每个文件属于已登记模块；每个登记模块真实存在
+  R9  根目录契约：根目录只允许 domains.json.root_contract 列出的条目
+  R10 前端 views 不得横向 import 另一个 view 的具体实现
+
+已知技术债
+  见 scripts/architecture_baseline.json。基线内的违规降级为 WARN（不失败），
+  但**新增**同类违规立即失败；修掉后请从基线删除，防止债务只增不减。
+
+用法
+  python scripts/audit_architecture.py          # 人类可读
+  python scripts/audit_architecture.py --strict # 基线违规也算失败（CI 收口用）
+退出码：0 通过；1 有未登记违规
+"""
+from __future__ import annotations
+
+import argparse
+import ast
+import json
+import re
+import sys
+from collections import defaultdict
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+BACKEND = ROOT / "backend"
+APP = BACKEND / "app"
+FRONTEND_SRC = ROOT / "frontend" / "src"
+DOMAINS_FILE = ROOT / "docs" / "architecture" / "domains.json"
+BASELINE_FILE = ROOT / "scripts" / "architecture_baseline.json"
+
+# ---------------------------------------------------------------- 规则表
+# 每层的"允许依赖"集合。root/bootstrap 是组合根，拥有装配特权。
+ALL_LAYERS = {"api", "schemas", "services", "repositories", "models", "core", "root", "bootstrap", "plugins_builtin"}
+LAYER_RULES: dict[str, set[str]] = {
+    "api": {"api", "schemas", "services", "core", "root"},
+    "schemas": {"schemas", "core", "root"},
+    "services": {"services", "repositories", "models", "schemas", "core", "root"},
+    "repositories": {"repositories", "models", "core", "root"},
+    "models": {"models", "core"},
+    "core": {"core", "models"},
+    "root": ALL_LAYERS,
+    "bootstrap": ALL_LAYERS,
+    "plugins_builtin": ALL_LAYERS,
+}
+# 组合根例外：这两个文件可以跨层（数据库会话、用户依赖装配）
+COMPOSITION_ROOT_FILES = {"app/api/deps.py", "app/api/__init__.py", "app/main.py"}
+
+errors: list[tuple[str, str, str]] = []   # (rule, detail, where)
+warns: list[tuple[str, str, str]] = []
+checked = 0
+
+
+def err(rule: str, detail: str, where: str = "") -> None:
+    errors.append((rule, detail, where))
+
+
+def warn(rule: str, detail: str, where: str = "") -> None:
+    warns.append((rule, detail, where))
+
+
+def rel(p: Path) -> str:
+    return p.relative_to(ROOT).as_posix()
+
+
+# ---------------------------------------------------------------- AST 工具
+def iter_runtime_imports(path: Path) -> list[tuple[str, int]]:
+    """返回 [(import 的模块名, 行号)]，排除 `if TYPE_CHECKING:` 分支。
+
+    为什么必须排除：api 层合法地用 TYPE_CHECKING 引用 User 类型注解，
+    这是零运行时开销的好实践，不应被判为"直接依赖 models"。
+    """
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    except SyntaxError as e:  # 语法错误的文件不参与依赖分析，但必须报出
+        err("PARSE", f"无法解析: {e}", rel(path))
+        return []
+
+    found: list[tuple[str, int]] = []
+
+    def is_type_checking(test: ast.expr) -> bool:
+        if isinstance(test, ast.Name):
+            return test.id == "TYPE_CHECKING"
+        if isinstance(test, ast.Attribute):
+            return test.attr == "TYPE_CHECKING"
+        return False
+
+    def visit(node: ast.AST, in_guard: bool = False) -> None:
+        if isinstance(node, ast.If):
+            guard = is_type_checking(node.test)
+            for child in node.body:
+                visit(child, in_guard or guard)
+            for child in node.orelse:  # `if not TYPE_CHECKING:` 的 else 是真运行时代码
+                visit(child, in_guard)
+            return
+        if isinstance(node, ast.Import):
+            for a in node.names:
+                if a.name.startswith("app"):
+                    found.append(("app" + a.name[3:], node.lineno))
+        elif isinstance(node, ast.ImportFrom):
+            mod = node.module or ""
+            if node.level:
+                # 相对 import：按文件位置还原成 app.xxx
+                base = path.relative_to(BACKEND).with_suffix("").parts
+                anchor = list(base[: len(base) - node.level])
+                mod = ".".join(anchor + ([mod] if mod else []))
+            if mod == "app" or mod.startswith("app."):
+                found.append((mod, node.lineno))
+        for child in ast.iter_child_nodes(node):
+            visit(child, in_guard)
+
+    visit(tree)
+    # 去掉 `if TYPE_CHECKING:` 内被误收的（visit 已处理，这里做保底去重）
+    return found
+
+
+def layer_of_module(mod: str) -> str:
+    parts = mod.split(".")
+    if len(parts) < 2:
+        return "root"
+    top = parts[1]
+    if top in ("main", "config", "database", "migrate", "seed", "migration_helpers", "bootstrap"):
+        return "root" if top != "bootstrap" else "bootstrap"
+    return top if top in ALL_LAYERS else "root"
+
+
+def layer_of_file(p: Path) -> str:
+    r = rel(p)
+    if r.startswith("app/bootstrap/"):
+        return "bootstrap"
+    for lay in ("api", "schemas", "services", "repositories", "models", "core", "plugins_builtin"):
+        if r.startswith(f"app/{lay}/"):
+            return lay
+    return "root"
+
+
+# ---------------------------------------------------------------- R1/R2 分层依赖
+def check_layer_rules() -> None:
+    global checked
+    for path in sorted(APP.rglob("*.py")):
+        if "__pycache__" in path.parts:
+            continue
+        checked += 1
+        src = layer_of_file(path)
+        relsrc = path.relative_to(BACKEND).as_posix()
+        if relsrc in COMPOSITION_ROOT_FILES or src in ("root", "bootstrap", "plugins_builtin"):
+            continue
+        for mod, line in iter_runtime_imports(path):
+            dst = layer_of_module(mod)
+            if dst == src:
+                continue
+            if dst not in LAYER_RULES[src]:
+                rule = "R2-core-isolation" if src == "core" else "R1-layer-direction"
+                err(rule, f"{src} 不得依赖 {dst}: import {mod}", f"{relsrc}:{line}")
+            elif src == "api" and dst == "repositories":
+                err("R1-layer-direction",
+                    f"api 不得绕过 services 直接用 repositories: import {mod}（组合根例外见 deps.py）",
+                    f"{relsrc}:{line}")
+
+
+# ---------------------------------------------------------------- R3/R4
+def check_framework_coupling() -> None:
+    for path in sorted((APP / "services").rglob("*.py")):
+        if path.name == "__init__.py":
+            continue
+        text = path.read_text(encoding="utf-8")
+        if "fastapi" in text:
+            err("R3-services-no-fastapi", "services 层不得 import fastapi（与框架解耦）", rel(path))
+
+    for path in sorted((APP / "api").glob("*.py")):
+        if path.name == "__init__.py":
+            continue
+        if path.relative_to(BACKEND).as_posix() in COMPOSITION_ROOT_FILES:  # deps.py 是会话装配点，例外
+            continue
+        text = path.read_text(encoding="utf-8")
+        if "SessionLocal(" in text or "create_engine(" in text:
+            err("R4-api-no-session", "api 层不得直接创建数据库连接/会话", rel(path))
+
+
+# ---------------------------------------------------------------- R5 路由注册
+def check_router_registration() -> None:
+    init = APP / "api" / "__init__.py"
+    text = init.read_text(encoding="utf-8")
+    for path in sorted((APP / "api").glob("*.py")):
+        stem = path.stem
+        if stem in ("__init__", "deps"):
+            continue
+        if not re.search(rf"include_router\(\s*{re.escape(stem)}\.", text):
+            err("R5-router-unregistered",
+                f"api/{stem}.py 未在 api/__init__.py 注册（接口将不存在）", rel(path))
+
+
+# ---------------------------------------------------------------- R6 模型注册
+def check_model_registration() -> None:
+    init_text = (APP / "models" / "__init__.py").read_text(encoding="utf-8")
+    for path in sorted((APP / "models").glob("*.py")):
+        stem = path.stem
+        if stem in ("__init__", "base", "types"):
+            continue
+        if f"from app.models.{stem} import" not in init_text:
+            err("R6-model-unregistered",
+                f"models/{stem}.py 未在 models/__init__.py 导入 → 不会注册到 metadata、不会建表",
+                rel(path))
+
+
+# ---------------------------------------------------------------- R7 命名
+def check_naming() -> None:
+    for path in sorted((APP / "services").glob("*.py")):
+        if path.name != "__init__.py" and not path.stem.endswith("_service"):
+            err("R7-naming", "services 层文件必须命名为 <module>_service.py", rel(path))
+    for path in sorted((APP / "repositories").glob("*.py")):
+        if path.name not in ("__init__.py", "base.py") and not path.stem.endswith("_repo"):
+            err("R7-naming", "repositories 层文件必须命名为 <module>_repo.py", rel(path))
+
+
+# ---------------------------------------------------------------- R8 领域归属
+MODULE_RULES = [
+    ("api", re.compile(r"^api/(?P<m>[a-z0-9_]+)\.py$")),
+    ("services", re.compile(r"^services/(?P<m>[a-z0-9_]+)_service\.py$")),
+    ("repositories", re.compile(r"^repositories/(?P<m>[a-z0-9_]+)_repo\.py$")),
+    ("models", re.compile(r"^models/(?P<m>[a-z0-9_]+)\.py$")),
+    ("schemas", re.compile(r"^schemas/(?P<m>[a-z0-9_]+)\.py$")),
+]
+
+
+def check_domain_map(domains: dict) -> None:
+    module_domain: dict[str, str] = {}
+    for name, meta in domains["domains"].items():
+        for m in meta["modules"]:
+            if m in module_domain:
+                err("R8-domain-overlap", f"模块 {m} 同时登记在 {module_domain[m]} 与 {name}（领域必须互斥）")
+            module_domain[m] = name
+
+    # domains.json 里的路径以 app/ 开头；这里统一成「相对 backend/app」的路径
+    def norm(s: str) -> str:
+        return s[len("app/"):] if s.startswith("app/") else s
+
+    shared_files = {norm(x) for x in domains["shared"]["files"]}
+    shared_dirs = [norm(d).rstrip("/") for d in domains["shared"]["packages"]]
+    overrides = {norm(k): v for k, v in domains.get("file_domain_overrides", {}).items()}
+
+    seen_modules: set[str] = set()
+    for path in sorted(APP.rglob("*.py")):
+        if "__pycache__" in path.parts:
+            continue
+        r = path.relative_to(APP).as_posix()
+        if r in shared_files or any(r == d or r.startswith(d + "/") for d in shared_dirs):
+            continue
+        if path.name == "__init__.py":
+            continue
+        if r in overrides:
+            continue
+        matched = False
+        for layer, pattern in MODULE_RULES:
+            m = pattern.match(r)
+            if m:
+                matched = True
+                module = m.group("m")
+                if module not in module_domain:
+                    err("R8-domain-unmapped",
+                        f"模块 {module} 未在 domains.json 登记领域（新增模块必须先登记）", r)
+                else:
+                    seen_modules.add(module)
+                break
+        if not matched and layer_of_file(path) in ("api", "services", "repositories", "models", "schemas"):
+            err("R8-domain-unmapped", "文件命名不符合模块约定，无法归属领域", r)
+
+    # 反向：登记了但代码里不存在（防止 domains.json 变成僵尸文档）
+    for module in module_domain:
+        if module not in seen_modules:
+            warn("R8-domain-stale", f"domains.json 登记的模块 {module} 找不到对应实现文件")
+
+    # 前端 views 目录
+    views = FRONTEND_SRC / "views"
+    declared = {k: v for k, v in domains["frontend_views"].items() if not k.startswith("$")}
+    if views.is_dir():
+        for d in sorted(p for p in views.iterdir() if p.is_dir()):
+            if d.name not in declared:
+                err("R8-view-unmapped", f"views/{d.name}/ 未在 domains.json.frontend_views 登记", rel(d))
+
+
+# ---------------------------------------------------------------- R9 根目录契约
+def check_root_contract(domains: dict) -> None:
+    contract = domains["root_contract"]
+    allowed_files = {x for x in contract["files"] if not x.startswith("$")}
+    allowed_dirs = {x for x in contract["dirs"] if not x.startswith("$")}
+    ignored = set(contract.get("ignored_dirs", []))
+    for entry in sorted(ROOT.iterdir()):
+        if entry.name in ignored:
+            continue
+        if entry.is_dir():
+            if entry.name not in allowed_dirs:
+                err("R9-root-contract", f"根目录不允许出现目录：{entry.name}/（归位见 ARCHITECTURE.md §7）")
+        else:
+            if entry.name not in allowed_files:
+                err("R9-root-contract", f"根目录不允许出现文件：{entry.name}（归位见 ARCHITECTURE.md §7）")
+
+
+# ---------------------------------------------------------------- R10 前端横向依赖
+IMPORT_RE = re.compile(
+    r"""(?:import\s+(?:[^'"]*?\s+from\s+)?|export\s+[^'"]*?\s+from\s+)['"]([^'"]+)['"]"""
+)
+
+
+def check_frontend_boundaries() -> None:
+    views = FRONTEND_SRC / "views"
+    if not views.is_dir():
+        return
+    for f in sorted(list(views.rglob("*.vue")) + list(views.rglob("*.ts"))):
+        text = f.read_text(encoding="utf-8", errors="ignore")
+        owner = f.relative_to(views).parts[0]
+        for spec in IMPORT_RE.findall(text):
+            target: Path | None = None
+            if spec.startswith("@/views/"):
+                target = FRONTEND_SRC / spec[2:]
+            elif spec.startswith("."):
+                target = (f.parent / spec).resolve()
+            if target is None:
+                continue
+            try:
+                target_rel = target.relative_to(views)
+            except ValueError:
+                continue
+            other = target_rel.parts[0] if target_rel.parts else ""
+            if other and other != owner:
+                warn("R10-view-cross-import",
+                     f"view 跨域直接 import：views/{owner} → views/{other}（应走 feature 入口或提升为 shared 组件）",
+                     rel(f))
+
+
+# ---------------------------------------------------------------- 基线
+def load_baseline() -> dict[str, set[str]]:
+    if not BASELINE_FILE.is_file():
+        return {}
+    data = json.loads(BASELINE_FILE.read_text(encoding="utf-8"))
+    out: dict[str, set[str]] = defaultdict(set)
+    for item in data.get("violations", []):
+        out[item["rule"]].add(item["detail"])
+    return out
+
+
+def apply_baseline(strict: bool) -> int:
+    baseline = load_baseline()
+    new_errors = []
+    known = 0
+    for rule, detail, where in errors:
+        if detail in baseline.get(rule, set()):
+            known += 1
+            if strict:
+                new_errors.append((rule, detail, where))
+        else:
+            new_errors.append((rule, detail, where))
+
+    print("=" * 70)
+    print(f"架构守护 · 扫描 {checked} 个后端模块")
+    print("=" * 70)
+    if new_errors:
+        print(f"\n❌ 未登记的架构违规：{len(new_errors)}\n")
+        for rule, detail, where in new_errors:
+            loc = f"  [{where}]" if where else ""
+            print(f"  ✗ {rule}{loc}\n      {detail}")
+    if known and not strict:
+        print(f"\n⚠️  已登记技术债：{known} 条（基线内，不阻断；修掉后请从 baseline 删除）")
+        for rule, detail, where in errors:
+            if detail in baseline.get(rule, set()):
+                print(f"     · {rule}: {detail}")
+    if warns:
+        print(f"\n⚠️  提示：{len(warns)} 条")
+        for rule, detail, where in warns:
+            print(f"     · {rule}: {detail}")
+
+    if new_errors:
+        print(f"\n{'=' * 70}\n❌ 架构守护失败（{len(new_errors)} 条），修复指引见 docs/architecture/ARCHITECTURE.md §4")
+        return 1
+    print(f"\n{'=' * 70}\n✅ 架构守护通过（{known} 条已知债务）")
+    return 0
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description="启明星架构守护（Architecture as Code）")
+    ap.add_argument("--strict", action="store_true", help="基线内的技术债也视为失败（CI 收口）")
+    args = ap.parse_args()
+
+    if not DOMAINS_FILE.is_file():
+        print(f"❌ 缺少领域地图：{rel(DOMAINS_FILE)}")
+        return 1
+    domains = json.loads(DOMAINS_FILE.read_text(encoding="utf-8"))
+
+    check_layer_rules()
+    check_framework_coupling()
+    check_router_registration()
+    check_model_registration()
+    check_naming()
+    check_domain_map(domains)
+    check_root_contract(domains)
+    check_frontend_boundaries()
+    return apply_baseline(args.strict)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

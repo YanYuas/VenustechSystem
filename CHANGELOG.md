@@ -7,6 +7,73 @@
 
 ## [Unreleased]
 
+### Changed — 架构重整：把"靠自觉"换成"靠机器"（2026-10-26）
+
+本轮**不动业务功能**，只重做架构的表达、边界与工程底座。背景是三位审计员对
+644 个文件做的只读审计（报告：`.arch-audit/reports/{backend,frontend,ops-docs}.md`）。
+
+**新增权威文档与机器契约**
+
+- `ARCHITECTURE.md`（仓库根）：全项目架构唯一权威——一条请求的 15 跳、五层依赖规则、
+  8 个领域的边界、目录契约、新增模块 12 步、债务清单与演进路线。
+- `docs/architecture/domains.json`：领域/模块的机器可读注册表（8 领域 × 48 模块）。
+- `scripts/audit_architecture.py`：AST 解析真实 import 图的架构守护，10 条规则
+  （分层方向 / core 隔离 / 命名 / 路由与模型注册 / 领域归属 / 根目录契约 / 前端边界），
+  替代原先只有 5 条文本断言的 `test_architecture.py`（后者改为调用它，单一规则来源）。
+- `scripts/architecture_baseline.json`：债务棘轮——已知违规降级为 WARN，新增违规立即失败。
+- `scripts/audit_docs_links.py`：文档链接与内联路径全量守护（归档区/CHANGELOG 冻结不校验）。
+- `docs/architecture/ADR/0001–0006`：分层模块化单体、core 最底层、架构即代码、
+  运行期数据、版本/依赖单一来源、文档 IA 六项决策记录。
+
+**结构修复**
+
+- `core` 不再反向依赖业务层：`core/event_handlers.py`、`core/growth_handlers.py`
+  上移到组合根 `app/bootstrap/`。审计前 `core → services/repositories` 是真实违规，
+  且旧守护测试全绿（抓不到）。
+- 根目录从 14 个游离文件收敛到 12 个（仅 4 个用户启动器 + 元文件 + 契约文档）：
+  统一服务 `server.js` + `package.json` → `ops/server/`；`push-branches.bat` → `ops/`。
+  `server.js` 已用 HTTP 实测：静态 200 / 代理 502 JSON / 令牌路径不变。
+- 后端测试入口 `tests/test_architecture.py` 改为调用架构守护（不再维护第二套规则）。
+
+**文档 IA 重组（58 个文件移动、零内容删除）**
+
+- `docs/` 从"按写作时间堆叠"改为五分区：`architecture/`（现行+legacy+ADR）、
+  `product/`（需求/PRD v1 归档/v2 现行/UI）、`guides/`、`process/archive/`、`design/`、`assets/`。
+- 新建 `docs/README.md`：唯一入口，10 秒导航 + 现行/archived 显式标注。
+- 5 组多版本文档收敛，21 个带日期的过程记录归档（保留可追溯性）。
+- 链接守护全量通过（现行 32 个 md 零失效）。
+
+**工程底座**
+
+- `VERSION` 成为版本唯一事实来源；`scripts/check_versions.py` 校验 5 处并支持 `--sync`
+  （修复 0.1.0 / 0.7.0 / 1.0 三处版本分裂）。
+- 依赖单一来源：`requirements.txt`（运行时）+ 新增 `requirements-dev.txt`（测试/工具）；
+  `pyproject.toml` 明确"仅工具配置"，版本与 `VERSION` 对齐；修复 `uv.lock` 空壳导致的
+  "按文档装不出依赖"。
+- `backend/.env.example` 重写：覆盖 `Settings` 全部 12 个字段，删除幽灵变量
+  `VENUSTECH_AI_API_KEY`，安全默认（`DEMO_SEED=false`、CORS 不用 `*`）。
+- 数据目录解析改为**与启动 CWD 无关**（默认恒为 `backend/data`），杜绝从仓库根启动
+  生成第二份库；新增 `var/` 约定与 `docs/runbooks/backup.md`（密钥与库必须成对备份）。
+- CI 从 1 个工作流（仅 Android 打包）扩到 4 个：`backend.yml`、`frontend.yml`、
+  `repo-guard.yml`，把 12 项守护全部纳入 CI（此前 CI 覆盖率 0%）。
+- `check_all.py` 新增 `--strict`（缺依赖=失败，杜绝"跳过即通过"的假绿）与文档链接项（13 项）。
+
+### Fixed — 单调日历依赖导致的"每周一必红"测试（2026-10-26）
+
+`test_dashboard_production.py::test_streak_calculates_consecutive_days` 断言
+"本周至少 2 天打卡"，但打卡日插入的是"今天 + 昨天"——周一运行时昨天属于上一周，
+本周只有 1 格为 True，测试必然失败。改为按 `weekday()` 推导期望值，全年任意一天都确定。
+（实测：2026-10-26 恰为周一，红的正是它。）
+
+### Security — 本轮审计发现、待你决策的 P0（尚未修复）
+
+- **令牌回环绕过**：`ops/server/server.js` 对 `127.0.0.1` 无条件放行；若用 cloudflared
+  隧道该端口，公网请求源地址即回环 → `X-API-Token` 形同虚设。
+- **旧分支含真实用户库**：`origin/feature/phase2-development` 树中存在
+  `backend/data/app.db`（606KB，公开可拉取）。需删除分支并按需清洗历史（不可逆，待确认）。
+- **备份导入 100% 失败**：前端用 `JSON.stringify` 发送 `FormData`，后端要求 multipart → 422。
+
+
 ### Fixed — 密钥轮换此前是「假轮换」，可致 API Key 永久丢失（2026-10-11）
 
 **这是本轮最重要的一条**：`SecurityService.rotate_key()` 声称轮换三张表，

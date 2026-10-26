@@ -261,8 +261,15 @@ class TestGroup2IdentityProjectStreakWeek:
 
         assert streak.days == 2
         assert len(streak.week_checkins) == 7
-        # 本周至少有 2 天打卡
-        assert sum(streak.week_checkins) >= 2
+        # 本周打卡格数必须精确等于"今天/昨天落在本周(MON-SUN)内的天数"。
+        #
+        # 这里曾经写的是 `assert sum(...) >= 2` —— 只在周二~周日成立：
+        # 周一运行时"昨天"属于上一周，本周只有 1 格为 True，测试必红
+        # （2026-10-26 周一实测失败）。日历相关的断言必须按星期几推导，
+        # 否则 CI 会每周一周期性变红。
+        week_start = today - timedelta(days=today.weekday())
+        expected_in_week = sum(1 for d in (today, today - timedelta(days=1)) if d >= week_start)
+        assert sum(streak.week_checkins) == expected_in_week
 
     def test_week_progress_counts_this_week_tasks(self, db_session, test_user):
         """本周进度环只统计本周（周一至周日）到期的任务。

@@ -2,7 +2,7 @@
 rem ============================================================
 rem Qimingxing System - MOBILE service (one-click)
 rem   Backend  FastAPI  127.0.0.1:8765  (loopback only)
-rem   Unified  node server.js  0.0.0.0:3000  (static + /api proxy, token-gated)
+rem   Unified  node ops\server\server.js  0.0.0.0:3000  (static + /api proxy, token-gated)
 rem   Phone connects via Tailscale/LAN:  http://<pc-ip>:3000
 rem   Access token is printed below and kept in .qm-token - enter it once in
 rem   the mobile app: Settings -> server address page.
@@ -96,5 +96,5 @@ echo.
 echo Keep this window open. Press Ctrl+C to stop the unified server.
 echo.
 set QM_TOKEN=%QM_TOKEN%
-node server.js
+node ops\server\server.js
 pause

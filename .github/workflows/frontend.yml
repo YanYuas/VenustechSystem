@@ -1,0 +1,102 @@
+# ============================================================
+# 前端 CI（GitHub Actions）
+#
+# 为什么需要（证据：.arch-audit/reports/ops-docs.md §7）：
+#   此前 .github/workflows 只有 android-build.yml（且只在 frontend/** 变更时
+#   打 APK），typecheck / vitest / build 三条最容易悄悄坏掉的链路从未进门禁。
+#
+# 覆盖 gates（对应 scripts/check_all.py 的第 6/7/8/12 项 + 第 5 项）：
+#   6  前端类型检查        -> npm run typecheck（vue-tsc --noEmit）
+#   12 前端单元测试        -> npm test（vitest run）
+#   7  离线队列行为测试    -> scripts/test-offline-queue.ts（esbuild 转译后 node 跑）
+#   8  HTTP 连通性测试     -> scripts/test-http-connectivity.ts（同上）
+#   5  设计令牌/图标存在性 -> frontend/scripts/audit-tokens.py（Python，标准库零依赖）
+# 构建产物：npm run build（vite build，仓库里不追产物，仅验证可构建）
+# ============================================================
+name: frontend-ci
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "frontend/**"
+      - ".github/workflows/frontend.yml"
+  pull_request:
+    paths:
+      - "frontend/**"
+      - ".github/workflows/frontend.yml"
+
+# 最小权限：只读仓库内容
+permissions:
+  contents: read
+
+concurrency:
+  group: frontend-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    name: typecheck + vitest + build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: frontend
+    env:
+      # vitest / vite 在 CI 下不做交互式 watch；同时让 vite 走 CI 构建分支
+      CI: "true"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          # 复用 npm 缓存；键里包含 lockfile，lock 变了缓存自然失效
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # audit-tokens.py 是 check_all.py 第 5 项，属 Python 标准库脚本，故本 job 也装 Python
+      - name: Set up Python 3.11 (for scripts/audit-tokens.py)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # 用 lockfile 精确安装（不是 npm install）：依赖漂移必须在这里暴露。
+      # 本机已用 `npm ci --dry-run` 验证 frontend/package-lock.json 与 package.json 一致
+      # （lockfileVersion 3，npm 10/Node 20 可读，无 peer 冲突）。
+      - name: Install dependencies (npm ci)
+        timeout-minutes: 10
+        run: npm ci --no-audit --no-fund
+
+      - name: Typecheck (vue-tsc --noEmit)
+        run: npm run typecheck
+
+      - name: Unit tests (vitest run)
+        timeout-minutes: 10
+        run: npm test
+
+      - name: Build (vite build)
+        timeout-minutes: 10
+        run: npm run build
+
+      # ---------- 下面 3 步是「仓库里已有、但从未在 CI 跑过」的守护 ----------
+      # 对应 check_all.py 第 5/7/8 项。逻辑全部取自 check_all.py，已验证本机退出码 0。
+      # 若想保持前端 CI 最小，可整块删除，不影响上面的 typecheck/test/build 门禁。
+      - name: Design tokens & icons audit (scripts/audit-tokens.py)
+        run: python scripts/audit-tokens.py
+
+      - name: Offline queue behavior test (esbuild -> node)
+        run: |
+          ./node_modules/.bin/esbuild --bundle scripts/test-offline-queue.ts \
+            --outfile=.tq.mjs --format=esm --platform=node
+          node .tq.mjs
+
+      - name: HTTP connectivity behavior test (esbuild -> node)
+        run: |
+          ./node_modules/.bin/esbuild --bundle scripts/test-http-connectivity.ts \
+            --outfile=.tc.mjs --format=esm --platform=node \
+            --banner:js="import.meta.env={VITE_API_BASE:'http://127.0.0.1:9/api/v1'};"
+          node .tc.mjs
