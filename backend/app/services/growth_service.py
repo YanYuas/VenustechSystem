@@ -203,7 +203,10 @@ class GrowthService:
         if state is None:
             state = GrowthState(user_id=user_id, exp=0, level=1)
             self.db.add(state)
-            self.db.commit()
+            # 只 flush：本方法是 award() 的**中间步骤**，若在结算途中提交，
+            # 后续写 GrowthEvent/SkillStat 失败就会留下「有等级、无流水」的
+            # 中间态。提交由 award() 末尾一次完成（读路径由 get_db 兜底）。
+            self.db.flush()
             self.db.refresh(state)
         return state
 

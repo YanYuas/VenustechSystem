@@ -97,6 +97,8 @@ class ResourceService:
             raise ValidationException(
                 f"非法内容类型: {data.content_type}（白名单: {sorted(INBOX_CONTENT_TYPES)}）")
         item = self.inbox_repo.create(user_id=user_id, **data.model_dump(exclude_none=True))
+        # 写完 → commit → publish：EXP 结算订阅者用独立 Session 反查条目
+        self.db.commit()
         event_bus.publish(EVENT_INBOX_ITEM_CREATED, item_id=item.id, user_id=user_id,
                        content_type=item.content_type)
         self.logger.info(f"收集箱条目创建: {item.id} ({item.content_type})")
@@ -146,6 +148,8 @@ class ResourceService:
             result["converted_to"] = "document"
             result["target_id"] = target_id
 
+        # 写完 → commit → publish：订阅者用独立 Session 反查条目状态
+        self.db.commit()
         event_bus.publish(EVENT_INBOX_ITEM_PROCESSED, item_id=item_id, action=action)
         self.logger.info(f"收集箱条目处理: {item_id} -> {action}")
         return result

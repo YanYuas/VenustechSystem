@@ -76,6 +76,8 @@ class AvatarService:
             if identity is None or identity.user_id != user_id or identity.deleted_at is not None:
                 raise ValidationException("身份不存在")
         memory = self.memory_repo.create(user_id=user_id, **data.model_dump(exclude_none=True))
+        # 写完 → commit → publish：订阅者用独立 Session 反查记忆
+        self.db.commit()
         event_bus.publish(EVENT_MEMORY_UPDATED, memory_id=memory.id, action="create")
         self.logger.info(f"记忆创建: {memory.id} ({memory.memory_type})")
         return self._memory_to_dict(memory)
@@ -133,6 +135,8 @@ class AvatarService:
             )
             selected.append(self._inspiration_to_dict(inspiration))
 
+        # 写完 → commit → publish：批量灵感一次性提交，订阅者再读
+        self.db.commit()
         event_bus.publish(EVENT_INSPIRATION_GENERATED, batch_id=batch_id, count=len(selected))
         self.logger.info(f"灵感生成: batch={batch_id}, {len(selected)}个")
         return {"batch_id": batch_id, "inspirations": selected, "count": len(selected)}
@@ -159,6 +163,8 @@ class AvatarService:
         updated = self.inspiration_repo.update(
             insp, status="completed", result=result or "已执行"
         )
+        # 写完 → commit → publish
+        self.db.commit()
         event_bus.publish(EVENT_INSPIRATION_EXECUTED, inspiration_id=inspiration_id)
         return self._inspiration_to_dict(updated)
 

@@ -295,6 +295,55 @@ def check_domain_map(domains: dict) -> None:
                 err("R8-view-unmapped", f"views/{d.name}/ 未在 domains.json.frontend_views 登记", rel(d))
 
 
+# ---------------------------------------------------------------- R11/R12 事务与迁移基线
+def check_transaction_and_migration() -> None:
+    """R11: repository 只 flush，不得 commit（提交权在 service / 请求边界）。
+
+    背景：2026-10 审计 D-04 —— 每个 repository 方法内部 commit，导致多步用例
+    （如「写文档 + 重建双链」）第二步失败时第一步已落库、无法回滚。
+    改造后由 service 在用例边界提交、`api/deps.get_db` 兜底；本规则防止回退。
+    BaseRepository 自身保留一个显式 `commit()` 出口（方法体内不算违规）。
+    """
+    for path in sorted((APP / "repositories").glob("*.py")):
+        if path.name == "__init__.py":
+            continue
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8-sig"))
+        except SyntaxError as e:
+            # 不能静默跳过：解析不了 = 规则失效（合规假象）。BOM/语法错都要报。
+            err("R11-repository-no-commit",
+                f"无法解析 repository（R11 事务规则无法校验）：{e}", rel(path))
+            continue
+
+        def visit(node: ast.AST, inside_commit_method: bool = False) -> None:
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                inside_commit_method = node.name == "commit"
+            if isinstance(node, ast.Call) and not inside_commit_method:
+                fn = node.func
+                if isinstance(fn, ast.Attribute) and fn.attr == "commit":
+                    err("R11-repository-no-commit",
+                        "repository 不得调用 commit()：只 flush，提交权在 service / get_db",
+                        f"{rel(path)}:{node.lineno}")
+            for child in ast.iter_child_nodes(node):
+                visit(child, inside_commit_method)
+
+        visit(tree)
+
+    # R12: 0001 基线必须是冻结 DDL，不得再出现 create_all/drop_all。
+    # 背景：create_all 建的是"当前代码注册的全部模型"，基线会随模型静默变化、
+    # 历史不可复现（审计 D-05）。重建后由 tests/test_migration_integrity.py 三方对账。
+    baseline = BACKEND / "migrations" / "versions" / "0001_initial.py"
+    if not baseline.is_file():
+        err("R12-migration-baseline", "缺少 0001_initial.py", "migrations/versions/")
+        return
+    text = baseline.read_text(encoding="utf-8")
+    for banned in ("create_all", "drop_all"):
+        if banned in text:
+            err("R12-migration-baseline",
+                f"0001 基线不得使用 {banned}（必须冻结为显式 DDL）",
+                rel(baseline))
+
+
 # ---------------------------------------------------------------- R9 根目录契约
 def check_root_contract(domains: dict) -> None:
     contract = domains["root_contract"]
@@ -410,6 +459,7 @@ def main() -> int:
     check_domain_map(domains)
     check_root_contract(domains)
     check_frontend_boundaries()
+    check_transaction_and_migration()
     return apply_baseline(args.strict)
 
 

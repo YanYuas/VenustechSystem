@@ -19,6 +19,10 @@ export interface Review {
   id: string
   type: ReviewType
   review_date: string
+  /** 关联项目（backend schemas/review.py:30） */
+  project_id: string | null
+  /** 身份轴（三期 B）（backend schemas/review.py:32） */
+  identity_id: string | null
   data: ReviewData
   created_at: string
   updated_at: string
@@ -31,8 +35,13 @@ export interface ReviewListQuery {
 }
 
 export interface UpsertReviewRequest {
-  type: ReviewType
+  /** 后端默认 "daily"（schemas/review.py:39 `type: str = "daily"`） */
+  type?: ReviewType
   date: string
+  /** 关联项目（backend schemas/review.py:41） */
+  project_id?: string | null
+  /** 身份轴（三期 B）：可空 = 未归类（backend schemas/review.py:43） */
+  identity_id?: string | null
   data: ReviewData
 }
 

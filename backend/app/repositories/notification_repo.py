@@ -42,5 +42,6 @@ class NotificationRepository(BaseRepository[Notification]):
             n.read_at = utcnow()
             count += 1
         if count:
-            self.db.commit()
+            # 只 flush；事务边界由调用方（service / get_db）闭合
+            self.db.flush()
         return count

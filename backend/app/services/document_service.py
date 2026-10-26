@@ -218,9 +218,13 @@ class DocumentService:
         if "identity_id" in payload:
             # None = 解除关联；空串视同 None（前端下拉清空）
             doc.identity_id = self._validated_identity_id(user_id, payload["identity_id"])
-        self.db.commit()
-        self.db.refresh(doc)
+        # 用例内**不提交**：正文更新 + 版本快照 + 双链重建（下面 _sync_backlinks）
+        # 必须同属一个事务。原实现在此处 commit，若双链重建失败，正文已落库、
+        # 双链却是旧数据 —— 正是 D-04 要修的非原子中间态。
         self._sync_backlinks(user_id, doc)
+        self.db.refresh(doc)  # 取回 onupdate 生成的新 updated_at
+        # 写完 → commit → publish：订阅者（AI 摘要/EXP）用独立 Session 反查文档
+        self.db.commit()
         if content_changed:
             event_bus.publish(EVENT_DOCUMENT_SAVED, document_id=doc.id)
         return self._doc_out(doc)
@@ -394,6 +398,10 @@ class DocumentService:
 
         单事务批量重建：此前每个链接一次 SELECT + 一次 INSERT（各自独立 commit），
         保存含 5 个链接的文档约产生 7 个独立事务（自动保存场景下放大明显）。
+
+        本方法**只 flush 不 commit**：它只是「保存文档」用例里的第二步，
+        提交必须由调用方在用例末尾（正文 + 版本 + 双链全部完成后）做一次，
+        否则双链重建失败时正文/版本已经落库，回滚不回去。
         """
         from sqlalchemy import delete, select as sa_select
 
@@ -417,7 +425,7 @@ class DocumentService:
                         target_doc_id=targets.get(title),
                         target_title=title,
                     ))
-        self.db.commit()
+        self.db.flush()
 
     def _owned_doc(self, doc_id: str, user_id: str) -> Document:
         doc = self.doc_repo.get(doc_id)

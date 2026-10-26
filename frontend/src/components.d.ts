@@ -12,14 +12,10 @@ export {}
 declare module 'vue' {
   export interface GlobalComponents {
     ActionSheet: typeof import('./components/common/ActionSheet.vue')['default']
-    AppHeader: typeof import('./components/layout/AppHeader.vue')['default']
     AppIcon: typeof import('./components/common/AppIcon.vue')['default']
-    AppSidebar: typeof import('./components/layout/AppSidebar.vue')['default']
     AppTitleBar: typeof import('./components/layout/AppTitleBar.vue')['default']
-    BaseBreadcrumb: typeof import('./components/layout/BaseBreadcrumb.vue')['default']
     BaseButton: typeof import('./components/common/BaseButton.vue')['default']
     BaseCard: typeof import('./components/common/BaseCard.vue')['default']
-    BaseConfirm: typeof import('./components/common/BaseConfirm.vue')['default']
     BaseDrawer: typeof import('./components/common/BaseDrawer.vue')['default']
     BaseEmpty: typeof import('./components/common/BaseEmpty.vue')['default']
     BaseInput: typeof import('./components/common/BaseInput.vue')['default']
@@ -30,7 +26,6 @@ declare module 'vue' {
     BaseSwitch: typeof import('./components/common/BaseSwitch.vue')['default']
     BaseTag: typeof import('./components/common/BaseTag.vue')['default']
     BaseToast: typeof import('./components/common/BaseToast.vue')['default']
-    BaseTooltip: typeof import('./components/common/BaseTooltip.vue')['default']
     Breadcrumb: typeof import('./components/layout/Breadcrumb.vue')['default']
     CommandPalette: typeof import('./components/layout/CommandPalette.vue')['default']
     DefaultLayout: typeof import('./components/layout/DefaultLayout.vue')['default']
@@ -47,9 +42,7 @@ declare module 'vue' {
     OfflineQueueIndicator: typeof import('./components/layout/OfflineQueueIndicator.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
-    SidebarFooter: typeof import('./components/layout/SidebarFooter.vue')['default']
     ToastItem: typeof import('./components/common/ToastItem.vue')['default']
     TopNav: typeof import('./components/layout/TopNav.vue')['default']
-    WindowStatusIndicator: typeof import('./components/layout/WindowStatusIndicator.vue')['default']
   }
 }

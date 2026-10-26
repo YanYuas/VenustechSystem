@@ -268,4 +268,8 @@ def seed_if_empty(db: Session) -> bool:
     nr.create(user_id=user.id, type="success", title="灵感已生成", content="基于《路演脚本-v1》生成了一条新灵感。", is_read=False, source_type="document")
     nr.create(user_id=user.id, type="info", title="备份已完成", content="上周数据已自动备份到本地 backups 目录。", is_read=True)
 
+    # 非请求调用方（main.py lifespan 的 `with SessionLocal() as db`）不经过
+    # get_db，**没有兜底 commit**：Session 退出时未提交的事务会被回滚。
+    # repository 自 D-04 改造后只 flush，因此这里必须显式提交一次。
+    db.commit()
     return True

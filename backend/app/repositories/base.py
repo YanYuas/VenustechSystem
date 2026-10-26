@@ -44,29 +44,38 @@ class BaseRepository(Generic[ModelT]):
                 q = q.where(getattr(self.model, key) == value)
         return int(self.db.scalar(q))
 
+    # ---------- 事务边界（架构 v2.0 §5.3 / 审计 D-04） ----------
+    # 本类**只 flush，不 commit**。写入的原子性由调用方（service 用例边界 /
+    # get_db 请求事务）负责：
+    #   · flush 把 SQL 发到数据库、拿到自增主键与默认值，但事务仍开放；
+    #   · 同一用例内后续步骤失败时，调用方一次 rollback 即可回滚全部写入；
+    #   · 需要提交时调用方显式 `repo.commit()`（或 `db.commit()`）。
+    # 历史教训：此前每个方法内部 commit，导致 service 的多步用例（删除文件夹、
+    # 保存文档 + 重建双链、批量生成任务）每一步都各自落库，中途失败留下中间态。
+
     def create(self, **kwargs) -> ModelT:
         obj = self.model(**kwargs)
         self.db.add(obj)
-        self.db.commit()
+        self.db.flush()
         self.db.refresh(obj)
         return obj
 
     def create_many(self, items: list[dict]) -> list[ModelT]:
-        """批量插入，**单次 commit**。
+        """批量插入，**同一事务内 flush 一次**。
 
         为什么需要它（而不是循环调用 create）：
-          create() 每次都会 commit。批量场景下（例如 S6-1 领域引擎一次生成
-          30~40 条学习任务）就会 commit 同样多次，带来两个后果：
-            1. **原子性被破坏** —— 中途任一条失败，前面的都已落库，
-               留下「计划已建、任务只建了一半」的中间态，且难以回滚；
-            2. 性能浪费 —— SQLite 默认每个事务一次 fsync，40 次 commit
-               的开销远大于一条 INSERT 语句本身。
+          即使 create() 已不再 commit，批量场景仍需要它：
+            1. 一次 flush 只发一批 INSERT，40 条任务的开销远小于逐条 flush；
+            2. 语义清晰 —— 这一批要么全在事务里、要么全回滚，不依赖调用方
+               再逐条补提交；
+            3. 历史上它就是为了修「中途失败留下半套数据」而引入的，
+               现在把 commit 上移后，原子性由调用方的事务统一保证。
         """
         if not items:
             return []
         objs = [self.model(**kwargs) for kwargs in items]
         self.db.add_all(objs)
-        self.db.commit()
+        self.db.flush()
         for obj in objs:
             self.db.refresh(obj)
         return objs
@@ -74,10 +83,13 @@ class BaseRepository(Generic[ModelT]):
     def update(self, obj: ModelT, **kwargs) -> ModelT:
         for key, value in kwargs.items():
             setattr(obj, key, value)
-        self.db.commit()
+        self.db.flush()
         self.db.refresh(obj)
         return obj
 
+    def commit(self) -> None:
+        """显式提交事务（供调用方在用例边界使用，本类内部不调用）。"""
+        self.db.commit()
 
     def paginate(self, page: int = 1, page_size: int = 20, **filters) -> tuple[list[ModelT], int]:
         """分页查询，返回 (数据列表, 总数)"""
@@ -88,4 +100,4 @@ class BaseRepository(Generic[ModelT]):
 
     def delete(self, obj: ModelT) -> None:
         self.db.delete(obj)
-        self.db.commit()
+        self.db.flush()

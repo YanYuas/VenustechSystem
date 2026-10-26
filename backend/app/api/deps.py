@@ -20,9 +20,25 @@ if TYPE_CHECKING:
 
 
 def get_db():
+    """请求级事务（架构 v2.0 §5.3 / 审计 D-04）。
+
+    事务边界在**请求**这一层闭合：
+      · 路由/服务没有显式 commit 的写入，由这里在响应前统一提交 —— 这是
+        repository 去掉内部 commit 后的兜底；
+      · 请求过程中抛任何异常（校验失败、业务异常、未捕获异常）都 rollback，
+        保证一个请求内的多步写入要么全成、要么全不成；
+      · finally 只负责归还连接。
+
+    注意：需要「写完 → commit → publish」语义的用例仍由 service 显式
+    commit（事件订阅者用独立 Session，未提交数据读不到）。
+    """
     db = SessionLocal()
     try:
         yield db
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()
 

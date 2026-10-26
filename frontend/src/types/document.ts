@@ -68,6 +68,8 @@ export interface CreateDocumentRequest {
   identity_id?: string | null
   /** Markdown 纯文本内容 */
   content?: string
+  /** 标签（backend schemas/document.py:36 `tags: list[str] | None`） */
+  tags?: string[] | null
 }
 
 export interface UpdateDocumentRequest {
@@ -76,6 +78,8 @@ export interface UpdateDocumentRequest {
   content?: string
   tags?: string[]
   folder_id?: string | null
+  /** 所属项目（backend schemas/document.py:44） */
+  project_id?: string | null
   identity_id?: string | null
 }
 

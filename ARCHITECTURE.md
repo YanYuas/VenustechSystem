@@ -280,7 +280,7 @@ VenustechSystem/
 
 | 守护 | 命令 | 守什么 |
 |---|---|---|
-| 架构 | `scripts/audit_architecture.py` | 分层方向、core 隔离、领域归属、路由/模型注册、根目录契约 |
+| 架构 | `scripts/audit_architecture.py` | 分层方向、core 隔离、领域归属、路由/模型注册、根目录契约、**事务边界(R11)**、**迁移基线(R12)**、前端边界 |
 | 后端测试 | `pytest backend/tests` | 1165 条：API 形状 + 生产行为 + 数据库基础设施 |
 | 后端冒烟 | `backend/scripts/smoke_backend.py` | 真实启动 + 迁移 + 端到端断言 |
 | 版本一致 | `scripts/check_versions.py` | 5 处版本 == `VERSION` |
@@ -305,20 +305,20 @@ CI：`.github/workflows/{backend,frontend,repo-guard}.yml` + `android-build.yml`
 
 | ID | 等级 | 债务 | 证据 | 处置阶段 |
 |---|---|---|---|---|
-| D-01 | **P0** | 令牌回环绕过：cloudflared 场景等于无鉴权 | `ops/server/server.js` `isAuthorized()` | Phase 1 |
-| D-02 | **P0** | `origin/feature/phase2-development` 包含真实用户库 `backend/data/app.db`（606KB，公开可拉） | `git cat-file -e <branch>:backend/data/app.db` | Phase 1（需你决策删分支/清历史） |
-| D-03 | **P0** | 备份导入 100% 失败：`FormData` 被 `JSON.stringify` 后发 JSON，后端要 multipart → 422 | `frontend/src/api/dashboard.ts` + `api/http.ts` ↔ `backend/app/api/backup.py` | Phase 1 |
-| D-04 | P1 | **事务边界下沉**：`BaseRepository` 每个方法内部 commit，service 再 commit → 多步操作无原子性 | `repositories/base.py` | Phase 1 |
-| D-05 | P1 | 迁移基线失效：`0001` 用 `create_all()`，11 张基线表无 DDL；升级库缺 11 个索引 | `migrations/versions/0001_initial.py` | Phase 1 |
-| D-06 | P1 | Repository 层名存实亡：16/31 service 直连 ORM；service 9441 行 vs repo 1412 行 | 审计报告 §2 | Phase 2 |
+| D-01 | **P0** | 令牌回环绕过：cloudflared 场景等于无鉴权 | `ops/server/server.js` `isAuthorized()` | ✅ 已修（2026-10-26）：代理头检测 + 常量时间比较 + 16 条单测 + CI |
+| D-02 | **P0** | `origin/feature/phase2-development` 包含真实用户库 `backend/data/app.db`（606KB，公开可拉） | 泄漏提交 `6b5c2dd`，仅该分支可达；**无 `.encryption_key`**（密文字段安全） | ⚠️ 已评估 + 检测守护 + runbook；**待你执行删分支/重建远端**（不可逆） |
+| D-03 | **P0** | 备份导入 100% 失败：`FormData` 被 `JSON.stringify` 后发 JSON，后端要 multipart → 422 | `frontend/src/api/dashboard.ts` + `api/http.ts` ↔ `backend/app/api/backup.py` | ✅ 已修（2026-10-26）：`http.postForm` + 真实 multipart 运行时断言 11/11 |
+| D-04 | P1 | **事务边界下沉**：`BaseRepository` 每个方法内部 commit，service 再 commit → 多步操作无原子性 | `repositories/base.py` | ✅ 已修（2026-10-26）：repo 只 flush、service 控 commit、get_db 兜底；8 条原子性测试 + 守护 R11 |
+| D-05 | P1 | 迁移基线失效：`0001` 用 `create_all()`，11 张基线表无 DDL；升级库缺 11 个索引 | `migrations/versions/0001_initial.py` | ✅ 已修（2026-10-26）：0001 冻结显式 DDL（49 表/79 索引）+ 0021 对账 + 6 条完整性测试 + 守护 R12 |
+| D-06 | P1 | Repository 层名存实亡：16/31 service 直连 ORM；service 9441 行 vs repo 1412 行 | 审计报告 §2 | Phase 2（事务边界已修，下一轮收口 repo 覆盖） |
 | D-07 | P1 | `core/sync.py` 藏 389 行领域逻辑；core 内共 815 行业务代码 | 审计报告 §2 | Phase 2 |
-| D-08 | P1 | 前端 13 处前后端契约漂移（几乎都是"后端有、前端类型没有"） | `frontend/src/types/*` vs `backend/app/schemas/*` | Phase 1 |
+| D-08 | P1 | 前端 13 处前后端契约漂移（几乎都是"后端有、前端类型没有"） | `frontend/src/types/*` vs `backend/app/schemas/*` | ✅ 已修 13/13（2026-10-26）；剩余：TaskStatus 需后端补 Literal、24 处 `| null` 语义待定 |
 | D-09 | P1 | 前端 god 组件：`SettingsView` 1577 行；16 个 view >500 行；`http.ts` 378 行 9 类职责 | 审计报告 §4–§6 | Phase 2 |
-| D-10 | P1 | 前端死代码约 1188 行（`AppHeader`/`AppSidebar`/`stores/app.ts` 等） | 审计报告 §7 | Phase 1 |
+| D-10 | P1 | 前端死代码约 1188 行（`AppHeader`/`AppSidebar`/`stores/app.ts` 等） | 审计报告 §7 | ✅ 已修（2026-10-26）：15 文件 / 1625 行，typecheck ×5 全绿 |
 | D-11 | P2 | 5 个启动器重复实现 venv/端口/令牌逻辑（4 份 venv 解析、2 种令牌生成） | `*.bat` + `scripts/dev.ps1` | Phase 2 |
 | D-12 | P2 | `.git` 是 Junction 指向 `C:\Users\21722\qimingxing-git-repo`：备份项目目录 ≠ 备份历史 | 文件系统 | Phase 1（写备份 runbook） |
 | D-13 | P2 | 无 lint：ESLint/Prettier/ruff 全缺 | — | Phase 2 |
-| D-14 | P2 | `server.js` 是唯一鉴权点却零测试 | `ops/server/server.js` | Phase 2 |
+| D-14 | P2 | `server.js` 是唯一鉴权点却零测试 | `ops/server/server.js` | ✅ 已修（2026-10-26）：`ops/server/test` 16 用例 + CI edge-server job |
 
 > 原则：**先修 P0/P1 的"正确性"，再谈结构搬迁**。在事务边界、迁移基线、备份导入还有问题时做领域分包，只是把混乱打包进更漂亮的新目录。
 
@@ -329,7 +329,7 @@ CI：`.github/workflows/{backend,frontend,repo-guard}.yml` + `android-build.yml`
 | 阶段 | 目标 | 内容 | 状态 |
 |---|---|---|---|
 | **Phase 0** | 架构可见、可守、可查 | 本文 + `domains.json` + AST 守护 + 债务基线 + CI 三件套 + 文档 IA + 版本/依赖/配置单一来源 + `core` 去业务化 + 根目录契约 | ✅ 本轮完成 |
-| **Phase 1** | 修正确性 P0/P1 | D-01/02/03 安全与功能；D-04 事务上移（service 控制 commit，repo 只 flush）；D-05 迁移基线重建；D-08 契约对齐；D-10 删死代码 | 待批 |
+| **Phase 1** | 修正确性 P0/P1 | D-01/03/04/05/08/10/14 ✅ 完成；D-02 ✅ 已评估（runbook + 守护，**远端处置待你执行**）；D-06/07/09 转入 Phase 2 | ✅ 本轮完成（2026-10-26，1229 测试全绿） |
 | **Phase 2** | 收口领域边界 | Repository 收口（D-06）、`core/sync` 领域逻辑下沉（D-07）、前端 `kernel/shared/features` 分层试点（单领域先迁） | 待批 |
 | **Phase 3** | 可持续交付 | lint、`server.js` 测试、启动器单一实现、发布/备份 runbook、`.git` 位置治理 | 待批 |
 

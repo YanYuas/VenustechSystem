@@ -20,7 +20,7 @@ api  →  services  →  repositories  →  models
 |---|---|---|
 | `api/` | 校验参数、调 service、返回信封 | 碰 models、直接建 Session、写业务 |
 | `services/` | 业务规则、状态机、事务、发事件 | import fastapi |
-| `repositories/` | 数据访问 | 调 service |
+| `repositories/` | 数据访问，只 `flush()` | **`commit()`**（提交权在 service / `get_db`，守护 R11 强制） |
 | `core/` | 基础设施 | 反向依赖 services / repositories |
 
 组合根（`main.py`、`bootstrap/`、`api/deps.py`）是唯一装配特权区。
@@ -47,6 +47,10 @@ cd frontend && npm run typecheck && npm test
 ## 4. 数据库变更（重要）
 
 改模型后生成迁移，启动时自动 `upgrade head`，**勿手改表**。
+
+> 基线已冻结：`0001_initial.py` 是**显式 DDL**（49 表 / 79 索引），不得再出现 `create_all`（守护 R12）。
+> 新模型变更一律新增迁移（下一个版本号），`0021_schema_reconcile` 负责把老库补齐到 ORM 一致。
+> 完整性由 `backend/tests/test_migration_integrity.py` 三方对账（全新库 / ORM metadata / 真实 DB）。
 
 ### 铁律：新迁移必须幂等
 

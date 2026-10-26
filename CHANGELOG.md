@@ -7,6 +7,50 @@
 
 ## [Unreleased]
 
+### Changed — Phase 1：修正正确性（3 个 P0 + 事务 / 迁移 / 契约 / 死代码，2026-10-26）
+
+本轮目标是"把架构纪律落到会出错的地方"。**后端测试 1215 → 1229 全绿**，新增 4 道守护。
+
+**P0-1 访问令牌回环绕过（安全，已修）**
+- 原缺陷：`server.js` 对 `127.0.0.1` 来源无条件放行；cloudflared 等隧道把公网请求转成回环连接后，`X-API-Token` 形同虚设。
+- 修复：判定逻辑抽到 `ops/server/lib/security.mjs` —— 只有"回环 **且无任何代理头**（`x-forwarded-for` / `cf-connecting-ip` / `forwarded` …）"才豁免；令牌比较改 `crypto.timingSafeEqual`；响应加 `nosniff` / `Referrer-Policy` / `X-Frame-Options`。
+- 令牌治理：新增 `npm run token:rotate`（旧令牌留在 `.qm-token.prev` 宽限期，删除即吊销）。
+- 验证：`ops/server/test` 16 条单测（含 4 条 P0 场景）+ 端到端 curl（代理头无令牌 401 / 本机直连放行）+ CI `edge-server` job。
+
+**P0-2 真实数据库存在于 Git 历史（已评估 + 防护，远端处置待仓库所有者执行）**
+- 事实：`backend/data/app.db`（606KB）在提交 `6b5c2dd` 进入历史，仅 `origin/feature/phase2-development` 可达；**未包含 `.encryption_key`**，故加密字段仍是密文。
+- 新增 `scripts/audit_repo_secrets.py`：检查当前索引 + 扫描全部 refs 的历史新增文件 + `.gitignore` 覆盖抽样；已接入 CI。
+- 处置步骤（删分支 / 重建远端 / 轮换凭据 / 验证）见 `docs/runbooks/security-incident-db-leak.md`。
+
+**P0-3 备份导入 100% 失败（已修）**
+- 原缺陷：`http.post` 对 `FormData` 做 `JSON.stringify`，body 变成 `{}` 且 `Content-Type: application/json`，后端 `/backup/import` 要求 multipart → 必 422。
+- 修复：`http.postForm()` 原样传 FormData、不手写 Content-Type（boundary 由运行时生成）、显式跳过离线队列（二进制体无法重放）；`backupApi.import` 切换。
+- 验证：真实 HTTP server 抓原始请求，断言 `multipart/form-data; boundary=...` 与原始字节 → 11/11 PASS；另加 4 条 vitest 供 CI。
+
+**事务上移：repo 只 flush，service 控 commit（D-04）**
+- `BaseRepository.create/create_many/update/delete` 不再内部 commit → `flush()`；`api/deps.get_db` 改为请求级事务（成功 commit / 异常 rollback）。
+- service 的 51 处 commit 收敛：删除 11 处破坏原子性的中间提交，补齐 15 处"发布事件前提交"（订阅者用独立 Session，未提交读不到），非请求调用方（seed / 后台任务 / 扫描线程）逐个补齐。
+- 新增 `tests/test_transaction_atomicity.py` 8 条：用例第二步失败时第一步必须整体回滚、publish 时刻独立 Session 可见、repo 只 flush、get_db 兜底提交。
+- 架构守护新增 **R11**：repositories 内出现 `commit()` 即失败（负向测试验证过会命中）。
+
+**迁移基线重建（D-05）**
+- `0001_initial.py` 从 `Base.metadata.create_all()` 改为**冻结显式 DDL**：49 张表 / 79 个索引，revision 与 down_revision 不变（已升级库不受影响），downgrade 显式逆序。
+- 新增 `0021_schema_reconcile.py`：幂等对账——补齐审计发现的 11 个缺失索引、删除 DB 侧同列重复索引、兜底补表/列/索引；对 0011 / 0020 / 无版本手工库均验证可升级。
+- 新增 `tests/test_migration_integrity.py` 6 条：全新库三方对账（ORM metadata / 实际 DB / 迁移链）、0001 无 bulk DDL、链线性单 head、0011→head、部分升级库、0021 幂等。
+- 架构守护新增 **R12**：0001 出现 `create_all`/`drop_all` 即失败。
+- 验证：7 个真实数据目录**副本**升级成功，业务行数 0 变化（`data` 154 行不变）。
+
+**前端契约对齐（D-08）**
+- 13 处漂移全部修正（task 的 `estimated_minutes`/`acceptance_criteria`、document 的 `tags`/`project_id`、ProjectMemory/Review 的 `identity_id`、`timestamp` 单位秒、review `type` 可选等），后端 `schemas/*.py` 为唯一真值。
+
+**前端死代码清理（D-10）**
+- 删除 15 个文件 / 1625 行（含被 `TopNav` 取代的 `AppHeader`/`AppSidebar`、死 store、6 个死 composable、死桶导出及其传递性死亡组件）。
+- 每个候选都有零引用证据（静态 import 全量解析 + 标签名双查 + `components.d.ts` + 懒加载 + 旧 dist 交叉验证）；`npm run typecheck` 连续 5 轮 exit 0。
+
+**验证入口**
+- `check_all.py` 扩到 **14 项**（新增仓库敏感文件守护），`--strict` 保持"缺依赖=失败"。
+- CI：`repo-guard` 增加敏感文件历史扫描；新增 `edge-server` job 跑统一服务测试。
+
 ### Changed — 架构重整：把"靠自觉"换成"靠机器"（2026-10-26）
 
 本轮**不动业务功能**，只重做架构的表达、边界与工程底座。背景是三位审计员对

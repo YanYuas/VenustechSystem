@@ -176,6 +176,9 @@ class WorkflowService:
             result_summary=summary,
         )
 
+        # 写完 → commit → publish：应用历史/任务/模板必须已落库，
+        # 订阅者（EXP 结算）用独立 Session 反查时才看得到。
+        self.db.commit()
         event_bus.publish(EVENT_WORKFLOW_APPLIED, workflow_id=workflow_id, user_id=user_id)
         self.logger.info(f"工作流应用: {workflow_id}, {summary}")
 

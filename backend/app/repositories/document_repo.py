@@ -108,10 +108,11 @@ class DocumentVersionRepository(BaseRepository[DocumentVersion]):
         )
 
     def delete_oldest(self, document_id: str, keep: int) -> None:
+        """裁剪超出的旧版本（只 flush；事务由调用方闭合）。"""
         versions = self.list_by_document(document_id)
         for v in versions[keep:]:
             self.db.delete(v)
-        self.db.commit()
+        self.db.flush()
 
 
 class BacklinkRepository(BaseRepository[Backlink]):
@@ -126,6 +127,7 @@ class BacklinkRepository(BaseRepository[Backlink]):
         return list(self.db.scalars(q))
 
     def delete_by_source(self, source_doc_id: str) -> None:
+        """删除某文档的出链（只 flush；事务由调用方闭合）。"""
         for bl in self.list_sources(source_doc_id):
             self.db.delete(bl)
-        self.db.commit()
+        self.db.flush()

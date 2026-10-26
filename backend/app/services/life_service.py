@@ -74,6 +74,8 @@ class LifeService:
             user_id=habit.user_id,
             checkin_date=cdate,
         )
+        # 写完 → commit → publish：EXP 结算订阅者用独立 Session 反查打卡记录
+        self.db.commit()
         event_bus.publish(EVENT_HABIT_CHECKIN, habit_id=habit_id, date=cdate.isoformat())
         self.logger.info(f"习惯打卡: {habit_id} @ {cdate}")
         return self._checkin_to_dict(checkin)
@@ -149,6 +151,8 @@ class LifeService:
             logged_date=log_date,
             **data.model_dump(exclude_none=True, exclude={"logged_date"}),
         )
+        # 写完 → commit → publish：订阅者用独立 Session 反查心情记录
+        self.db.commit()
         event_bus.publish(EVENT_MOOD_LOGGED, mood_id=mood.id, score=mood.score)
         return self._mood_to_dict(mood)
 
@@ -212,6 +216,8 @@ class LifeService:
             diary_date=diary_date,
             **data.model_dump(exclude_none=True, exclude={"diary_date"}),
         )
+        # 写完 → commit → publish：订阅者用独立 Session 反查日记
+        self.db.commit()
         event_bus.publish(EVENT_DIARY_CREATED, diary_id=diary.id)
         self.logger.info(f"日记创建: {diary.id}")
         return self._diary_to_dict(diary)

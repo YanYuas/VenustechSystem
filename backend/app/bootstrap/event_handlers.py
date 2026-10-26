@@ -134,6 +134,9 @@ async def _handle_task_completed(task_id: str) -> None:
             source_type="task",
             source_id=task_id,
         )
+        # 后台任务自建 Session（不经过 get_db），repository 只 flush，
+        # 必须在此显式提交，否则 finally 的 close() 会把写入回滚掉。
+        db.commit()
         logger.info("任务完成通知已创建: {}", task_id)
     except Exception:
         logger.exception("创建任务完成通知失败")

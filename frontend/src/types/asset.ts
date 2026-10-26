@@ -61,6 +61,8 @@ export interface ProjectMemory {
   extracted_assets: string[]
   key_metrics: Record<string, unknown>
   tags: string[]
+  /** 身份轴（三期 B）：可空 = 未归类（backend schemas/asset.py:93） */
+  identity_id: string | null
   created_at: string
   updated_at: string
 }

@@ -234,6 +234,8 @@ class LearningService:
             review_count=card.review_count + 1,
         )
 
+        # 写完 → commit → publish：EXP 结算订阅者用独立 Session 反查卡片
+        self.db.commit()
         event_bus.publish(EVENT_FLASHCARD_REVIEWED, card_id=card_id, quality=quality,
                           next_interval=interval)
         self.logger.info(f"卡片复习: {card_id}, quality={quality}, next={next_review}")
@@ -256,6 +258,8 @@ class LearningService:
             logged_date=logged_date,
             **data.model_dump(exclude_none=True, exclude={"logged_date"}),
         )
+        # 写完 → commit → publish：订阅者用独立 Session 反查学习时长记录
+        self.db.commit()
         event_bus.publish(EVENT_STUDY_TIME_LOGGED, log_id=log.id, duration=log.duration)
         return self._time_to_dict(log)
 

@@ -27,6 +27,11 @@ export interface Task {
   reminder_time: string | null
   recurrence: RecurrenceRule | null
   focus_duration: number
+  // ---------- S6-1 领域规则引擎（backend schemas/task.py:45-46）----------
+  /** 预估时长（分钟）：学习计划生成的任务会带上，用于日程排布 */
+  estimated_minutes: number | null
+  /** 达标标准：对「做完没做完」之外的第二层验收 */
+  acceptance_criteria: string | null
   created_at: string
   updated_at: string
 }
@@ -90,6 +95,10 @@ export interface UpdateTaskRequest {
   /** null 表示清除提醒（一次性提醒触发后清除） */
   reminder_time?: string | null
   recurrence?: RecurrenceRule | null
+  // S6-1：计划生成的任务会带这两项，允许用户后续自行微调
+  // （backend schemas/task.py:82-83，estimated_minutes 有 ge=0 / le=100000 约束）
+  estimated_minutes?: number | null
+  acceptance_criteria?: string | null
 }
 
 // ---------- 批量操作（M02 F07） ----------

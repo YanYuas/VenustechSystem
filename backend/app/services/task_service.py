@@ -206,9 +206,11 @@ class TaskService:
             reminder_time=data.reminder_time,
             recurrence=data.recurrence,
         )
+        # 硬约束「写完 → commit → publish」：订阅者（成长体系 EXP 结算、
+        # 任务完成通知）用**独立 Session** 反查该任务，未提交的数据读不到。
+        self.db.commit()
         event_bus.publish(EVENT_TASK_CREATED, task_id=task.id)
         return self._to_out(task)
-
     def detail(self, user_id: str, task_id: str) -> TaskDetailOut:
         task = self._owned(task_id, user_id)
         out = self._to_out(task)

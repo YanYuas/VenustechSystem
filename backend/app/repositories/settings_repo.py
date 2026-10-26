@@ -53,6 +53,7 @@ class SettingRepository(BaseRepository[Setting]):
         row.value = value
         if row.deleted_at is not None:
             row.deleted_at = None
-        self.db.commit()
+        # 只 flush；事务边界由调用方闭合（repository 不再持有事务）
+        self.db.flush()
         self.db.refresh(row)
         return row

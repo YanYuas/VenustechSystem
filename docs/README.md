@@ -107,11 +107,13 @@
 
 **什么时候看**：部署、启动演示、准备演示数据、排查环境与数据目录问题时。
 
-> 现状：**`docs/runbooks/` 已建立**（当前有备份 runbook）；部署 / 发布 / 故障处置 runbook 待补。以下为当前可用的运维入口，均为现行。
+> 现状：**`docs/runbooks/` 已建立**（备份恢复 / 数据泄漏处置两份）；部署 / 发布 / 故障处置 runbook 待补。以下为当前可用的运维入口，均为现行。
 
 | 场景 | 入口 |
 |---|---|
 | 备份与恢复（人工步骤 + 备份契约） | [runbooks/backup.md](runbooks/backup.md) |
+| **真实数据库被提交进 Git 历史（P0）** | [runbooks/security-incident-db-leak.md](runbooks/security-incident-db-leak.md) |
+| 访问令牌轮换（手机端配对） | `cd ops/server && npm run token:rotate` · 见 [README.md](../README.md) 部署章节 |
 | 一键启动（开发 / 演示 / 移动端） | 仓库根 [start-dev.bat](../start-dev.bat) · [start-demo.bat](../start-demo.bat) · [start-mobile.bat](../start-mobile.bat) |
 | 脚本化启动与守护检查 | [scripts/dev.ps1](../scripts/dev.ps1) · `scripts/check_all.py`（一键校验，项数以脚本输出为准） |
 | 环境变量模板 | [backend/.env.example](../backend/.env.example)（照此配置，勿提交真实 `.env`） |

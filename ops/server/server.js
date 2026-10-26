@@ -13,8 +13,11 @@ import { createServer } from 'node:http'
 import pkg from 'http-proxy'
 const { createProxyServer } = pkg
 import { fileURLToPath } from 'node:url'
-import { basename, extname, isAbsolute, join, relative, resolve, sep } from 'node:path'
-import { readFileSync, writeFileSync, existsSync } from 'node:fs'
+import { join, resolve } from 'node:path'
+import { readFileSync, existsSync } from 'node:fs'
+import { createStaticResolver, getMimeType } from './lib/static-files.mjs'
+import { isAuthorized } from './lib/security.mjs'
+import { loadAccessTokens } from './lib/access-token.mjs'
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
 
@@ -58,110 +61,77 @@ proxy.on('error', (err, _req, res) => {
   }
 })
 
-// ---------- MIME 类型 ----------
-const MIME_TYPES = {
-  '.html': 'text/html; charset=utf-8',
-  '.js': 'application/javascript',
-  '.mjs': 'application/javascript',
-  '.css': 'text/css',
-  '.json': 'application/json',
-  '.png': 'image/png',
-  '.jpg': 'image/jpeg',
-  '.svg': 'image/svg+xml',
-  '.ico': 'image/x-icon',
-  '.woff': 'font/woff',
-  '.woff2': 'font/woff2',
-  '.ttf': 'font/ttf',
-  '.txt': 'text/plain',
+// ---------- 静态路径解析（实现在 lib/static-files.mjs，含路径穿越测试） ----------
+const { resolveStaticPath, cacheHeaderFor } = createStaticResolver(FRONTEND_DIST)
+
+// ---------- 安全响应头 ----------
+// 静态资源与 API 响应都带。CSP 暂不启用：index.html 有内联主题脚本（FOUC 防护），
+// 上 CSP 需要先改造成 nonce/hash，属 Phase 3。
+function setSecurityHeaders(res) {
+  res.setHeader('X-Content-Type-Options', 'nosniff')
+  res.setHeader('Referrer-Policy', 'no-referrer')
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN')
 }
 
-function getMimeType(path) {
-  return MIME_TYPES[extname(path).toLowerCase()] ?? 'application/octet-stream'
-}
-
-/** 必须每次校验的文件：一旦被缓存，应用更新后会加载到旧的入口/旧 SW */
-const NO_CACHE_FILES = new Set(['index.html', 'sw.js', 'manifest.webmanifest'])
-
-/**
- * 把请求 URL 解析为 dist 内的安全绝对路径。
- * 返回 null 表示越界（调用方回 403）。
- *
- * 两个关键点：
- *   - 先剥离 `?query` 与 `#hash`：req.url 是原始串，带参进 join 会变成
- *     非法文件名 → 静默 fallback 到 index.html（资源全变 HTML）
- *   - 越界判定用 relative()，不能用 startsWith()：后者会把
- *     `...\frontend\dist-secret` 误判为在 dist 之内
- */
-function resolveStaticPath(rawUrl) {
-  let pathOnly = (rawUrl ?? '/').split('?')[0].split('#')[0]
-  try {
-    pathOnly = decodeURIComponent(pathOnly)
-  } catch {
-    return null // 非法百分号编码
-  }
-  if (pathOnly.includes('\0')) return null
-  const resolved = resolve(join(FRONTEND_DIST, pathOnly))
-  const rel = relative(FRONTEND_DIST, resolved)
-  if (rel.startsWith('..') || isAbsolute(rel)) return null
-  return { full: resolved, rel }
-}
-
-/** 缓存策略：入口与 SW 不缓存；hash 资源长期缓存；其余短缓存 */
-function cacheHeaderFor(fullPath) {
-  if (NO_CACHE_FILES.has(basename(fullPath))) return 'no-cache, must-revalidate'
-  if (fullPath.includes(`${sep}assets${sep}`)) return 'public, max-age=31536000, immutable'
-  return 'public, max-age=3600'
-}
 
 // ---------- 访问令牌（安全审计修复：API 单点鉴权） ----------
 // 后端只绑 127.0.0.1，server.js 是唯一外部入口 —— /api/* 必须携带
 // X-API-Token（静态资源放行，App/PWA 首屏加载不受影响）。
-// Token 来源：环境变量 QM_TOKEN > .qm-token 文件（首次启动自动生成）。
-import { randomBytes } from 'node:crypto'
-// 令牌文件固定在仓库根（兼容迁移前的路径，手机端无需重新配对）
+// Token 来源：环境变量 QM_TOKEN > .qm-token 文件（首次启动自动生成）；
+//             .qm-token.prev 是轮换宽限期内的旧令牌。
 const TOKEN_FILE = resolve(__dirname, '..', '..', '.qm-token')
-let API_TOKEN = process.env.QM_TOKEN ?? ''
-if (!API_TOKEN) {
-  try {
-    API_TOKEN = readFileSync(TOKEN_FILE, 'utf8').trim()
-  } catch { /* 首次启动 */ }
-  if (!API_TOKEN) {
-    API_TOKEN = randomBytes(24).toString('hex')
-    try {
-      writeFileSync(TOKEN_FILE, API_TOKEN)
-      console.log(`🔑 已生成访问令牌（手机端"设置 → 服务器地址"页需填入）: ${API_TOKEN}`)
-      console.log(`   令牌文件: ${TOKEN_FILE}`)
-    } catch (e) {
-      console.error('⚠️ 令牌写入失败，/api 将拒绝外部访问:', e.message)
-    }
-  }
+const { tokens: API_TOKENS, generated: TOKEN_GENERATED } = loadAccessTokens({
+  tokenFile: TOKEN_FILE,
+  envToken: process.env.QM_TOKEN,
+})
+if (TOKEN_GENERATED) {
+  console.log(`🔑 已生成访问令牌（手机端"设置 → 服务器地址"页需填入）: ${API_TOKENS[0]}`)
+  console.log(`   令牌文件: ${TOKEN_FILE}`)
 }
-// 本机回环来源不校验（PC 前端零改动可用）；外部来源必须持令牌
-const LOOPBACK_HOSTS = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1'])
+if (API_TOKENS.length === 0) {
+  console.error('⚠️ 无可用访问令牌：/api 将拒绝所有非本机直连请求（fail-closed）')
+}
 
-function isAuthorized(req) {
-  if (LOOPBACK_HOSTS.has(req.socket.remoteAddress ?? '')) return true
-  const token = req.headers['x-api-token'] ?? ''
-  return API_TOKEN.length > 0 && token === API_TOKEN
+/**
+ * 回环绕过只对"本机浏览器直连"生效：
+ * 一旦请求带代理头（cloudflared / nginx / Caddy 等隧道），回环地址仅代表
+ * 最后一跳在本机，不等于调用者可信 —— 必须校验令牌。判定逻辑在
+ * lib/security.mjs（纯函数，有单测），此处只做请求对象适配。
+ */
+function authorize(req) {
+  return isAuthorized({
+    remoteAddress: req.socket?.remoteAddress,
+    headers: req.headers,
+    tokens: API_TOKENS,
+  })
 }
 
 // ---------- 静态文件服务器 ----------
 const isApiRequest = (url) => url === '/api' || (url ?? '').startsWith('/api/')
 
 const server = createServer((req, res) => {
+  setSecurityHeaders(res)
+
   // 1. /api/* → 代理到后端（带令牌校验）
   if (isApiRequest(req.url)) {
     if (req.method === 'OPTIONS') {
       // CORS 预检放行（浏览器会先发预检，此时未必带令牌）
+      res.setHeader('Vary', 'Origin')
       res.writeHead(204, {
         'Access-Control-Allow-Origin': req.headers.origin ?? '*',
-        'Access-Control-Allow-Methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
+        'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-API-Token',
       })
       res.end()
       return
     }
-    if (!isAuthorized(req)) {
+    const auth = authorize(req)
+    if (!auth.ok) {
+      // 服务端留证据，客户端不泄露具体原因（避免探测）
+      console.warn(
+        `[auth] 拒绝 /api 请求: reason=${auth.reason} remote=${req.socket?.remoteAddress} ` +
+          `proxied=${req.headers['x-forwarded-for'] ?? req.headers['cf-connecting-ip'] ?? '-'}`,
+      )
       res.writeHead(401, { 'Content-Type': 'application/json; charset=utf-8' })
       res.end(JSON.stringify({ code: 4010, message: '需要访问令牌：请在设置页填入服务器访问令牌', data: null }))
       return
@@ -209,7 +179,7 @@ const server = createServer((req, res) => {
 
 // SSE 长连接代理（同样校验令牌 —— WS/升级通道不得绕过）
 server.on('upgrade', (req, socket, head) => {
-  if (isApiRequest(req.url) && !isAuthorized(req)) {
+  if (isApiRequest(req.url) && !authorize(req).ok) {
     socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n')
     socket.destroy()
     return
@@ -224,6 +194,8 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`   前端资源：${FRONTEND_DIST}`)
   console.log(``)
   console.log(`   ⚠️  已监听 0.0.0.0:${PORT} —— 同网络的其他设备都能访问本端口。`)
-  console.log(`      /api/* 需要 X-API-Token（本机回环来源豁免）。`)
+  console.log(`      /api/* 需要 X-API-Token；仅「本机浏览器直连」豁免。`)
+  console.log(`      经隧道/反代（cloudflared 等）访问时一律校验令牌，回环不放行。`)
+  console.log(`      令牌轮换：cd ops/server && npm run token:rotate（旧令牌宽限 1 轮，删 .qm-token.prev 即吊销）`)
   console.log(`      公共 WiFi 下建议改用 Tailscale，不要在开放网络暴露此端口。`)
 })

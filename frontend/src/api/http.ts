@@ -118,6 +118,20 @@ export class OfflineQueuedError extends Error {
 
 const WRITE_METHODS = new Set(['POST', 'PATCH', 'PUT', 'DELETE'])
 
+/**
+ * request() 的额外控制项（不属于 fetch 的 RequestInit，故单列一个参数）。
+ */
+interface RequestControls {
+  /**
+   * 网络失败 / 离线时是否允许把请求交给离线队列重放（默认 true，保持既有语义）。
+   *
+   * 只有 JSON 字符串请求体可重放（队列里存的就是可序列化的 body）；
+   * FormData / Blob 这类二进制体无法序列化进 IndexedDB，
+   * 上传类请求必须显式关闭，否则队列里会留下一条永远重放不了的「空请求」。
+   */
+  allowOfflineQueue?: boolean
+}
+
 function isOffline(): boolean {
   try {
     return typeof navigator !== 'undefined' && navigator.onLine === false
@@ -139,7 +153,11 @@ function isNetworkFailure(err: unknown): boolean {
   return /Failed to fetch|NetworkError|请求超时|timeout|aborted/i.test(msg)
 }
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+async function request<T>(
+  path: string,
+  options: RequestInit = {},
+  controls: RequestControls = {},
+): Promise<T> {
   const headers: Record<string, string> = { ...(options.headers as Record<string, string>) }
   const token = getApiToken()
   if (token) headers['X-API-Token'] = token
@@ -163,7 +181,8 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     }
   }
   // 写操作 + （离线 或 网络失败）→ 交给离线队列，而不是直接失败
-  if (WRITE_METHODS.has(method) && offlineEnqueueHandler) {
+  // allowOfflineQueue === false 的请求（FormData 上传）跳过：二进制体无法重放
+  if (WRITE_METHODS.has(method) && offlineEnqueueHandler && controls.allowOfflineQueue !== false) {
     if (isOffline() || isNetworkFailure(lastError)) {
       try {
         const body = typeof options.body === 'string' ? JSON.parse(options.body) : undefined
@@ -308,6 +327,22 @@ export const http = {
   },
   post<T>(path: string, body?: unknown) {
     return request<T>(path, { method: 'POST', body: JSON.stringify(body) })
+  },
+  /**
+   * 表单上传（multipart/form-data）—— 文件 / 备份包等二进制体专用。
+   *
+   * 与 post() 的三点关键差异（都是「备份导入必失败」P0-3 的根因，别改回去）：
+   *  1. body 原样交给 fetch，**绝不 JSON.stringify**：FormData 一旦被序列化就变成
+   *     字符串 "{}"，后端只看得到一个空对象；
+   *  2. **不手动设置 Content-Type**：multipart 必须由浏览器/运行时自己写
+   *     `multipart/form-data; boundary=...`；手写头会丢掉 boundary，FastAPI 的
+   *     `UploadFile = File(...)` 仍然 422（doRequest 里已按 FormData 跳过 Content-Type）；
+   *  3. **不进离线队列**：队列只能重放 JSON，二进制体无法序列化。
+   *
+   * 超时 / token / 错误处理 / 连通性提示全部复用 request() → doRequest()，与普通请求一致。
+   */
+  postForm<T>(path: string, form: FormData) {
+    return request<T>(path, { method: 'POST', body: form }, { allowOfflineQueue: false })
   },
   patch<T>(path: string, body?: unknown) {
     return request<T>(path, { method: 'PATCH', body: JSON.stringify(body) })

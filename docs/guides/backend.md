@@ -493,8 +493,9 @@ class TaskService:
         # 业务逻辑...
         return PaginatedData(list=[...], total=..., page=..., page_size=...)
 ```
-- 接收 `Session`，不管理事务生命周期
-- 复杂操作使用 `self.db.commit()`
+- 接收 `Session`，**不管理请求级事务生命周期**（请求结束由 `api/deps.get_db` 统一 commit/rollback）
+- **用例边界显式提交**：多步写在全部完成后调用一次 `self.db.commit()`；发布领域事件前必须先 commit
+  （订阅者用独立 Session 读取，未提交则读不到）—— 固定顺序「写完 → commit → publish」
 - 返回 Pydantic Schema 对象
 - **更新操作必须使用字段白名单**：定义 `_UPDATABLE_FIELDS` 集合，防止通过 `setattr` 越权修改 `user_id`/`is_focus` 等内部字段
 
@@ -511,6 +512,8 @@ class TaskRepository(BaseRepository[Task]):
 ```
 - 只做数据查询，不包含业务逻辑
 - 继承 `BaseRepository[T]` 获得通用 CRUD
+- **只 `flush()`，绝不 `commit()`**：提交权在 service/请求边界，这样多步操作才能整体回滚
+  （架构守护 R11 强制：repositories 内出现 `db.commit()` 即失败）
 
 ### 9.5 Model 层规范
 ```python

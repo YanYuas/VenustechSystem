@@ -118,3 +118,40 @@ jobs:
             exit 1
           fi
           echo "✅ git ls-files 未发现 *.db / *.qm-token / *.pem / *.key / .env"
+
+      # 上面那步只看「当前索引」；本步额外扫描**全部 refs 的历史新增文件**。
+      # 背景：backend/data/app.db 曾被提交（提交 6b5c2dd），删出索引并不能消除历史。
+      # 现状：历史泄漏仍存在（待按 docs/runbooks/security-incident-db-leak.md 处置），
+      #       因此默认只告警、不判红；**处置完成后请把本步骤改为 --strict**，让复发直接失败。
+      - name: 仓库敏感文件守护（索引 + 历史 + .gitignore）
+        if: always()
+        run: python scripts/audit_repo_secrets.py
+
+  # 统一 Web 服务（ops/server）是唯一鉴权入口，必须有自己的测试。
+  # 2026-10 审计 P0：回环绕过（cloudflared 场景无鉴权）—— 修复后在这里守住。
+  edge-server:
+    name: 统一服务测试（鉴权 / 路径穿越）
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: ops/server
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: ops/server/package-lock.json
+
+      - name: Install
+        run: npm ci --no-audit --no-fund
+
+      - name: Syntax check
+        run: node --check server.js && node --check rotate-token.mjs
+
+      - name: Unit tests (node:test)
+        run: npm test

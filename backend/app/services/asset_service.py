@@ -141,6 +141,8 @@ class AssetService:
         """使用SOP（计数+1，返回步骤清单）"""
         sop = self._owned(self.sop_repo, sop_id, user_id, "SOP")
         updated = self.sop_repo.update(sop, use_count=sop.use_count + 1)
+        # 写完 → commit → publish：EXP 结算订阅者用独立 Session 反查 SOP
+        self.db.commit()
         event_bus.publish(EVENT_SOP_USED, sop_id=sop_id, use_count=updated.use_count)
         return self._sop_to_dict(updated)
 
@@ -208,6 +210,8 @@ class AssetService:
 
         # 计数
         updated = self.prompt_repo.update(prompt, use_count=prompt.use_count + 1)
+        # 写完 → commit → publish：EXP 结算订阅者用独立 Session 反查 Prompt
+        self.db.commit()
         event_bus.publish(EVENT_PROMPT_USED, prompt_id=prompt_id, use_count=updated.use_count)
 
         return {
@@ -281,6 +285,8 @@ class AssetService:
         if data.project_id is not None:
             self._ensure_project_owned(user_id, data.project_id)
         memory = self.memory_repo.create(user_id=user_id, **data.model_dump(exclude_none=True))
+        # 写完 → commit → publish：EXP 结算订阅者用独立 Session 反查项目记忆
+        self.db.commit()
         event_bus.publish(EVENT_PROJECT_MEMORY_CREATED, memory_id=memory.id)
         self.logger.info(f"项目记忆创建: {memory.id}")
         return self._memory_to_dict(memory)

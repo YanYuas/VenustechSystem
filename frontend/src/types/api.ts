@@ -7,8 +7,12 @@ export interface ApiResponse<T = unknown> {
   code: number
   message: string
   data: T
-  /** 服务端时间戳（毫秒），可选 */
-  timestamp?: number
+  /**
+   * 服务端时间戳（单位：**秒**，Unix epoch）。
+   * 后端 core/response.py:17 `int(time.time())` 总是返回，故这里为必填；
+   * 旧注释误写「毫秒」，按毫秒换算会差 1000 倍。
+   */
+  timestamp: number
 }
 
 export interface PaginatedData<T> {

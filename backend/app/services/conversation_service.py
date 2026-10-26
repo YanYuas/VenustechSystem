@@ -73,6 +73,15 @@ class ConversationService:
             content=data.content,
             referenced_doc_ids=data.referenced_doc_ids or [],
         )
+        # 用户消息在**调用外部 LLM 之前**提交，理由有两条（D-04 改造后新增）：
+        #   1. 持久性：流式中断/客户端断开时，用户说过的话不该丢（改造前
+        #      repo.create 自带 commit，行为一致）；
+        #   2. 锁粒度：请求级事务会一直开到响应结束，而 AI 流式响应可能持续
+        #      数十秒。不在此断开事务，就会在整段流式期间持有 SQLite 写锁，
+        #      并发写入（如桌宠位置上报）会撞 busy_timeout 变成 500。
+        # 助手消息仍由 get_db 在响应结束后统一提交（SSE 的依赖清理确实在
+        # 响应体发完之后，FastAPI request_stack 包住 await response(...)）。
+        self.db.commit()
         # 2. 构建上下文（含思维模式）
         mode = data.mode if data.mode in MODE_CONFIG else "normal"
         messages = self._build_context(conv.id, data.content, data.referenced_doc_ids or [], mode)

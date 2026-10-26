@@ -1,6 +1,6 @@
 // ============================================================
 // Composables 统一导出
-// 通用: useAsync / useToast / useModal / useTheme / useShortcuts / useOnline / useAutoSave
+// 通用: useAsync / useToast / useModal / useTheme / useShortcuts / useAutoSave
 // 业务: useTask / useDocument / useConversation / useReview / useDashboard
 // ============================================================
 export { useAsync } from './useAsync'
@@ -8,7 +8,6 @@ export { useToast, toast } from './useToast'
 export { useModal, modal } from './useModal'
 export { useTheme } from './useTheme'
 export { useShortcuts } from './useShortcuts'
-export { useOnline } from './useOnline'
 export { useAutoSave } from './useAutoSave'
 export { useTask } from './useTask'
 export { useDocument } from './useDocument'
@@ -17,9 +16,3 @@ export { useReview } from './useReview'
 export { useDashboard } from './useDashboard'
 export { useNotification } from './useNotification'
 export { useReminderWatcher } from './useReminderWatcher'
-
-export { useResource } from './useResource'
-export { useLearning } from './useLearning'
-export { useLife } from './useLife'
-export { useAsset } from './useAsset'
-export { useDataCache } from './useDataCache'
