@@ -4,14 +4,14 @@
 # ============================================================
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, timedelta, timezone
 
 from sqlalchemy.orm import Session
 
 from app.core.event_bus import EVENT_TASK_COMPLETED, EVENT_TASK_CREATED, event_bus
 from app.core.exceptions import NotFoundException, TaskStateException, ValidationException
 from app.models.base import utcnow
-from app.models.task import Task
+from app.models.task import FocusSession, Task
 from app.repositories import (
     FocusSessionRepository,
     IdentityRepository,

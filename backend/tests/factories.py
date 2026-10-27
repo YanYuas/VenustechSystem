@@ -117,7 +117,6 @@ def make_focus_session(
     duration: int = 0,
 ):
     """直接在 db 中创建一条 FocusSession，返回 ORM 对象（已 flush）。"""
-    from datetime import datetime, timezone
 
     from app.models.task import FocusSession
     from app.models.base import utcnow

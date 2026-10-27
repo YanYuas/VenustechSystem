@@ -77,10 +77,10 @@ export interface PetState {
  * 只是名字取反了，非常容易读错。
  */
 export interface PetStats {
-  intimacy: number  // 亲密度 0-100
-  satiety: number   // 饱食度 0-100
-  mood: number      // 心情 0-100
-  energy: number    // 精力 0-100
+  intimacy: number // 亲密度 0-100
+  satiety: number // 饱食度 0-100
+  mood: number // 心情 0-100
+  energy: number // 精力 0-100
   updated_at: string | null
   /** 本次读取是否发生了按时间的衰减（由后端惰性计算） */
   decayed: boolean
@@ -90,9 +90,7 @@ export interface PetStats {
 export type PetVitals = Pick<PetStats, 'intimacy' | 'satiety' | 'mood' | 'energy'>
 
 /** 互动时的**增量**（不是绝对值） */
-export type PetStatsDelta = Partial<
-  Record<'intimacy' | 'satiety' | 'mood' | 'energy', number>
->
+export type PetStatsDelta = Partial<Record<'intimacy' | 'satiety' | 'mood' | 'energy', number>>
 
 /**
  * 桌宠动作名。

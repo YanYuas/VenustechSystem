@@ -16,9 +16,9 @@ import {
   http,
   setOfflineQueueHandler,
   type OfflineEnqueueHandler,
-} from '../src/api/http'
-import { backendUnreachable, isBackendUnreachable, markReachable } from '../src/api/connectivity'
-import { toast } from '../src/composables/useToast'
+} from '../src/kernel/http'
+import { backendUnreachable, isBackendUnreachable, markReachable } from '../src/kernel/http/connectivity'
+import { toast } from '../src/kernel/ui/toast'
 
 let passed = 0
 let failed = 0

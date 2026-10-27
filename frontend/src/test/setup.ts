@@ -26,11 +26,15 @@ window.matchMedia = ((query: string) => ({
     return query.includes('dark') ? mediaState.dark : !mediaState.dark
   },
   onchange: null,
-  addEventListener: (_: string, fn: Listener) => { mediaState.listeners.push(fn) },
+  addEventListener: (_: string, fn: Listener) => {
+    mediaState.listeners.push(fn)
+  },
   removeEventListener: (_: string, fn: Listener) => {
     mediaState.listeners = mediaState.listeners.filter((f) => f !== fn)
   },
-  addListener: (fn: Listener) => { mediaState.listeners.push(fn) },
+  addListener: (fn: Listener) => {
+    mediaState.listeners.push(fn)
+  },
   removeListener: (fn: Listener) => {
     mediaState.listeners = mediaState.listeners.filter((f) => f !== fn)
   },

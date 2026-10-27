@@ -4,10 +4,9 @@
 # ============================================================
 from __future__ import annotations
 
-from sqlalchemy.orm import Session
 
 from app.repositories.base import BaseRepository
-from app.models.resource import InboxItem, Template, Domain
+from app.models.resource import InboxItem
 
 
 class InboxItemRepository(BaseRepository[InboxItem]):

@@ -1,9 +1,9 @@
 // ============================================================
 // kernel/offline/offlineQueue —— 离线队列 Store（迁移批次 P1，ADR-0007）
-// 原 `@/stores/offlineQueue`（现为薄转发壳，P4 删除）。
+// P4 起公开入口：`@/kernel/offline/offlineQueue`。
 //
 // 职责：
-// - 持有队列管理器（核心逻辑在 utils/offlineQueueCore，存储用 IndexedDB）
+// - 持有队列管理器（核心逻辑在同目录 offlineQueueCore，存储用 IndexedDB）
 // - 监听 online/offline，联网时自动 FIFO 重放
 // - 暴露给 UI：pending / failed / flushing / items
 // - 离线入队与重放结果通过 window CustomEvent 广播，由角标组件弹 toast
@@ -11,12 +11,8 @@
 // ============================================================
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import {
-  createQueueManager,
-  type QueueEntry,
-  type QueueManager,
-} from '@/utils/offlineQueueCore'
-import { createIndexedDbStorage } from '@/utils/offlineQueueIdb'
+import { createQueueManager, type QueueEntry, type QueueManager } from './offlineQueueCore'
+import { createIndexedDbStorage } from './offlineQueueIdb'
 import { getApiBase, getApiToken } from '../http'
 
 export const OFFLINE_QUEUE_EVENT = 'qm-offline-queue'
@@ -119,7 +115,12 @@ export const useOfflineQueueStore = defineStore('offlineQueue', () => {
   }
 
   /** 拦截到离线写操作时调用 */
-  async function enqueue(path: string, method: QueueEntry['method'], body?: unknown, label?: string) {
+  async function enqueue(
+    path: string,
+    method: QueueEntry['method'],
+    body?: unknown,
+    label?: string,
+  ) {
     const m = getManager()
     if (!m) throw new Error('离线队列不可用（无 IndexedDB）')
     await m.enqueue({ path, method, body, label })
@@ -167,7 +168,18 @@ export const useOfflineQueueStore = defineStore('offlineQueue', () => {
   }
 
   return {
-    pending, failed, flushing, items, online, hasPending, badgeText,
-    init, dispose, enqueue, flush, retryAll, clearFailed,
+    pending,
+    failed,
+    flushing,
+    items,
+    online,
+    hasPending,
+    badgeText,
+    init,
+    dispose,
+    enqueue,
+    flush,
+    retryAll,
+    clearFailed,
   }
 })

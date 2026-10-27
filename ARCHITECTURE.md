@@ -95,10 +95,10 @@ models/<module>.py ── SQLAlchemy 模型 → SQLite（WAL）
 |---|---|---|
 | 1 | 应用装配：Pinia、Router、全局错误处理、离线队列接线 | `frontend/src/app/main.ts` |
 | 2 | 路由匹配，**懒加载**页面 | `frontend/src/app/router/index.ts` |
-| 3 | 页面组件（视图只管渲染与交互） | `frontend/src/views/Task/TaskListView.vue` |
-| 4 | 组合式函数承接视图逻辑（可复用、可测） | `frontend/src/composables/useTask.ts` |
-| 5 | 领域 API 封装（路径/类型/参数） | `frontend/src/api/task.ts` |
-| 6 | **唯一 HTTP 漏斗**：baseURL、token、超时、重试、离线入队、SSE、信封解包、错误提示 | `frontend/src/api/http.ts` |
+| 3 | 页面组件（视图只管渲染与交互） | `frontend/src/features/task/views/TaskListView.vue` |
+| 4 | 组合式函数承接视图逻辑（可复用、可测） | `frontend/src/features/task/composables/useTask.ts` |
+| 5 | 领域 API 封装（路径/类型/参数） | `frontend/src/features/task/api.ts` |
+| 6 | **唯一 HTTP 漏斗**：baseURL、token、超时、重试、离线入队、SSE、信封解包、错误提示 | `frontend/src/kernel/http/index.ts` |
 | 7 | 生产环境经边缘服务（dev 环境 Vite 直连 8765） | `ops/server/server.js` |
 | 8 | FastAPI 入口：CORS、统一异常、插件路由挂载 | `backend/app/main.py` |
 | 9 | 路由聚合 `/api/v1` | `backend/app/api/__init__.py` |
@@ -107,7 +107,7 @@ models/<module>.py ── SQLAlchemy 模型 → SQLite（WAL）
 | 12 | 数据访问 | `backend/app/repositories/task_repo.py` |
 | 13 | ORM 模型 → SQLite | `backend/app/models/task.py` → `app.db` |
 | 14 | 统一响应信封 `{code, message, data}` | `backend/app/core/response.py` |
-| 15 | 前端解包 `body.data`，非 0 code 抛 ApiError | `frontend/src/api/http.ts` |
+| 15 | 前端解包 `body.data`，非 0 code 抛 ApiError | `frontend/src/kernel/http/index.ts` |
 
 **写路径的额外一跳**：service 提交后 `event_bus.publish(EVENT_TASK_COMPLETED, ...)` → 订阅者（`app/bootstrap/event_handlers.py`、`app/bootstrap/growth_handlers.py`）异步处理通知、AI 摘要、成长经验值。**事件是解耦手段，不是业务事实来源**——数据库仍是唯一真相。
 
@@ -172,14 +172,14 @@ features/<domain>/views      页面（只渲染/交互）
 
 | 领域 | 职责 | 模块 | 前端目录 |
 |---|---|---|---|
-| **platform** 平台底座 | 认证、设置、安全、备份、同步、事件、健康、日志、通知、规则、插件 | auth, user, settings, security, backup, sync, events, health, logs, notification, rules, plugins, audit, settings_history | `Settings/`, `NotFound/` |
-| **execution** 执行管理 | 任务、项目、工作流、工作区 | task, project, workflow, workspace | `Task/`, `Project/`, `Workflow/`, `Workspace/` |
-| **knowledge** 个人知识 | 文档、文件夹、学习/间隔重复、资源、模板、经验、复盘 | document, folder, learning, flashcard, study_plan, study_time, domain, resource, template, experience, review | `Document/`, `Learning/`, `Resource/`, `Experience/`, `Review/` |
-| **growth** 个人成长 | 成长 EXP、身份、习惯、心情、日记 | growth, identity, life, habit, habit_checkin, mood, diary | `Growth/`, `Identity/`, `Life/` |
-| **assistant** AI 交互 | 对话、助手、快捷面板、LLM 客户端与提示词 | conversation, assistant, panel, ai | `Conversation/`, `Assistant/`, `AiHot/` |
-| **companion** 桌宠陪伴 | 桌宠状态/动作、形象、头像 | avatar, pet | `Avatar/`, `Pet/` |
-| **asset** 资产沉淀 | SOP/Prompt/Skill/项目记忆、保险箱 | asset, vault, sop, sop_version, skill, project_memory, prompt | `Asset/`, `Vault/` |
-| **insight** 数据洞察 | 首页聚合、报告（只读，不写别人的表） | dashboard, report | `Dashboard/`, `Report/` |
+| **platform** 平台底座 | 认证、设置、安全、备份、同步、事件、健康、日志、通知、规则、插件 | auth, user, settings, security, backup, sync, events, health, logs, notification, rules, plugins, audit, settings_history | `features/settings/`, `features/auth/`, `features/notification/`, `features/sync/`, `features/system/` |
+| **execution** 执行管理 | 任务、项目、工作流、工作区 | task, project, workflow, workspace | `features/task/`, `features/project/`, `features/workflow/`, `features/workspace/` |
+| **knowledge** 个人知识 | 文档、文件夹、学习/间隔重复、资源、模板、经验、复盘 | document, folder, learning, flashcard, study_plan, study_time, domain, resource, template, experience, review | `features/document/`, `features/learning/`, `features/resource/`, `features/experience/`, `features/review/` |
+| **growth** 个人成长 | 成长 EXP、身份、习惯、心情、日记 | growth, identity, life, habit, habit_checkin, mood, diary | `features/growth/`, `features/identity/`, `features/life/` |
+| **assistant** AI 交互 | 对话、助手、快捷面板、LLM 客户端与提示词 | conversation, assistant, panel, ai | `features/conversation/`, `features/assistant/`, `features/aihot/`, `features/panel/` |
+| **companion** 桌宠陪伴 | 桌宠状态/动作、形象、头像 | avatar, pet | `features/avatar/`, `features/pet/` |
+| **asset** 资产沉淀 | SOP/Prompt/Skill/项目记忆、保险箱 | asset, vault, sop, sop_version, skill, project_memory, prompt | `features/asset/`, `features/vault/` |
+| **insight** 数据洞察 | 首页聚合、报告（只读，不写别人的表） | dashboard, report | `features/dashboard/`, `features/report/` |
 
 **跨领域规则**：允许调用对方 **service 的公开方法**（如 dashboard 聚合各域）；**禁止**直接 import 对方的 repository/model 做写操作。当前 `identity_service` 删除时跨 10 张表写，属于待收口债务（D-06）。
 
@@ -205,7 +205,7 @@ VenustechSystem/
 │   │   ├── migrate.py          启动迁移；seed.py 演示数据
 │   │   └── migration_helpers.py
 │   ├── migrations/             Alembic（0001 冻结基线 + 0002–0022；见 §10 D-05）
-│   ├── tests/                  1282 条测试（api/production/repository_contract/sync/architecture）
+│   ├── tests/                  1284 条测试（api/production/repository_contract/sync/architecture）
 │   ├── scripts/                后端专用：冒烟/探针/种子/演示数据
 │   ├── requirements.txt        ★ 运行时依赖唯一来源
 │   ├── requirements-dev.txt    测试/工具依赖
@@ -213,18 +213,14 @@ VenustechSystem/
 │   └── data/                   默认运行期数据（gitignored；长期目标见 §7）
 ├── frontend/                   Vue3 + TS + Vite（详见 §4.2）
 │   ├── src/
-│   │   ├── app/                main.ts / App.vue / router / errorHandler
-│   │   ├── kernel/             ★ 无业务语义底座：http(唯一漏斗) / ui(toast,modal) / offline
-│   │   ├── shared/             ★ 设计系统与壳：constants、directives（styles/components P3 归位）
-│   │   ├── features/           ★ 领域包：pet/（api·model·composables·components·views·index）
-│   │   ├── views/              其余页面目录（P3 逐域迁入 features/）
-│   │   ├── composables/        其余视图逻辑（P3 迁入 feature 或 kernel）
-│   │   ├── api/                其余领域 API + 8 个薄转发壳（P4 删除）
-│   │   ├── components/         common(共享) / layout(壳) / 业务组件（P3 归位）
-│   │   ├── stores/             Pinia（offlineQueue 转发壳）
-│   │   ├── types/ styles/      前后端契约类型、4 套主题 × 明暗（P3 归位）
-│   │   ├── constants/ directives/ utils/   过渡壳/工具（P3/P4）
+│   │   ├── app/                main.ts / App.vue / router / errorHandler / layout(业务壳) / views(404)
+│   │   ├── kernel/             ★ 无业务语义底座：http(client·errors·request·sse·types) / ui / offline / device / async / electron
+│   │   ├── shared/             ★ 设计系统与壳：components(common+layout) / theme / constants / directives / composables / types
+│   │   ├── features/           ★ 27 个领域包（api·model·composables·components·views·index.ts）
+│   │   ├── styles/             4 套主题 × 明暗（P4 剩余：迁入 shared/styles）
 │   │   └── test/               vitest setup
+│   ├── eslint.config.js        ESLint 9 flat（含 ADR-0007 分层边界规则）
+│   ├── .prettierrc.json        Prettier（semi:false；多语句内联 handler 必须抽函数）
 │   ├── public/                 manifest + sw.js（PWA）
 │   ├── android/                Capacitor 原生工程（构建产物，勿手改）
 │   └── scripts/                前端专用测试脚本（esbuild）
@@ -293,12 +289,13 @@ VenustechSystem/
 
 ## 9. 质量门禁与验证
 
-**唯一验证入口**：`python scripts/check_all.py`（14 项）；CI 必须 `--strict`（缺依赖=失败，不给假绿）。
+**唯一验证入口**：`python scripts/check_all.py`（15 项）；CI 必须 `--strict`（缺依赖=失败，不给假绿）。
 
 | 守护 | 命令 | 守什么 |
 |---|---|---|
 | 架构 | `scripts/audit_architecture.py` | 分层方向、core 隔离、领域归属、路由/模型注册、根目录契约、**事务边界(R11)**、**迁移基线(R12)**、**service 零直连 ORM(R13)**、**前端 kernel/shared/features 分层(R14)**；R1/R2/R13/R14 均有负向测试证明会变红 |
-| 后端测试 | `pytest backend/tests` | 1282 条：API 形状 + 生产行为 + 仓储契约 + 同步引擎 + 数据库基础设施 |
+| 后端测试 | `pytest backend/tests` | 1284 条：API 形状 + 生产行为 + 仓储契约 + 同步引擎 + 数据库基础设施 |
+| 后端 lint | `cd backend && python -m ruff check app tests` | ruff 0.6.2 只启正确性规则 `E4,E7,E9,F`：未定义名 / 未使用导入与变量 / 重定义 / 语法错误；**不跑 `ruff format`**（避免纯风格 diff），口径见 `backend/pyproject.toml` |
 | 后端冒烟 | `backend/scripts/smoke_backend.py` | 真实启动 + 迁移 + 端到端断言 |
 | 版本一致 | `scripts/check_versions.py` | 5 处版本 == `VERSION` |
 | 文档链接 | `scripts/audit_docs_links.py` | 全量 md 相对链接与内联路径 |
@@ -306,6 +303,8 @@ VenustechSystem/
 | 日志格式 | `scripts/audit_log_format.py` | loguru `{}` 占位符（`%s` 会静默丢参数） |
 | 交付物 | `scripts/audit_delivery.py` | 一键脚本真能启动、冒烟不含水分 |
 | 设计令牌 | `frontend/scripts/audit-tokens.py` | 用了不存在的 CSS 变量 |
+| 前端 lint | `npm run lint` | ESLint 9 flat：正确性 + **ADR-0007 分层边界**（kernel/shared/features 依赖方向） |
+| 前端格式 | `npm run format:check` | Prettier 一致性（`semi:false`；多语句内联 handler 必须抽函数） |
 | 前端类型 | `npm run typecheck` | TS 严格模式 |
 | 前端单测 | `npm test` | vitest（纯逻辑） |
 | 前端行为 | `frontend/scripts/test-*.ts` | 离线队列 / HTTP 连通性 |
@@ -324,18 +323,19 @@ CI：`.github/workflows/{backend,frontend,repo-guard}.yml` + `android-build.yml`
 |---|---|---|---|---|
 | D-01 | **P0** | 令牌回环绕过：cloudflared 场景等于无鉴权 | `ops/server/server.js` `isAuthorized()` | ✅ 已修（2026-10-26）：代理头检测 + 常量时间比较 + 16 条单测 + CI |
 | D-02 | **P0** | `origin/feature/phase2-development` 包含真实用户库 `backend/data/app.db`（606KB，公开可拉） | 泄漏提交 `6b5c2dd`，仅该分支可达；**无 `.encryption_key`**（密文字段安全） | ⚠️ 已评估 + 检测守护 + runbook；**待你执行删分支/重建远端**（不可逆） |
-| D-03 | **P0** | 备份导入 100% 失败：`FormData` 被 `JSON.stringify` 后发 JSON，后端要 multipart → 422 | `frontend/src/api/dashboard.ts` + `api/http.ts` ↔ `backend/app/api/backup.py` | ✅ 已修（2026-10-26）：`http.postForm` + 真实 multipart 运行时断言 11/11 |
+| D-03 | **P0** | 备份导入 100% 失败：`FormData` 被 `JSON.stringify` 后发 JSON，后端要 multipart → 422 | `frontend/src/features/dashboard/api.ts` + `kernel/http/index.ts` ↔ `backend/app/api/backup.py` | ✅ 已修（2026-10-26）：`http.postForm` + 真实 multipart 运行时断言 11/11 |
 | D-04 | P1 | **事务边界下沉**：`BaseRepository` 每个方法内部 commit，service 再 commit → 多步操作无原子性 | `repositories/base.py` | ✅ 已修（2026-10-26）：repo 只 flush、service 控 commit、get_db 兜底；8 条原子性测试 + 守护 R11 |
 | D-05 | P1 | 迁移基线失效：`0001` 用 `create_all()`，11 张基线表无 DDL；升级库缺 11 个索引 | `migrations/versions/0001_initial.py` | ✅ 已修（2026-10-26）：0001 冻结显式 DDL（49 表/79 索引）+ 0021 对账 + 6 条完整性测试 + 守护 R12 |
 | D-06 | P1 | Repository 层名存实亡：16/31 service 直连 ORM；service 9441 行 vs repo 1412 行 | 审计报告 §2 | ✅ 已修（2026-10-27）：16 service / 156 调用点 → **0**；新增 7 个 repo、约 60 个语义化方法；守护 R13 |
 | D-07 | P1 | `core/sync.py` 藏 389 行领域逻辑；core 内共 815 行业务代码 | 审计报告 §2 | ✅ 已修（2026-10-27）：`core/sync.py` → `services/sync/`；core **0 依赖 models**；删除死代码 `core/cache.py`；R2 收紧 |
-| D-08 | P1 | 前端 13 处前后端契约漂移（几乎都是"后端有、前端类型没有"） | `frontend/src/types/*` vs `backend/app/schemas/*` | ✅ 已修 13/13（2026-10-26）；剩余：TaskStatus 需后端补 Literal、24 处 `| null` 语义待定 |
+| D-08 | P1 | 前端 13 处前后端契约漂移（几乎都是"后端有、前端类型没有"） | `frontend/src/features/*/model.ts` vs `backend/app/schemas/*` | ✅ 已修（2026-10-27）：13/13 + TaskStatus/TaskPriority Literal + ADR-0008 `\| null` 语义落地 34 处 |
 | D-09 | P1 | 前端 god 组件：`SettingsView` 1577 行；16 个 view >500 行；`http.ts` 378 行 9 类职责 | 审计报告 §4–§6 | ✅ 已修（2026-10-27）：SettingsView **1701 → 291 行**；14 分区组件 + 3 composable；DOM 405 节点零差异；`http.ts` 迁入 `kernel/http` |
 | D-10 | P1 | 前端死代码约 1188 行（`AppHeader`/`AppSidebar`/`stores/app.ts` 等） | 审计报告 §7 | ✅ 已修（2026-10-26）：15 文件 / 1625 行，typecheck ×5 全绿 |
-| D-11 | P2 | 5 个启动器重复实现 venv/端口/令牌逻辑（4 份 venv 解析、2 种令牌生成） | `*.bat` + `scripts/dev.ps1` | Phase 2 |
-| D-12 | P2 | `.git` 是 Junction 指向 `C:\Users\21722\qimingxing-git-repo`：备份项目目录 ≠ 备份历史 | 文件系统 | Phase 1（写备份 runbook） |
-| D-13 | P2 | 无 lint：ESLint/Prettier/ruff 全缺 | — | Phase 2 |
+| D-11 | P2 | 5 个启动器重复实现 venv/端口/令牌逻辑（4 份 venv 解析、2 种令牌生成） | `*.bat` + `scripts/dev.ps1` | ✅ 已修（2026-10-27）：唯一实现 `ops/start.ps1`（`-Mode`/`-WhatIf`）+ 根 .bat 薄转发壳；审计守护点迁移 + 负向测试 |
+| D-12 | P2 | `.git` 是 Junction 指向 `C:\Users\21722\qimingxing-git-repo`：备份项目目录 ≠ 备份历史 | 文件系统 | ✅ 已提供工具（2026-10-27）：`ops/backup-git.ps1`（bundle 创建/校验/轮转，实测 4.5MB 通过）+ runbook；结构性迁移待停机窗口 |
+| D-13 | P2 | 无 lint：ESLint/Prettier/ruff 全缺 | — | ✅ 已修（2026-10-27）：backend ruff E4/E7/E9/F（245→0，进 CI）；frontend ESLint 9 flat（含 ADR-0007 边界）+ Prettier（进 CI） |
 | D-14 | P2 | `server.js` 是唯一鉴权点却零测试 | `ops/server/server.js` | ✅ 已修（2026-10-26）：`ops/server/test` 16 用例 + CI edge-server job |
+| D-16 | P2 | `backend/scripts/**` 未纳入 ruff（实测 13 条，含 3 条 F821 疑似真 bug） | `backend/scripts/` | Phase 4 |
 | D-15 | **P0（隐性）** | 架构守护 R1/R2 长期**空转**：`layer_of_file()` 拿仓库相对路径比 `app/` 前缀（永不匹配），且 `TYPE_CHECKING` 豁免标记传入未使用 → `--strict` 恒绿 | `scripts/audit_architecture.py` | ✅ 已修（2026-10-27）：路径基准改为 `backend/`、TYPE_CHECKING 真正豁免；新增 4 条负向 + 2 条回归测试 |
 
 > 原则：**先修 P0/P1 的"正确性"，再谈结构搬迁**。在事务边界、迁移基线、备份导入还有问题时做领域分包，只是把混乱打包进更漂亮的新目录。
@@ -349,7 +349,8 @@ CI：`.github/workflows/{backend,frontend,repo-guard}.yml` + `android-build.yml`
 | **Phase 0** | 架构可见、可守、可查 | 本文 + `domains.json` + AST 守护 + 债务基线 + CI 三件套 + 文档 IA + 版本/依赖/配置单一来源 + `core` 去业务化 + 根目录契约 | ✅ 本轮完成 |
 | **Phase 1** | 修正确性 P0/P1 | D-01/03/04/05/08/10/14 ✅ 完成；D-02 ✅ 已评估（runbook + 守护，**远端处置待你执行**）；D-06/07/09 转入 Phase 2 | ✅ 本轮完成（2026-10-26，1229 测试全绿） |
 | **Phase 2** | 收口领域边界 | D-06 仓储收口（156→0，R13）、D-07 sync 下沉（core 0 models 依赖）、D-09 SettingsView 拆分（1701→291）、前端 `kernel/shared/features` + pet 试点（R14）、D-15 守护空转修复 | ✅ 本轮完成（2026-10-27，1282 测试 + 86 前端测试全绿） |
-| **Phase 3** | 可持续交付 | D-11 启动器单一实现、D-12 `.git` 备份治理、D-13 lint（ESLint/Prettier/ruff 进 CI）、前端其余 25 域迁入 features、删除 8 个薄转发壳、`kernel` 过渡依赖归位 | 待批 |
+| **Phase 3** | 可持续交付 | P3 全量迁移（27 域 → features，旧路径 392→0）、P4（8 壳删除 + kernel 依赖归位 + `kernel/http` 拆分）、D-11 启动器单一实现、D-12 备份工具、D-13 前后端 lint 进 CI、ADR-0008 | ✅ 本轮完成（2026-10-27，1284 后端 + 86 前端测试，lint/format/构建全绿） |
+| **Phase 4** | 收尾与交付 | P0-2 远端泄漏处置（**需你执行**）、`styles/` 与工程文件归位、`backend/scripts` 纳入 lint、`var/` 数据物理迁移、CI 首次真实运行 | 待批 |
 
 **明确不做（以及为什么）**：
 
@@ -370,3 +371,5 @@ CI：`.github/workflows/{backend,frontend,repo-guard}.yml` + `android-build.yml`
 | [0004](docs/architecture/ADR/0004-runtime-data-and-secrets.md) | 运行期数据收敛 `var/`，配置单一入口 |
 | [0005](docs/architecture/ADR/0005-version-and-dependency-single-source.md) | `VERSION` 为版本真相；`requirements.txt` 为依赖真相 |
 | [0006](docs/architecture/ADR/0006-docs-information-architecture.md) | 文档 IA：架构/产品/指南/过程/设计 五分区 |
+| [0007](docs/architecture/ADR/0007-frontend-feature-architecture.md) | 前端 kernel / shared / features 分层 + strangler 迁移 |
+| [0008](docs/architecture/ADR/0008-null-semantics-in-requests.md) | 请求体 `null` = 清空，省略 = 不改 |

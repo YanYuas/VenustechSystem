@@ -54,53 +54,53 @@ def seed_if_empty(db: Session) -> bool:
     # —— 启明星开发 ——
     t1 = tr.create(user_id=user.id, title="完成PRD文档", status="in_progress", priority="high",
                    project_tag="启明星开发", is_focus=True, description="整理需求文档并输出正式版", sort_order=0)
-    t2 = tr.create(user_id=user.id, title="设计桌宠动作帧", status="pending", priority="high",
-                   project_tag="启明星开发", description="完成8种动作的帧动画设计", sort_order=1)
+    tr.create(user_id=user.id, title="设计桌宠动作帧", status="pending", priority="high",
+              project_tag="启明星开发", description="完成8种动作的帧动画设计", sort_order=1)
     t3 = tr.create(user_id=user.id, title="后端 API 联调", status="in_progress", priority="high",
                    project_tag="启明星开发", description="跑通 5 模块接口", sort_order=2)
-    t4 = tr.create(user_id=user.id, title="实现任务看板视图", status="pending", priority="medium",
-                   project_tag="启明星开发", due_date=today + timedelta(days=1), sort_order=3)
-    t5 = tr.create(user_id=user.id, title="路演彩排", status="waiting", priority="urgent",
-                   project_tag="启明星开发", due_date=today + timedelta(days=2), sort_order=4)
-    t6 = tr.create(user_id=user.id, title="UI 画廊定稿", status="completed", priority="medium",
-                   project_tag="启明星开发", completed_at=utcnow() - timedelta(days=1), sort_order=5)
+    tr.create(user_id=user.id, title="实现任务看板视图", status="pending", priority="medium",
+              project_tag="启明星开发", due_date=today + timedelta(days=1), sort_order=3)
+    tr.create(user_id=user.id, title="路演彩排", status="waiting", priority="urgent",
+              project_tag="启明星开发", due_date=today + timedelta(days=2), sort_order=4)
+    tr.create(user_id=user.id, title="UI 画廊定稿", status="completed", priority="medium",
+              project_tag="启明星开发", completed_at=utcnow() - timedelta(days=1), sort_order=5)
     # —— 数学建模 ——
-    t7 = tr.create(user_id=user.id, title="历年真题分析", status="pending", priority="medium",
-                   project_tag="数学建模", due_date=today, description="做近三年真题梳理", sort_order=10)
+    tr.create(user_id=user.id, title="历年真题分析", status="pending", priority="medium",
+              project_tag="数学建模", due_date=today, description="做近三年真题梳理", sort_order=10)
     t8 = tr.create(user_id=user.id, title="动态规划算法复现", status="in_progress", priority="high",
                    project_tag="数学建模", description="经典 DP 题代码实现", sort_order=11)
-    t9 = tr.create(user_id=user.id, title="论文模板准备", status="pending", priority="medium",
-                   project_tag="数学建模", sort_order=12)
-    t10 = tr.create(user_id=user.id, title="赛前冲刺方案", status="waiting", priority="urgent",
-                    project_tag="数学建模", due_date=today + timedelta(days=3), sort_order=13)
+    tr.create(user_id=user.id, title="论文模板准备", status="pending", priority="medium",
+              project_tag="数学建模", sort_order=12)
+    tr.create(user_id=user.id, title="赛前冲刺方案", status="waiting", priority="urgent",
+              project_tag="数学建模", due_date=today + timedelta(days=3), sort_order=13)
     # —— 小说创作 ——
-    t11 = tr.create(user_id=user.id, title="世界观设定细化", status="in_progress", priority="medium",
-                    project_tag="小说创作", description="补充弱水规则细节", sort_order=20)
-    t12 = tr.create(user_id=user.id, title="第一章初稿", status="pending", priority="medium",
-                    project_tag="小说创作", sort_order=21)
-    t13 = tr.create(user_id=user.id, title="女主角色卡", status="completed", priority="medium",
-                    project_tag="小说创作", completed_at=utcnow() - timedelta(days=2), sort_order=22)
+    tr.create(user_id=user.id, title="世界观设定细化", status="in_progress", priority="medium",
+              project_tag="小说创作", description="补充弱水规则细节", sort_order=20)
+    tr.create(user_id=user.id, title="第一章初稿", status="pending", priority="medium",
+              project_tag="小说创作", sort_order=21)
+    tr.create(user_id=user.id, title="女主角色卡", status="completed", priority="medium",
+              project_tag="小说创作", completed_at=utcnow() - timedelta(days=2), sort_order=22)
     # —— 外贸系统 ——
     t14 = tr.create(user_id=user.id, title="需求评审会议", status="waiting", priority="high",
                     project_tag="外贸系统", due_date=today, sort_order=30)
-    t15 = tr.create(user_id=user.id, title="接口联调测试", status="in_progress", priority="high",
-                    project_tag="外贸系统", description="订单模块接口", sort_order=31)
-    t16 = tr.create(user_id=user.id, title="部署演练", status="pending", priority="medium",
-                    project_tag="外贸系统", due_date=today + timedelta(days=4), sort_order=32)
+    tr.create(user_id=user.id, title="接口联调测试", status="in_progress", priority="high",
+              project_tag="外贸系统", description="订单模块接口", sort_order=31)
+    tr.create(user_id=user.id, title="部署演练", status="pending", priority="medium",
+              project_tag="外贸系统", due_date=today + timedelta(days=4), sort_order=32)
     # —— 学习成长 ——
-    t17 = tr.create(user_id=user.id, title="英语单词打卡", status="in_progress", priority="low",
-                    project_tag="学习成长", due_date=today, sort_order=40)
-    t18 = tr.create(user_id=user.id, title="阅读《深度工作》", status="pending", priority="low",
-                    project_tag="学习成长", sort_order=41)
-    t19 = tr.create(user_id=user.id, title="间隔重复复习", status="in_progress", priority="low",
-                    project_tag="学习成长", due_date=today, sort_order=42)
+    tr.create(user_id=user.id, title="英语单词打卡", status="in_progress", priority="low",
+              project_tag="学习成长", due_date=today, sort_order=40)
+    tr.create(user_id=user.id, title="阅读《深度工作》", status="pending", priority="low",
+              project_tag="学习成长", sort_order=41)
+    tr.create(user_id=user.id, title="间隔重复复习", status="in_progress", priority="low",
+              project_tag="学习成长", due_date=today, sort_order=42)
     # —— 生活 ——
-    t20 = tr.create(user_id=user.id, title="体检预约", status="pending", priority="medium",
-                    due_date=today + timedelta(days=1), sort_order=50)
-    t21 = tr.create(user_id=user.id, title="整理房间", status="completed", priority="low",
-                    completed_at=utcnow() - timedelta(days=1), sort_order=51)
-    t22 = tr.create(user_id=user.id, title="每日运动", status="in_progress", priority="low",
-                    due_date=today, sort_order=52)
+    tr.create(user_id=user.id, title="体检预约", status="pending", priority="medium",
+              due_date=today + timedelta(days=1), sort_order=50)
+    tr.create(user_id=user.id, title="整理房间", status="completed", priority="low",
+              completed_at=utcnow() - timedelta(days=1), sort_order=51)
+    tr.create(user_id=user.id, title="每日运动", status="in_progress", priority="low",
+              due_date=today, sort_order=52)
 
     # 子任务
     sr = SubtaskRepository(db)
@@ -118,53 +118,53 @@ def seed_if_empty(db: Session) -> bool:
     # ================= 文档（15） =================
     dr = DocumentRepository(db)
     d1_c = "本文档记录启明星系统的整体架构设计。采用 Electron + Vue3 + FastAPI + SQLite 技术栈，以第二分身为核心差异化亮点，构建任务、知识、复盘的一体化闭环。详见 [[第二分身产品思路]]。"
-    d1 = dr.create(user_id=user.id, title="项目架构设计笔记", folder_id=inbox.id,
-                   content=d1_c, tags=["架构", "设计"], word_count=count_words(d1_c), version=2,
-                   summary="启明星系统技术架构设计，模块化单体 + 本地优先。")
+    dr.create(user_id=user.id, title="项目架构设计笔记", folder_id=inbox.id,
+              content=d1_c, tags=["架构", "设计"], word_count=count_words(d1_c), version=2,
+              summary="启明星系统技术架构设计，模块化单体 + 本地优先。")
     d2_c = "第二分身不是聊天机器人，而是住在用户电脑里的 AI 伙伴。她阅读用户的文档，学习思维方式，主动整理知识，以二次元形象陪伴用户，是产品的情感连接点。"
-    d2 = dr.create(user_id=user.id, title="第二分身产品思路", folder_id=inbox.id,
-                   content=d2_c, tags=["AI", "产品"], word_count=count_words(d2_c), version=1)
+    dr.create(user_id=user.id, title="第二分身产品思路", folder_id=inbox.id,
+              content=d2_c, tags=["AI", "产品"], word_count=count_words(d2_c), version=1)
     d3_c = "用户故事集：学生希望管理课程与笔记；自由职业者需要多项目并行；创业者追求认知减负；知识工作者依赖个人知识库。"
-    d3 = dr.create(user_id=user.id, title="用户故事集", folder_id=inbox.id,
-                   content=d3_c, tags=["产品", "PRD"], word_count=count_words(d3_c), version=1)
+    dr.create(user_id=user.id, title="用户故事集", folder_id=inbox.id,
+              content=d3_c, tags=["产品", "PRD"], word_count=count_words(d3_c), version=1)
     d4_c = "数学建模历年真题分析：重点关注离散优化与统计建模两类题型，结合往届获奖论文提炼通用解法框架，配套代码与模板。"
-    d4 = dr.create(user_id=user.id, title="数学建模-历年题分析", folder_id=learn.id,
-                   content=d4_c, tags=["数学", "建模"], word_count=count_words(d4_c), version=1,
-                   summary="离散优化 + 统计建模两大题型解法框架。")
+    dr.create(user_id=user.id, title="数学建模-历年题分析", folder_id=learn.id,
+              content=d4_c, tags=["数学", "建模"], word_count=count_words(d4_c), version=1,
+              summary="离散优化 + 统计建模两大题型解法框架。")
     d5_c = "动态规划笔记：背包问题、最长公共子序列、区间 DP 的核心转移方程与模板代码，附典型例题。"
-    d5 = dr.create(user_id=user.id, title="算法笔记-动态规划", folder_id=learn.id,
-                   content=d5_c, tags=["算法"], word_count=count_words(d5_c), version=1)
+    dr.create(user_id=user.id, title="算法笔记-动态规划", folder_id=learn.id,
+              content=d5_c, tags=["算法"], word_count=count_words(d5_c), version=1)
     d6_c = "英语高频词汇表：按主题分类整理（工作/学习/生活），含例句与记忆技巧。"
-    d6 = dr.create(user_id=user.id, title="英语高频词汇表", folder_id=learn.id,
-                   content=d6_c, tags=["英语"], word_count=count_words(d6_c), version=1)
+    dr.create(user_id=user.id, title="英语高频词汇表", folder_id=learn.id,
+              content=d6_c, tags=["英语"], word_count=count_words(d6_c), version=1)
     d7_c = "周会纪要 0825：同步启明星开发进度、桌宠动作设计排期、路演素材准备计划，明确下周里程碑。"
-    d7 = dr.create(user_id=user.id, title="周会纪要-0825", folder_id=work.id,
-                   content=d7_c, tags=["会议"], word_count=count_words(d7_c), version=1)
+    dr.create(user_id=user.id, title="周会纪要-0825", folder_id=work.id,
+              content=d7_c, tags=["会议"], word_count=count_words(d7_c), version=1)
     d8_c = "外贸系统需求评审：梳理订单、客户、商品三大模块，明确接口边界与数据字典。"
-    d8 = dr.create(user_id=user.id, title="外贸系统需求评审", folder_id=work.id,
-                   content=d8_c, tags=["外贸", "需求"], word_count=count_words(d8_c), version=1)
+    dr.create(user_id=user.id, title="外贸系统需求评审", folder_id=work.id,
+              content=d8_c, tags=["外贸", "需求"], word_count=count_words(d8_c), version=1)
     d9_c = "开发计划 v2：按纵向切片推进，两周一个可用里程碑，先跑通核心闭环再扩展。"
-    d9 = dr.create(user_id=user.id, title="开发计划-v2", folder_id=work.id,
-                   content=d9_c, tags=["计划"], word_count=count_words(d9_c), version=1)
+    dr.create(user_id=user.id, title="开发计划-v2", folder_id=work.id,
+              content=d9_c, tags=["计划"], word_count=count_words(d9_c), version=1)
     d10_c = "小说世界观设定：弱水三千，只取一瓢。海灵一族生活于弱水之上，以记忆为食，人类的分身由记忆凝结而成。"
-    d10 = dr.create(user_id=user.id, title="小说设定-世界观", folder_id=create.id,
-                    content=d10_c, tags=["小说", "设定"], word_count=count_words(d10_c), version=1)
+    dr.create(user_id=user.id, title="小说设定-世界观", folder_id=create.id,
+              content=d10_c, tags=["小说", "设定"], word_count=count_words(d10_c), version=1)
     d11_c = "第一章初见：她沿着弱水缓行，岸边的记忆碎片在脚下闪烁。少年伸手，指尖触到一片温热——那是他遗忘的某个夏天。参考 [[小说设定-世界观]]。"
-    d11 = dr.create(user_id=user.id, title="第一章-初见", folder_id=create.id,
-                    content=d11_c, tags=["小说"], word_count=count_words(d11_c), version=1,
-                    ai_suggested_tags=["开篇", "相遇"])
+    dr.create(user_id=user.id, title="第一章-初见", folder_id=create.id,
+              content=d11_c, tags=["小说"], word_count=count_words(d11_c), version=1,
+              ai_suggested_tags=["开篇", "相遇"])
     d12_c = "角色卡-女主：海灵一族，擅长倾听记忆，性格温柔但坚定，口头禅是『我记着你的每一件事』。"
-    d12 = dr.create(user_id=user.id, title="角色卡-女主", folder_id=create.id,
-                    content=d12_c, tags=["小说", "角色"], word_count=count_words(d12_c), version=1)
+    dr.create(user_id=user.id, title="角色卡-女主", folder_id=create.id,
+              content=d12_c, tags=["小说", "角色"], word_count=count_words(d12_c), version=1)
     d13_c = "路演脚本 v1：20 分钟流程——开场痛点、产品演示（任务/知识/第二分身高潮）、复盘闭环、二期畅想。含关键话术与应急预案。"
-    d13 = dr.create(user_id=user.id, title="路演脚本-v1", folder_id=project.id,
-                    content=d13_c, tags=["路演", "演讲"], word_count=count_words(d13_c), version=1)
+    dr.create(user_id=user.id, title="路演脚本-v1", folder_id=project.id,
+              content=d13_c, tags=["路演", "演讲"], word_count=count_words(d13_c), version=1)
     d14_c = "灵感集：把模块化架构应用到插件系统；第二分身的人格切换；工作流模板市场。好想法先记下来。"
-    d14 = dr.create(user_id=user.id, title="灵感集", folder_id=project.id,
-                    content=d14_c, tags=["灵感"], word_count=count_words(d14_c), version=1)
+    dr.create(user_id=user.id, title="灵感集", folder_id=project.id,
+              content=d14_c, tags=["灵感"], word_count=count_words(d14_c), version=1)
     d15_c = "月度总结模板：本月完成、关键成果、问题与反思、下月目标。用于周期性复盘沉淀。"
-    d15 = dr.create(user_id=user.id, title="月度总结模板", folder_id=project.id,
-                    content=d15_c, tags=["模板", "复盘"], word_count=count_words(d15_c), version=1)
+    dr.create(user_id=user.id, title="月度总结模板", folder_id=project.id,
+              content=d15_c, tags=["模板", "复盘"], word_count=count_words(d15_c), version=1)
 
     # ================= 复盘：7 天日报 + 3 周周报 =================
     rvr = ReviewRepository(db)

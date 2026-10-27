@@ -23,7 +23,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.core.encryption import EncryptionManager
-from app.core.exceptions import BusinessException, ValidationException
+from app.core.exceptions import ValidationException
 from app.config import get_settings
 from app.schemas.task import CreateTaskRequest
 from app.services.resource_service import ResourceService, CreateInboxItemRequest

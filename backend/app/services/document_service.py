@@ -5,7 +5,6 @@
 from __future__ import annotations
 
 import re
-from datetime import date, datetime, timezone
 
 from sqlalchemy.orm import Session
 
@@ -71,7 +70,7 @@ class DocumentService:
         return inbox
 
     def folders_tree(self, user_id: str) -> list[FolderOut]:
-        inbox = self._ensure_inbox(user_id)
+        self._ensure_inbox(user_id)
         all_folders = self.folder_repo.list_by_user(user_id)
         by_parent: dict[str | None, list[Folder]] = {}
         for f in all_folders:

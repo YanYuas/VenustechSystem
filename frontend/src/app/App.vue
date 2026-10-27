@@ -2,10 +2,10 @@
 // ============================================================
 // 应用根组件 —— 挂载全局服务宿主（Toast / 命令式弹窗）
 // ============================================================
-import BaseToast from '@/components/common/BaseToast.vue'
-import ModalHost from '@/components/common/ModalHost.vue'
+import BaseToast from '@/shared/components/common/BaseToast.vue'
+import ModalHost from '@/shared/components/common/ModalHost.vue'
 
-import { useTheme } from '@/composables/useTheme'
+import { useTheme } from '@/shared/theme/useTheme'
 
 useTheme()
 </script>

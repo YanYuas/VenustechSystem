@@ -148,49 +148,49 @@ frontend/src/
 - `.qm-token` 是本地令牌，已被 `.gitignore` 排除
 - 新增配置项必须同步更新 `.env.example`
 
-## 7. 启动方式
+## 7. 启动方式（单一实现：`ops/start.ps1`）
 
-### 环境初始化（仅首次）
+**D-11 之后的模型**：根目录 4 个 `.bat` 与 `scripts/dev.ps1` 都只是**薄转发壳**，
+真正的启动逻辑只存在于 [`ops/start.ps1`](../../ops/start.ps1)（安装逻辑在 `ops/setup.ps1`）。
+不要再往任何 `.bat` 里加逻辑 —— `scripts/audit_delivery.py` 会把实现细节写回转发壳判红。
 
-```bash
-setup.bat
+| 场景 | 命令（任选其一） | 端口 | 数据目录 |
+|---|---|---|---|
+| 环境初始化（仅首次） | `setup.bat` ＝ `ops\setup.ps1` | — | — |
+| 开发 | `start-dev.bat` ＝ `ops\start.ps1 -Mode dev` | 8765(--reload) + 5173 | `backend\data` |
+| 演示（丰富示例数据） | `start-demo.bat` ＝ `-Mode demo` | 8765 + 5173 | `backend\data_demo`（缺库自动 seed） |
+| 手机 / 局域网 | `start-mobile.bat` ＝ `-Mode mobile` | 8765(回环) + **3000**(对外) | `backend\data` |
+
+```powershell
+# 三种模式都可以先"预演"：只打印将要执行的命令 / 环境变量，不启动进程
+powershell -ExecutionPolicy Bypass -File ops\start.ps1 -Mode dev    -WhatIf
+powershell -ExecutionPolicy Bypass -File ops\start.ps1 -Mode demo   -WhatIf
+powershell -ExecutionPolicy Bypass -File ops\start.ps1 -Mode mobile -WhatIf
+
+# 分支开发：数据目录隔离（相对 backend\，会被转成绝对 Windows 路径）
+powershell -ExecutionPolicy Bypass -File ops\start.ps1 -Mode dev -DataDir .\data-fusion
+
+# 兼容旧入口（等价于 -Mode dev [-DataDir]，仅供既有文档/肌肉记忆使用）
+powershell -ExecutionPolicy Bypass -File scripts\dev.ps1 -DataDir .\data-fusion
 ```
 
-### 开发模式
+> 启动器会做这些校验（都只在这一处实现）：项目 venv 是否存在、能否 `import uvicorn/fastapi`、
+> `frontend\node_modules`、端口占用（dev 仅提示 / demo 直接拦下）、`frontend\dist` 是否需要构建。
+> 后端进程的 CWD 固定为 `backend\`（`app` 包只在那里），所以从任何目录调用都不会
+> `ModuleNotFoundError: No module named 'app'`。
+
+### 手动启动（不推荐，仅排障用）
 
 ```bash
-start-dev.bat
-# 后端: http://localhost:8765
-# 前端: http://localhost:5173
-# 统一服务: http://localhost:3000
-```
-
-### 演示模式（丰富示例数据）
-
-```bash
-start-demo.bat
-```
-
-### 移动端
-
-```bash
-start-mobile.bat
-```
-
-### 手动启动
-
-```bash
-# 后端
+# 后端（必须用项目 venv；PATH 上的 python 通常缺依赖）
 cd backend
-uv sync --all-extras
-uvicorn app.main:app --reload --port 8765
+.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8765 --reload
 
 # 前端
 cd frontend
-npm install
 npm run dev  # → http://localhost:5173
 
-# 统一服务（可选）
+# 统一服务（可选；生产/移动端先 npm run build）
 node ops/server/server.js  # → http://localhost:3000
 ```
 
@@ -201,6 +201,11 @@ node ops/server/server.js  # → http://localhost:3000
 ```bash
 # 全量检查
 python scripts/check_all.py
+
+# 后端 lint（ruff 0.6.2；口径见 backend/pyproject.toml 的 [tool.ruff.lint]：
+# 只启用 E4/E7/E9/F 正确性规则 —— 未定义名 / 未使用导入与变量 / 重定义 / 语法错误；
+# 不跑 ruff format，线长 E501 显式忽略，避免纯风格重排淹没业务 diff）
+cd backend && python -m ruff check app tests
 
 # 交付物审计
 python scripts/audit_delivery.py
@@ -221,10 +226,13 @@ Remove-Item "C:\Users\21722\qimingxing-git-repo\*.lock" -Force
 ```
 
 ### Q: 后端启动报 `ModuleNotFoundError: app`？
-A: 必须从仓库根目录启动，或在 `backend/` 目录下设置 `PYTHONPATH`。`start-dev.bat` 已处理此问题。
+A: `app` 包只在 `backend\` 下，而 uvicorn 以 **CWD** 为 import 根 —— 所以必须让 CWD=`backend\`。
+   用一键启动器即可（`ops\start.ps1` 已固定后端 CWD，并统一用 `backend\.venv` 的解释器）；
+   手动排障时请 `cd backend` 后再跑 `.venv\Scripts\python.exe -m uvicorn app.main:app ...`，
+   **不要**在仓库根直接跑 `python -m uvicorn app.main:app`。
 
 ### Q: 移动端离线队列如何工作？
-A: 弱网时请求写入本地 IndexedDB，网络恢复后自动重放。见 `frontend/src/composables/` 中的离线队列相关函数。
+A: 弱网时请求写入本地 IndexedDB，网络恢复后自动重放。见 `frontend/src/kernel/offline/`（offlineQueue / offlineQueueCore / offlineQueueIdb）。
 
 ### Q: 如何添加新主题？
 A: 在 `frontend/src/styles/` 中新增主题变量文件，在 `data-theme` 中注册，无需修改组件代码。

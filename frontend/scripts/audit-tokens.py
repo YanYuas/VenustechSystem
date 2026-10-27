@@ -103,7 +103,10 @@ def collect_icons() -> tuple[dict[str, set[str]], set[str]]:
     """图标名：定义来自 AppIcon.vue 的 paths 映射，使用来自静态 name="x"。"""
     used: dict[str, set[str]] = {}
     defined: set[str] = set()
-    icon_file = FRONTEND / "src" / "components" / "common" / "AppIcon.vue"
+    # 图标定义跟着设计系统走（P3 迁到 shared/）。不要硬编码目录：
+    # 目录再次调整时这里不应成为假红来源。
+    _candidates = sorted((FRONTEND / "src").rglob("AppIcon.vue"))
+    icon_file = _candidates[0] if _candidates else FRONTEND / "src" / "shared" / "components" / "common" / "AppIcon.vue"
     if icon_file.exists():
         text = icon_file.read_text(encoding="utf-8")
         block = text[text.index("paths") : text.index("}", text.index("paths"))]
@@ -151,7 +154,7 @@ def main() -> int:
         failed = True
     if ic_missing:
         print(f"\n[引用审计] ❌ 未定义图标 {len(ic_missing)} 个")
-        print("      → 请在 src/components/common/AppIcon.vue 的 paths 里补上，或改用已存在的图标名")
+        print("      → 请在 src/shared/components/common/AppIcon.vue 的 paths 里补上，或改用已存在的图标名")
         failed = True
 
     if failed:

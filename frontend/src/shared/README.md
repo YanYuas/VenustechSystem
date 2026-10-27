@@ -1,42 +1,54 @@
-# shared/ —— 设计系统与外壳（迁移批次 P1/P3，ADR-0007）
+# shared/ —— 设计系统与外壳（ADR-0007，P3 已完成）
 
-`shared/` 放**跨领域复用的 UI 设计系统与外壳**。与 `kernel/` 的区别：kernel 是"看不见的技术底座"
-（http / toast / modal / offline / theme 引擎），shared 是"看得见的公共 UI"（组件、样式、常量、指令、工具）。
+`shared/` 放**跨领域复用的 UI 设计系统与通用能力**。与 `kernel/` 的区别：kernel 是"看不见的技术底座"
+（http / toast / modal / offline / device / electron），shared 是"看得见的公共 UI 与中立能力"。
 
-## 依赖规则（硬约束）
+## 依赖规则（硬约束，R14 已强制）
 
-1. `shared` **只能依赖 `kernel`**（含 vue / pinia 等第三方库）。
-2. `shared` 不得 import `features/`、`api/`、`views/`、`composables/`、`stores/`（过渡目录同理）。
+1. `shared` **只能依赖 `kernel`**（含 vue / pinia 等第三方库）与 `shared` 自身。
+2. `shared` 不得 import `features/`、以及旧过渡目录 `api/views/composables/stores/components/types/utils`。
 3. 业务语义不进 shared：凡知道"任务/复盘/桌宠"等业务概念的代码，属于对应 `features/<domain>`。
-4. 反向：`features/<d>` 可以依赖 `shared`；`kernel` 不得依赖 `shared`。
+4. 反向：`features/<d>` 可以依赖 `shared`（如 `@/shared/components/common/BaseCard.vue`）；
+   `kernel` 不得依赖 `shared`。
 
-过渡期唯一例外：`shared/constants/dimensions.ts` 仍 import `@/types/common` 的 `NavItem`
-（类型目录 P3 才归位），这是**有意的临时依赖**，P3 一并解决。
-
-## 当前目录（本轮已真实迁入）
+## 当前目录（P3 完成后）
 
 ```
 shared/
-├── constants/
-│   ├── index.ts            # 应用常量唯一真源（APP / STORAGE_KEYS / ROUTES / TASK_STATUS / THEME_PACKS …）
-│   ├── dimensions.ts       # 六大维度导航配置（DIMENSIONS / ROUTE_TO_DIMENSION / MAIN_NAV_ITEMS）
-│   └── __tests__/constants.spec.ts
-├── directives/
-│   └── index.ts            # 全局指令：v-focus / v-click-outside / v-copy
-└── README.md
+├── README.md
+├── components/
+│   ├── common/            # BaseButton/BaseCard/BaseInput/BaseModal/BasePagination/…（17 个）
+│   └── layout/            # 6 个纯 UI 布局件（AppTitleBar/Breadcrumb/CommandPalette/…）
+├── composables/           # useAutoSave、useQueryAction（+ __tests__）
+├── constants/             # index.ts（APP/STORAGE_KEYS/ROUTES/THEME_PACKS…）、dimensions.ts + __tests__
+├── directives/            # 全局指令 v-focus / v-click-outside / v-copy
+├── theme/                 # useTheme.ts（主题引擎）+ __tests__
+└── types/                 # common.ts、user.ts（Toast 类型 re-export 自 kernel/ui/types）
 ```
 
-旧路径（`@/constants`、`@/constants/dimensions`、`@/directives`）保留**薄转发壳**，
-只做 re-export、壳内禁止写实现；P4 统一删除。
+带业务依赖的 4 个壳件（DefaultLayout / TopNav / GlobalSearch / LeftInfoPanel）放在 `app/layout/`，
+不放这里 —— 它们依赖 features，放 shared 会违反 R14（详见 `features/README.md` 的偏差说明）。
 
-## P3 迁移计划（本轮**故意不动**的部分及原因）
+## P3 已完成的归位
 
-| 待迁模块 | 目标位置 | 本轮不动的原因 |
-|---|---|---|
-| `styles/`（variables/global/element-plus/animations.scss） | `shared/styles/` | 样式通过 `main.ts` 的 4 条副作用 import 注入，且被 `vite.config` 的 scss 配置/全局主题变量依赖；移动会同时改注入顺序与构建配置，风险 > 收益，需独立批次 + 视觉回归 |
-| `components/common/`（Base* 16 个组件 + 宿主组件） | `shared/components/common/` | 全仓 100+ 处 import；且 `components.d.ts` 的自动注册路径与 `unplugin-vue-components` 扫描目录绑定，需同步改 vite 配置（本轮禁止改构建配置） |
-| `components/layout/`（DefaultLayout/TopNav 等 12 个） | `shared/layout/` | 路由壳（DefaultLayout）与导航/主题/设备探测耦合，需与 `app/` 层一起迁；改动面大且缺 UI 回归网 |
-| `utils/`（offlineQueueCore/Idb、reportHtml、electron） | `shared/utils/` 或 `kernel/` | `offlineQueue` 已被 kernel/offline 依赖（P1），其 core/idb 属技术底座更应进 `kernel/offline/`；`reportHtml` 是纯函数需先补/迁移测试，`electron` 属运行时探测。统一放 P3 处理，避免本轮 kernel 目录反复搬 |
-| `types/common.ts`（Semantic / NavItem / ThemePack …） | `shared/types/` 或保留 | 类型跨 kernel/shared/features 共用，归位需要与各 feature 的 `model.ts` 一起规划，属 P3 |
+| 旧位置                                                       | 新位置                                                          |
+| ------------------------------------------------------------ | --------------------------------------------------------------- |
+| `components/common/*`                                        | `shared/components/common/*`                                    |
+| `components/layout/*`（6 个纯 UI）                           | `shared/components/layout/*`                                    |
+| `composables/useTheme.ts`                                    | `shared/theme/useTheme.ts`                                      |
+| `composables/useAutoSave.ts`、`useQueryAction.ts`            | `shared/composables/*`                                          |
+| `composables/useAsync.ts`、`useDevice.ts`、`useShortcuts.ts` | `kernel/async/`、`kernel/device/`、`kernel/ui/`                 |
+| `types/common.ts`、`types/user.ts`                           | `shared/types/*`                                                |
+| `constants/*`、`directives/*`                                | 实现已在 P2 迁入 shared；P3 把消费者全部改指新路径；P4 删除旧壳 |
 
-**P4**：删除薄壳、清空按类型平铺目录、ESLint `no-restricted-imports` 进 CI 后把上述依赖规则变成**强制**。
+## P4 状态
+
+- ✅ **8 个薄转发壳已全部删除**，`api/ composables/ stores/ constants/ directives/` 过渡目录清空移除；
+  现在所有代码只能从 `@/kernel/*` 或 `@/shared/*` 取用（R14 无 WARN 豁免）。
+- 剩余待办：
+
+| 待办                                                                          | 原因                                                                                                                 |
+| ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `styles/`（variables / global / element-plus / animations）→ `shared/styles/` | 由 `app/main.ts` 的副作用 import 注入，且 `vite.config` 的 scss 配置与主题 token 依赖注入顺序；需独立批次 + 视觉回归 |
+| `test/setup.ts`、`auto-imports.d.ts`、`components.d.ts` 等工程文件归位        | 构建/测试工具约定路径，移动需同步改 vite/vitest 配置，收益低                                                         |
+| ESLint `no-restricted-imports` 边界规则进 CI                                  | ADR-0007 P4 项；由并行任务安装配置，目前由 R14（`scripts/audit_architecture.py`）+ typecheck 兜底                    |

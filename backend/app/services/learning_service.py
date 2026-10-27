@@ -224,7 +224,7 @@ class LearningService:
         next_review = today + timedelta(days=interval)
 
         # 更新卡片
-        updated = self.card_repo.update(
+        self.card_repo.update(
             card,
             ef=round(ef, 2),
             repetition=repetition,
@@ -232,7 +232,7 @@ class LearningService:
             next_review=next_review,
             last_reviewed_at=datetime.utcnow(),
             review_count=card.review_count + 1,
-        )
+            )
 
         # 写完 → commit → publish：EXP 结算订阅者用独立 Session 反查卡片
         self.db.commit()

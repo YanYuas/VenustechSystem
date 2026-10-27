@@ -1,0 +1,16 @@
+# 依赖与构建产物
+node_modules/
+dist/
+coverage/
+android/
+public/
+
+# 锁文件与生成物（不参与格式化）
+package-lock.json
+src/auto-imports.d.ts
+src/components.d.ts
+src/env.d.ts
+
+# 原生 / 构建脚本（Android Gradle 产物）
+android/**/*.gradle
+android/**/*.xml

@@ -297,7 +297,25 @@ interface ApiResponse<T> {
 |------|------|------|
 | v1.0 | 2026-08-29 | 初始版本，前端骨架全线推进后沉淀 |
 | v1.1 | 2026-09-04 | 一期打磨收尾：①补全文件夹管理UI（创建/重命名/删除/层级导航）②补全对话删除功能 ③通知点击跳转（按类型路由到对应页面）④首页一屏自适应优化 ⑤useDocument新增文件夹CRUD方法 ⑥useConversation新增deleteConversation方法 ⑦TypeScript严格模式零错误验证 ⑧生产构建成功验证（5.08s） |
+| v1.3 | 2026-10-27 | 目录分层重构：`kernel/`（http/ui/offline/device/async）+ `shared/`（设计系统/主题/常量/指令）+ `features/<domain>/`（27 个领域，唯一所有权落点），旧按类型目录已删除；引入 ESLint 9 flat + Prettier 并纳入 CI，其中 ESLint 用 `no-restricted-imports` 强制 ADR-0007 分层边界 |
 | v1.2 | 2026-10-11 | 引入单元测试体系（vitest + jsdom）并修 3 处缺陷：①`vitest.config.ts` + `src/test/setup.ts`，4 个 spec / **75 条用例**，纳入 `check_all.py` 第 12 项（11 项 → 12 项）②**修 `useTheme` 的 `isDark` 不响应系统明暗**（computed 依赖里只有 `config`，系统切换时 `data-theme` 变了但 `isDark` 不重算）③**修 `THEME_PACKS` 漏 `epic`**（常量 3 套 vs 类型/useTheme/设置页 4 套）④**修 `useQueryAction` 处理器抛错变成未捕获 Promise rejection**（改为捕获 + 记日志 + 保留 action 参数以便重试） |
+
+## 八、Lint 与格式化（D-13）
+
+```bash
+npm run lint          # ESLint 9 flat config：正确性 + ADR-0007 分层边界
+npm run format        # Prettier 统一格式（写）
+npm run format:check  # CI 用：只检查不写
+npm run typecheck     # vue-tsc --noEmit
+```
+
+- 规则基调**正确性优先**（非类型检查的 TS/Vue 推荐集 + `eslint-config-prettier`）；风格交给 Prettier，两者不重叠。
+- **边界由 ESLint 强制**（ADR-0007）：`kernel/` 不得 import `shared/`/`features/`；`shared/` 不得 import `features/`；`features/a` 不得深链 `features/b` 内部文件（只能 `@/features/b` 入口）。违反 `npm run lint` 直接失败。
+
+> ⚠️ **Prettier 陷阱（已踩过）**：配置为 `semi: false`，Prettier 会把 Vue 内联事件处理器里的
+> **多语句**打印成换行分隔（无分号），Vue 编译器会报
+> `Error parsing JavaScript expression` 导致构建失败。
+> 约定：**Vue 模板内联事件处理器必须是单次调用/单表达式**；多语句一律抽成命名函数后 `@click="onXxx(...)"`。
 
 ---
 

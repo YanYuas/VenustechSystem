@@ -9,10 +9,9 @@ from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeou
 import importlib
 import importlib.util
 import logging
-import os
 from dataclasses import dataclass, replace, field
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 logger = logging.getLogger("app.plugin")
 

@@ -728,7 +728,7 @@ python scripts/smoke_backend.py
 3. **PATCH 不支持把字段置空**：`{k: v for k, v in data.items() if v is not None}` 会丢弃
    `null`，需清空请传空串；支持置空须引入 `exclude_unset` 语义（属接口变更）
 4. SOP 版本历史取默认 100 条上限（未分页）
-5. **API 测试必须按前端真实契约写**：先读 `frontend/src/api/<模块>.ts` 核对参数位置
+5. **API 测试必须按前端真实契约写**：先读 `frontend/src/features/<domain>/api.ts` 核对参数位置
    （query / body / 路径）。实证：`resource/inbox/batch-process` 后端把 `item_ids` 当裸
    body 数组、`action` 当 query，而前端发 `{item_ids, action}` 对象体 —— 端点恒定 400，
    vue-tsc 与后端自测都发现不了

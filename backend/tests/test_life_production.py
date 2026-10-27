@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
-import pytest
 
 from app.models.life import Diary, Habit, HabitCheckin, MoodLog
 from app.schemas.life import CreateDiaryRequest, CreateHabitRequest, CreateMoodLogRequest

@@ -119,7 +119,7 @@ class TestStreamMessages:
         """
         svc = _svc(db_session, test_user)
         conv = svc.create()
-        events = _collect(svc.stream_messages(conv.id, SendMessageRequest(content="你好")))
+        _collect(svc.stream_messages(conv.id, SendMessageRequest(content="你好")))
 
         assert count_rows(db_session, "messages", conversation_id=conv.id) == 2
 

@@ -17,7 +17,6 @@ from __future__ import annotations
 from datetime import date, timedelta
 
 import pytest
-from sqlalchemy import select
 
 from app.core.exceptions import NotFoundException, ValidationException
 from app.models.review import Review
@@ -320,7 +319,6 @@ class TestGroup3AutoFill:
 
         防什么：auto_fill 的文档过滤如果时区算错，会漏掉今天创建的文档。
         """
-        from datetime import datetime
         from app.models.document import Document
 
         today = date.today()
@@ -474,7 +472,6 @@ class TestGroup4ConvertTask:
             svc.convert_task("non-existent-review", ConvertTaskRequest(content="任务"))
 
         # 查库：没有产生任务
-        from app.models.task import Task
         assert count_rows(db_session, "tasks", user_id=test_user.id) == 0
 
     def test_convert_task_other_users_review_raises(self, db_session, test_user, other_user):
@@ -483,7 +480,6 @@ class TestGroup4ConvertTask:
         防什么：convert_task 如果只检查复盘存在性而不检查归属，用户可以
         用别人的复盘创建任务（虽然任务归属自己，但语义上不对）。
         """
-        from app.models.task import Task
         from app.schemas.review import ConvertTaskRequest
 
         # 造其他用户的复盘

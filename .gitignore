@@ -82,6 +82,7 @@ pytest-of-*/
 backend/pytest-of-*/
 tmp?????????/
 backend/venustech_smoke/
+backend/tmp*/
 
 # ---------- 本地工具状态（智能体记忆/会话数据，非项目源码） ----------
 .workbuddy/

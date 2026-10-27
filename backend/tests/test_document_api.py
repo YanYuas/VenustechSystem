@@ -15,9 +15,7 @@
 # ============================================================
 from __future__ import annotations
 
-from datetime import timedelta
 
-import pytest
 from sqlalchemy import select
 
 from app.database import SessionLocal
@@ -419,7 +417,7 @@ class TestApiGroup3VersionBacklinkGraph:
         防什么：graph 接口如果漏了边的解析，图谱只有节点没有连线。
         """
         # 创建目标文档 B 和含 [[B]] 的源文档 A
-        r_b = client.post("/api/v1/documents", json={"title": "B", "content": "b"})
+        client.post("/api/v1/documents", json={"title": "B", "content": "b"})
         client.post("/api/v1/documents", json={"title": "A", "content": "[[B]]"})
 
         r = client.get("/api/v1/documents/graph/data")
@@ -686,7 +684,7 @@ class TestApiGroup6SearchTypeFolderBoundary:
             fixture = seed_document_fixture(db, default_user_id)
             db.commit()
             doc_id = fixture["docs"]["mec_algorithm"].id  # 在 research 文件夹下
-            inbox_id = fixture["folders"]["inbox"].id
+            fixture["folders"]["inbox"].id
         finally:
             db.close()
 

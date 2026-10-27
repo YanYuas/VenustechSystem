@@ -13,7 +13,7 @@ from typing import AsyncIterator, NamedTuple
 
 import httpx
 
-from app.core.exceptions import AIKeyMissingException, AIRequestFailedException
+from app.core.exceptions import AIRequestFailedException
 from app.core.security import decrypt_secret
 from app.config import get_settings
 

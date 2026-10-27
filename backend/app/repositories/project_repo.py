@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
 
 from app.models.project import Project, ProjectMilestone
 from app.models.task import Task
@@ -96,7 +95,6 @@ class ProjectRepository(BaseRepository[Project]):
         return result
 
     def count_overdue(self, project_id: str, today) -> int:
-        from datetime import date as _date
         return int(
             self.db.execute(
                 select(func.count(Task.id)).where(

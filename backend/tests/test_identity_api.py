@@ -5,7 +5,6 @@
 # ============================================================
 from __future__ import annotations
 
-import pytest
 
 from app.database import SessionLocal
 from app.models.identity import Identity

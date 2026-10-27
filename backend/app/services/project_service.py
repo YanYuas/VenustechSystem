@@ -21,7 +21,6 @@ from app.repositories.identity_repo import IdentityRepository
 from app.repositories.project_repo import MilestoneRepository, ProjectRepository
 from app.schemas.project import (
     MilestoneCreate,
-    MilestoneOut,
     MilestoneUpdate,
     ProjectCreate,
     ProjectStatsOut,
@@ -166,7 +165,7 @@ class ProjectService:
 
     def detail(self, user_id: str, project_id: str) -> dict:
         """项目详情：基础信息 + 统计 + 任务/文档/对话/复盘/里程碑列表（各取前50）。"""
-        p = self._owned(user_id, project_id)
+        self._owned(user_id, project_id)
         result = self.get(user_id, project_id)
 
         def _iso(v):
@@ -328,7 +327,6 @@ class ProjectService:
     def export(self, user_id: str, project_id: str) -> dict:
         """项目导出（M06 F07）；D-06：四类数据经各域 Repository 取数。"""
         project = self._owned(user_id, project_id)
-        from datetime import datetime
         tasks = self.task_repo.list_all_by_project(project_id)
         tasks_data = [{"id": t.id, "title": t.title, "status": t.status, "priority": t.priority, "due_date": str(t.due_date) if t.due_date else None, "created_at": t.created_at.isoformat()} for t in tasks]
         docs = self.doc_repo.list_all_by_project(project_id)

@@ -2,13 +2,13 @@
 // kernel/ui/toast —— Toast 通知服务（迁移批次 P1，ADR-0007）
 // 命令式调用，配合 BaseToast 容器渲染
 // 用法: const toast = useToast(); toast.success('已保存')
-// 依赖: I06 BaseToast（容器挂载点 #toast-container，宿主组件 P3 再迁 shared）
+// 依赖: I06 BaseToast（容器挂载点 #toast-container，宿主组件在 shared/components/common）
 //
-// 旧路径 `@/composables/useToast` 已是薄转发壳（P4 删除）。
+// 公开入口：`@/kernel/ui/toast`。
 // 连通性状态属于 kernel/http（kernel 内部），故这里 import 其内部路径。
 // ============================================================
 import { reactive } from 'vue'
-import type { ToastItem, ToastType } from '@/types/common'
+import type { ToastItem, ToastType } from './types'
 import { CONNECTIVITY_TOAST_TITLE, isBackendUnreachable } from '../http/connectivity'
 
 const DEFAULT_DURATION: Record<ToastType, number> = {

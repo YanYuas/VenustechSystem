@@ -6,13 +6,7 @@
 // 跨域使用请从 `@/features/pet` 导入。
 // ============================================================
 import { http } from '@/kernel/http'
-import type {
-  PetConfig,
-  PetAvatar,
-  PetState,
-  PetStats,
-  PetStatsDelta,
-} from './model'
+import type { PetConfig, PetAvatar, PetState, PetStats, PetStatsDelta } from './model'
 
 export const petApi = {
   // 配置

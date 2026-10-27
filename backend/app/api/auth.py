@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
 from app.core.response import success
-from app.core.security import decrypt_secret, encrypt_secret
+from app.core.security import encrypt_secret
 from app.schemas.auth import (
     ApiVerifyResult,
     InitRequest,

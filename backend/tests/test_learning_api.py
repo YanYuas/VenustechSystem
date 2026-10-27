@@ -5,13 +5,11 @@
 # ============================================================
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date
 
-import pytest
 
 from app.database import SessionLocal
 from app.models.learning import Flashcard, StudyPlan, StudyTimeLog
-from tests.factories import count_rows
 
 
 def _db():

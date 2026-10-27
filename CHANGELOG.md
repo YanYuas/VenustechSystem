@@ -7,6 +7,39 @@
 
 ## [Unreleased]
 
+### Changed — Phase 3：前端全量分层 + 交付底座（2026-10-27）
+
+本轮把"按类型平铺"的前端彻底迁入领域包，并把启动器/lint/备份治理补齐。**后端 1284 测试、前端 86 测试、lint/format/typecheck/build 全绿。**
+
+**P3 全量迁移：27 个领域 → `features/`**
+- 142 个文件移动：`api/<d>.ts` → `features/<d>/api.ts`；`types/<d>.ts` + api 内联类型 → `features/<d>/model.ts`；`views/<Domain>/` → `features/<d>/views/`；`components/<domain>/`、`composables/use<Domain>` 同理；每个领域一个 `index.ts` 唯一出口（view 只导出懒加载入口，避免主包污染）。
+- 非领域资产归位：`types/api` → `kernel/http/types`；`types/common|user` → `shared/types`；`utils/offlineQueue*` → `kernel/offline`；`useTheme`/`useAutoSave`/`useQueryAction` → `shared`；`useDevice`/`useAsync`/`useShortcuts` → `kernel`；`components/common` → `shared/components/common`；纯 UI layout → `shared/components/layout`；业务壳（DefaultLayout/TopNav/GlobalSearch/LeftInfoPanel）→ `app/layout`；NotFound → `app/views`。
+- 旧路径引用 **392 → 0**；三个旧桶（api/types/composables index）删除。
+- 构建结果：main chunk 87,473 → **88,647 B（+1.3%）**，各域 view 仍独立懒加载 chunk。
+
+**P4：薄壳清理 + kernel 收口 + `kernel/http` 拆分**
+- 8 个薄转发壳全部删除，`api/ composables/ stores/ constants/ directives/` 过渡目录清空；`frontend/src` 只剩 `app/features/kernel/shared/styles/test`。
+- `kernel` 对上层引用归零；架构守护删除 `TRANSITIONAL_AREAS`（旧目录依赖一律 ERROR），R14 负向测试证明会变红。
+- `kernel/http/index.ts`（416 行、9 类职责）拆为 `client` / `errors` / `request` / `sse` / `types` / `connectivity` + 22 行纯出口；**公开 API 与行为契约逐字不变**（10 个 value + 1 个 type，AST 对比一致）。
+
+**ADR-0008：请求体 `null` 语义**
+- 明确"显式 null = 清空、省略 = 不改"（后端 `exclude_unset=True` + 字段存在即赋值）。前端请求类型落地 34 处 `?: T | null`（含 Project/Milestone），不再用 `as any` 表达清除关联。
+
+**D-11 启动器单一实现**
+- 新增 `ops/start.ps1`（`-Mode dev|demo|mobile [-DataDir] [-WhatIf]`）与 `ops/setup.ps1`；根 4 个 `.bat` 与 `scripts/dev.ps1` 改为 ASCII 薄转发壳（原 97/120/100/86 行 → 14–17 行）。
+- `-WhatIf` 三模式实测（不启动进程）；`audit_delivery.py` 守护点从 .bat 迁到 ps1，新增"转发壳契约/模式契约"，两次负向验证均变红。
+
+**D-12 Git 历史备份治理**
+- 新增 `ops/backup-git.ps1`：检测 `.git` Junction 并警告、`git bundle create --all`、`bundle verify` 校验、按数量轮转；实测 4.5MB / 107 commits 通过。备份 runbook 更新为脚本优先流程。
+
+**D-13 lint 进 CI**
+- 后端：`ruff 0.6.2`，`select = E4/E7/E9/F`（不做 format），**245 → 0**；F841 修复一律"只剥赋值、保留有副作用的调用"；F821 连锁暴露并修复了 `project_service.export()` 的一处函数内 import 隐患。CI `backend.yml` 增加 ruff 步。
+- 前端：ESLint 9 flat + Prettier + `eslint-config-prettier`；**核心是 ADR-0007 分层边界由 `no-restricted-imports` 强制**（kernel↛shared/features、shared↛features、feature 禁止深链跨域），负向验证会变红；CI `frontend.yml` 增加 `lint` 与 `format:check`。
+- 付了学费：Prettier `semi:false` 会把 Vue **多语句**内联事件处理器拆成换行（Vue 表达式解析失败 → build 红）。已把 25 处抽成 23 个命名函数，扫描器归零；约定写入 `docs/guides/frontend.md`：**模板内联 handler 必须是单次调用，多语句抽函数**。
+
+**验证入口**
+- `check_all.py` 扩到 **15 项**（新增 ruff；前端 lint/format 在 CI）。CI 四工作流覆盖：后端 lint+测试+冒烟、前端 lint+format+typecheck+测试+构建、仓库守护、Android 打包。
+
 ### Changed — Phase 2：收口领域边界（Repository / sync / 前端分层，2026-10-27）
 
 本轮目标：把"分层正确"升级为"边界被机器守住"。**后端测试 1229 → 1282，前端测试 86，全部通过。**

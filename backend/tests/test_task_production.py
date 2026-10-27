@@ -314,8 +314,8 @@ class TestGroup2StatusFocusSubtask:
         target = fixture["tasks"]["pending_low_tomorrow"]
 
         svc = TaskService(db_session)
-        s1 = svc.add_subtask(test_user.id, target.id, CreateSubtaskRequest(title="选品牌"))
-        s2 = svc.add_subtask(test_user.id, target.id, CreateSubtaskRequest(title="下单"))
+        svc.add_subtask(test_user.id, target.id, CreateSubtaskRequest(title="选品牌"))
+        svc.add_subtask(test_user.id, target.id, CreateSubtaskRequest(title="下单"))
 
         # 查库验证子任务
         db_session.expire_all()
@@ -584,8 +584,8 @@ class TestGroup4RecurringStatsList:
 
         # 查库：今天的实例只有1条（按 title+due_date 判重）
         today = date.today()
-        count = count_rows(db_session, "tasks", user_id=test_user.id,
-                           title="每日英语阅读", due_date=today)
+        count_rows(db_session, "tasks", user_id=test_user.id,
+                   title="每日英语阅读", due_date=today)
         # 用 count_rows 不支持多条件？用 select 查
         instances = db_session.scalars(
             select(Task).where(
@@ -603,14 +603,14 @@ class TestGroup4RecurringStatsList:
         条件错了（比如漏了 user_id、completed_on 的日期范围不对），
         返回值就会和库不一致。
         """
-        fixture = seed_task_fixture(db_session, test_user.id)
+        seed_task_fixture(db_session, test_user.id)
         db_session.commit()
 
         svc = TaskService(db_session)
         stats = svc.today_stats(test_user.id)
 
         # 独立查库验证每个计数
-        today = date.today()
+        date.today()
         # in_progress
         db_in_progress = count_rows(db_session, "tasks", user_id=test_user.id, status="in_progress")
         assert stats.in_progress == db_in_progress
@@ -618,15 +618,14 @@ class TestGroup4RecurringStatsList:
         db_waiting = count_rows(db_session, "tasks", user_id=test_user.id, status="waiting")
         assert stats.waiting == db_waiting
         # completed_today：completed_at 是今天的
-        from app.models.base import utcnow
         # 夹具里3条 completed 都是 utcnow() 创建的，算今天
-        completed_today = db_session.scalars(
+        db_session.scalars(
             select(Task).where(
-                Task.user_id == test_user.id,
-                Task.status == "completed",
-                Task.completed_at.is_not(None),
+            Task.user_id == test_user.id,
+            Task.status == "completed",
+            Task.completed_at.is_not(None),
             )
-        ).all()
+            ).all()
         # 简化验证：completed_today >= 夹具中的3条（都是刚创建的）
         assert stats.completed_today >= 3
         # must_do：今天截止且未完成的
@@ -823,7 +822,6 @@ class TestGroup6EdgeCases:
         防什么：focus_stop 如果没有检查 end_time 是否为 None，重复 stop 会
         把 duration 累加两次（或者用新的 end_time 覆盖旧的）。
         """
-        from app.models.base import utcnow
 
         fixture = seed_task_fixture(db_session, test_user.id)
         db_session.commit()
@@ -1177,7 +1175,7 @@ class TestGroup8ValidationAndSearch:
         防什么：list 的 project_tag 过滤如果拼错了（比如用了 ILIKE 而不是 =），
         会返回部分匹配的结果。
         """
-        fixture = seed_task_fixture(db_session, test_user.id)
+        seed_task_fixture(db_session, test_user.id)
         db_session.commit()
 
         svc = TaskService(db_session)
@@ -1226,7 +1224,7 @@ class TestGroup9UpdateFilterFocusSort:
 
         防什么：due_date 过滤如果用了 >= 而不是 =，会返回截止日晚于该日期的任务。
         """
-        fixture = seed_task_fixture(db_session, test_user.id)
+        seed_task_fixture(db_session, test_user.id)
         db_session.commit()
         today = date.today()
 
@@ -1261,7 +1259,7 @@ class TestGroup9UpdateFilterFocusSort:
 
         防什么：sort 参数如果没有映射到正确的列，排序会无效或报错。
         """
-        fixture = seed_task_fixture(db_session, test_user.id)
+        seed_task_fixture(db_session, test_user.id)
         db_session.commit()
 
         svc = TaskService(db_session)

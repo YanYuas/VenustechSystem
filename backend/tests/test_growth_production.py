@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-import pytest
 
 from app.models.growth import GrowthEvent, GrowthState, SkillStat
 from app.services.growth_service import (

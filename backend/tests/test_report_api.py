@@ -11,7 +11,6 @@ from __future__ import annotations
 
 from datetime import date
 
-import pytest
 
 from app.database import SessionLocal
 from app.models.task import Task

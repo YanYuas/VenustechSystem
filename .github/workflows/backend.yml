@@ -42,7 +42,7 @@ concurrency:
 
 jobs:
   backend:
-    name: pytest + 架构守护 + 冒烟
+    name: lint + pytest + 架构守护 + 冒烟
     runs-on: ubuntu-latest
     # 防止某个用例挂死把 6 小时的默认上限烧完
     timeout-minutes: 30
@@ -82,6 +82,7 @@ jobs:
         run: |
           python -V
           python -m pytest --version
+          python -m ruff --version
 
       # 免 pytest 入口：即使 pytest 装不上也要能把分层守护跑起来（E-01 的直接对策）
       - name: Architecture guard (tests/test_architecture.py)
@@ -100,6 +101,14 @@ jobs:
             exit 1
           fi
           python scripts/audit_architecture.py --strict
+
+      # 后端 lint（D-13）：规则口径在 backend/pyproject.toml —— 只启 E4/E7/E9/F 正确性规则，
+      # 显式忽略 E501（线长），**不跑 ruff format**（全仓格式化会产出千行纯风格 diff）。
+      # 放在 pytest 之前：lint 秒级失败，比等几分钟测试更早给信号。
+      - name: "Ruff lint (correctness rules: E4/E7/E9/F)"
+        working-directory: backend
+        timeout-minutes: 5
+        run: python -m ruff check app tests
 
       - name: Backend test suite (pytest)
         working-directory: backend

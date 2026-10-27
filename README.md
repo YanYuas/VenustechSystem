@@ -48,18 +48,36 @@ backend/app/models/*.py     SQLAlchemy → SQLite
 
 环境：Python 3.11+、Node 18+（可选 [uv](https://docs.astral.sh/uv/)）。
 
+根目录 4 个 `.bat` 都是**薄转发壳**：全部逻辑在 [ops/start.ps1](ops/start.ps1) 一处实现
+（D-11 启动器单一实现），`.bat` 只负责把参数转给 PowerShell。安装逻辑同理在
+[ops/setup.ps1](ops/setup.ps1)。
+
 ```bash
-# 1) 首次安装依赖（只做一次；不会碰 git）
+# 1) 首次安装依赖（只做一次；不会碰 git）→ ops/setup.ps1
 setup.bat
 
-# 2) 开发启动：后端 127.0.0.1:8765 + 前端 http://localhost:5173
+# 2) 开发启动：后端 127.0.0.1:8765(--reload) + 前端 http://localhost:5173
 start-dev.bat
 
-# 准备给别人的演示数据（独立库，不污染真实数据）
+# 演示启动（独立库 backend/data_demo，不污染真实数据；缺库自动 seed）
 start-demo.bat
 
 # 手机 / 局域网（后端只绑回环，唯一对外端口 3000，需要访问令牌）
 start-mobile.bat
+```
+
+同一个实现也可以直接调用；**`-WhatIf` 只打印将要执行的命令与环境变量，不启动任何进程**：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File ops\start.ps1 -Mode dev    -WhatIf
+powershell -ExecutionPolicy Bypass -File ops\start.ps1 -Mode demo   -WhatIf
+powershell -ExecutionPolicy Bypass -File ops\start.ps1 -Mode mobile -WhatIf
+
+# 分支隔离：数据目录指到独立位置（相对 backend\，会自动转绝对路径）
+powershell -ExecutionPolicy Bypass -File ops\start.ps1 -Mode dev -DataDir .\data-fusion
+
+# 旧入口仍可用（兼容壳，等价于 -Mode dev [-DataDir]）
+powershell -ExecutionPolicy Bypass -File scripts\dev.ps1 -DataDir .\data-fusion
 ```
 
 手动启动（等价）：
@@ -93,6 +111,7 @@ python scripts/check_all.py --strict # CI 用：缺依赖=失败，杜绝"跳过
 ```bash
 python scripts/audit_architecture.py       # 架构守护（分层/领域归属/根目录契约）
 cd backend && python -m pytest tests -q    # 后端测试
+cd backend && python -m ruff check app tests  # 后端 lint（正确性规则 E4/E7/E9/F）
 cd frontend && npm run typecheck && npm test
 ```
 
@@ -106,11 +125,11 @@ CI：`.github/workflows/{backend,frontend,repo-guard}.yml`（Android 打包另�
 |---|---|
 | `backend/` | FastAPI 后端：`api → services → repositories → models`，`core/` 基础设施，`bootstrap/` 组合根 |
 | `frontend/` | Vue 3 前端（含 Capacitor Android 工程） |
-| `ops/` | 运行时与运维：统一 Web 服务 `server/server.js`、推送辅助 |
+| `ops/` | 运行时与运维：统一 Web 服务 `server/server.js`、**唯一启动实现 `start.ps1` / `setup.ps1`**、推送辅助 |
 | `scripts/` | 质量门禁与工程脚本（check_all / audit_* / check_versions） |
 | `docs/` | 文档：架构 / 产品 / 指南 / 过程归档 / 设计素材（索引见 [docs/README.md](docs/README.md)） |
 | `var/` | 运行期数据约定（gitignored） |
-| `*.bat` | 仅 4 个用户启动器（setup / start-dev / start-demo / start-mobile） |
+| `*.bat` | 仅 4 个**薄转发壳**（setup / start-dev / start-demo / start-mobile → `ops\*.ps1`） |
 
 根目录契约由架构守护强制；每个目录的"能放什么/禁止什么"见 [ARCHITECTURE.md §6](ARCHITECTURE.md)。
 

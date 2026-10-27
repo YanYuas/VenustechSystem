@@ -16,7 +16,6 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
 from datetime import date, datetime
 from enum import Enum
 from pathlib import Path

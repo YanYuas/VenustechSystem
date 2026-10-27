@@ -8,7 +8,7 @@ import json
 import logging
 import re
 
-from app.core.exceptions import AIRequestFailedException, AIServiceException, NotFoundException
+from app.core.exceptions import AIRequestFailedException, NotFoundException
 from app.models.document import Document
 from app.models.user import User
 from app.repositories import DocumentRepository

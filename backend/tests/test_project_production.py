@@ -9,7 +9,6 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta
 
 import pytest
-from sqlalchemy import select
 
 from app.core.exceptions import NotFoundException, ValidationException
 from app.models.project import Project, ProjectMilestone
@@ -717,7 +716,7 @@ class TestGroup6SortCascadeHealthDetail:
         """
         svc = ProjectService(db_session)
         p1 = svc.create(test_user.id, _make_project(name="A", sort_order=1))
-        p2 = svc.create(test_user.id, _make_project(name="B", sort_order=2))
+        svc.create(test_user.id, _make_project(name="B", sort_order=2))
 
         svc.update(test_user.id, p1["id"], ProjectUpdate(sort_order=3))
 

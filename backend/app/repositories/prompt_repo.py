@@ -4,7 +4,6 @@
 # ============================================================
 from __future__ import annotations
 
-from sqlalchemy.orm import Session
 
 from app.repositories.base import BaseRepository
 from app.models.asset import PromptTemplate

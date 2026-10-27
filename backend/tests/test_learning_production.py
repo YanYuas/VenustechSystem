@@ -7,7 +7,7 @@
 # ============================================================
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 
 import pytest
 
@@ -20,7 +20,6 @@ from app.schemas.learning import (
     ReviewSubmitRequest,
 )
 from app.services.learning_service import LearningService
-from tests.factories import count_rows
 
 
 def _make_plan(name="数学分析", **overrides):
@@ -209,7 +208,7 @@ class TestGroup2Sm2BoundaryStatsUpdateDelete:
         """
         svc = LearningService(db_session)
         # 新建卡片 next_review=今天 → 在队列中
-        due_card = svc.create_card(test_user.id, _make_card(front="今天复习", back="A"))
+        svc.create_card(test_user.id, _make_card(front="今天复习", back="A"))
         # 造一个未来复习的卡片
         future_card = svc.create_card(test_user.id, _make_card(front="未来复习", back="B"))
         db_session.execute(

@@ -16,7 +16,6 @@
 from __future__ import annotations
 
 import pytest
-from sqlalchemy import select
 
 from app.core.exceptions import DuplicateFolderNameException, InboxImmutableException, NotFoundException
 from app.models.folder import Folder
@@ -169,7 +168,7 @@ class TestGroup2RenameInboxAuth:
         这条测试锁定当前行为，如果未来修复了重名检查，这条会失败提醒更新。
         """
         svc = DocumentService(db_session)
-        folder_a = svc.create_folder(test_user.id, name="文件夹A")
+        svc.create_folder(test_user.id, name="文件夹A")
         folder_b = svc.create_folder(test_user.id, name="文件夹B")
 
         # 把 B 改名为 "文件夹A"（和 A 同名）
@@ -373,7 +372,7 @@ class TestGroup4TreeSortIsolation:
         svc = DocumentService(db_session)
         root = svc.create_folder(test_user.id, name="根")
         child = svc.create_folder(test_user.id, name="子", parent_id=root.id)
-        grandchild = svc.create_folder(test_user.id, name="孙", parent_id=child.id)
+        svc.create_folder(test_user.id, name="孙", parent_id=child.id)
 
         tree = svc.folders_tree(test_user.id)
         root_node = next(n for n in tree if n.name == "根")
@@ -619,7 +618,7 @@ class TestGroup6DeepScenarios:
         root = svc.create_folder(test_user.id, name="根")
         child = svc.create_folder(test_user.id, name="子", parent_id=root.id)
         grand = svc.create_folder(test_user.id, name="孙", parent_id=child.id)
-        great_grand = svc.create_folder(test_user.id, name="曾孙", parent_id=grand.id)
+        svc.create_folder(test_user.id, name="曾孙", parent_id=grand.id)
 
         tree = svc.folders_tree(test_user.id)
         root_node = next(n for n in tree if n.name == "根")

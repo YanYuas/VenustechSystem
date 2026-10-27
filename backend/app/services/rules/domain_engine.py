@@ -34,9 +34,9 @@ import re
 from dataclasses import dataclass
 
 from app.core.logger import get_logger
+from app.services.rules.domain_lib import DOMAIN_LIB, DomainDef, TaskDef, UnitDef
 
 logger = get_logger("rules")
-from app.services.rules.domain_lib import DOMAIN_LIB, DomainDef, TaskDef, UnitDef
 
 # 验证任务的「达标标准」是固定的 —— 源实现里就是硬编码字符串
 VERIFY_ACCEPTANCE = "完成并记录为一段真实经历（记录后技能正式点亮）"

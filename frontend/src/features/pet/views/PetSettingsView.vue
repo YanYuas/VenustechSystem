@@ -7,7 +7,7 @@ import { ref, onMounted } from 'vue'
 import { petApi } from '../api'
 import { useToast } from '@/kernel/ui/toast'
 import type { PetConfig, PetAvatar, PetState } from '../model'
-import BaseCard from '@/components/common/BaseCard.vue'
+import BaseCard from '@/shared/components/common/BaseCard.vue'
 
 const toast = useToast()
 
@@ -63,7 +63,12 @@ function switchTab(tab: 'display' | 'state' | 'voice' | 'avatar') {
 const avatars = ref<PetAvatar[]>([])
 const avatarLoading = ref(false)
 const showAvatarForm = ref(false)
-const avatarForm = ref({ name: '', description: '', image_url: '', mode: 'simple' as 'simple' | 'advanced' })
+const avatarForm = ref({
+  name: '',
+  description: '',
+  image_url: '',
+  mode: 'simple' as 'simple' | 'advanced',
+})
 
 async function fetchAvatars() {
   avatarLoading.value = true
@@ -77,7 +82,10 @@ async function fetchAvatars() {
 }
 
 async function createAvatar() {
-  if (!avatarForm.value.name) { toast.warning('请填写形象名称'); return }
+  if (!avatarForm.value.name) {
+    toast.warning('请填写形象名称')
+    return
+  }
   try {
     await petApi.createAvatar(avatarForm.value)
     toast.success('形象已创建')
@@ -113,7 +121,10 @@ async function deleteAvatar(id: string) {
 const ttsTestText = ref('你好，我是启明星，你的桌面伙伴！')
 
 function testTTS() {
-  if (!config.value?.tts_enabled) { toast.warning('请先开启TTS'); return }
+  if (!config.value?.tts_enabled) {
+    toast.warning('请先开启TTS')
+    return
+  }
   if ('speechSynthesis' in window) {
     const utterance = new SpeechSynthesisUtterance(ttsTestText.value)
     utterance.rate = config.value.tts_rate
@@ -140,7 +151,13 @@ onMounted(() => fetchConfig())
 
     <!-- Tab导航 -->
     <div class="tab-nav">
-      <button v-for="tab in tabs" :key="tab.key" class="tab-btn" :class="{ active: activeTab === tab.key }" @click="switchTab(tab.key)">
+      <button
+        v-for="tab in tabs"
+        :key="tab.key"
+        class="tab-btn"
+        :class="{ active: activeTab === tab.key }"
+        @click="switchTab(tab.key)"
+      >
         <span class="tab-icon">{{ tab.icon }}</span>
         <span>{{ tab.label }}</span>
       </button>
@@ -148,7 +165,6 @@ onMounted(() => fetchConfig())
 
     <div v-if="configLoading" class="loading">加载中...</div>
     <template v-else-if="config">
-
       <!-- ==================== 显示设置 ==================== -->
       <div v-if="activeTab === 'display'" class="tab-content">
         <BaseCard class="config-section">
@@ -169,7 +185,14 @@ onMounted(() => fetchConfig())
           </div>
           <div class="form-row">
             <label class="form-label">透明度: {{ Math.round(config.opacity * 100) }}%</label>
-            <input type="range" v-model.number="config.opacity" min="0.3" max="1" step="0.1" class="form-range" />
+            <input
+              type="range"
+              v-model.number="config.opacity"
+              min="0.3"
+              max="1"
+              step="0.1"
+              class="form-range"
+            />
           </div>
           <div class="form-row">
             <label class="form-label">
@@ -207,7 +230,14 @@ onMounted(() => fetchConfig())
           </div>
           <div class="form-row">
             <label class="form-label">气泡时长: {{ config.bubble_duration }}秒</label>
-            <input type="range" v-model.number="config.bubble_duration" min="2" max="15" step="1" class="form-range" />
+            <input
+              type="range"
+              v-model.number="config.bubble_duration"
+              min="2"
+              max="15"
+              step="1"
+              class="form-range"
+            />
           </div>
         </BaseCard>
 
@@ -227,7 +257,14 @@ onMounted(() => fetchConfig())
           </div>
           <div class="form-row">
             <label class="form-label">动作切换间隔: {{ config.action_switch_interval }}秒</label>
-            <input type="range" v-model.number="config.action_switch_interval" min="10" max="120" step="5" class="form-range" />
+            <input
+              type="range"
+              v-model.number="config.action_switch_interval"
+              min="10"
+              max="120"
+              step="5"
+              class="form-range"
+            />
           </div>
         </BaseCard>
 
@@ -275,13 +312,27 @@ onMounted(() => fetchConfig())
         <BaseCard class="config-section">
           <h3 class="section-title">⏰ 时间段动作</h3>
           <div class="time-grid">
-            <div class="time-item"><span class="time-range">06:00-09:00</span><span class="time-action">伸懒腰</span></div>
-            <div class="time-item"><span class="time-range">09:00-12:00</span><span class="time-action">认真工作</span></div>
-            <div class="time-item"><span class="time-range">12:00-14:00</span><span class="time-action">吃饭休息</span></div>
-            <div class="time-item"><span class="time-range">14:00-18:00</span><span class="time-action">思考中</span></div>
-            <div class="time-item"><span class="time-range">18:00-19:00</span><span class="time-action">放松中</span></div>
-            <div class="time-item"><span class="time-range">19:00-23:00</span><span class="time-action">休闲阅读</span></div>
-            <div class="time-item"><span class="time-range">23:00-06:00</span><span class="time-action">睡觉/守夜</span></div>
+            <div class="time-item">
+              <span class="time-range">06:00-09:00</span><span class="time-action">伸懒腰</span>
+            </div>
+            <div class="time-item">
+              <span class="time-range">09:00-12:00</span><span class="time-action">认真工作</span>
+            </div>
+            <div class="time-item">
+              <span class="time-range">12:00-14:00</span><span class="time-action">吃饭休息</span>
+            </div>
+            <div class="time-item">
+              <span class="time-range">14:00-18:00</span><span class="time-action">思考中</span>
+            </div>
+            <div class="time-item">
+              <span class="time-range">18:00-19:00</span><span class="time-action">放松中</span>
+            </div>
+            <div class="time-item">
+              <span class="time-range">19:00-23:00</span><span class="time-action">休闲阅读</span>
+            </div>
+            <div class="time-item">
+              <span class="time-range">23:00-06:00</span><span class="time-action">睡觉/守夜</span>
+            </div>
           </div>
         </BaseCard>
 
@@ -311,15 +362,36 @@ onMounted(() => fetchConfig())
           </div>
           <div class="form-row" v-if="config.tts_enabled">
             <label class="form-label">语速: {{ config.tts_rate.toFixed(1) }}x</label>
-            <input type="range" v-model.number="config.tts_rate" min="0.5" max="2" step="0.1" class="form-range" />
+            <input
+              type="range"
+              v-model.number="config.tts_rate"
+              min="0.5"
+              max="2"
+              step="0.1"
+              class="form-range"
+            />
           </div>
           <div class="form-row" v-if="config.tts_enabled">
             <label class="form-label">音调: {{ config.tts_pitch.toFixed(1) }}</label>
-            <input type="range" v-model.number="config.tts_pitch" min="0.5" max="2" step="0.1" class="form-range" />
+            <input
+              type="range"
+              v-model.number="config.tts_pitch"
+              min="0.5"
+              max="2"
+              step="0.1"
+              class="form-range"
+            />
           </div>
           <div class="form-row" v-if="config.tts_enabled">
             <label class="form-label">音量: {{ Math.round(config.tts_volume * 100) }}%</label>
-            <input type="range" v-model.number="config.tts_volume" min="0" max="1" step="0.1" class="form-range" />
+            <input
+              type="range"
+              v-model.number="config.tts_volume"
+              min="0"
+              max="1"
+              step="0.1"
+              class="form-range"
+            />
           </div>
         </BaseCard>
 
@@ -335,8 +407,10 @@ onMounted(() => fetchConfig())
       <!-- ==================== 形象管理 ==================== -->
       <div v-if="activeTab === 'avatar'" class="tab-content">
         <div class="content-toolbar">
-          <h3 class="section-title" style="margin:0">🎨 形象列表</h3>
-          <button class="btn-primary" @click="showAvatarForm = !showAvatarForm">{{ showAvatarForm ? '取消' : '+ 上传形象' }}</button>
+          <h3 class="section-title" style="margin: 0">🎨 形象列表</h3>
+          <button class="btn-primary" @click="showAvatarForm = !showAvatarForm">
+            {{ showAvatarForm ? '取消' : '+ 上传形象' }}
+          </button>
         </div>
 
         <!-- 上传表单 -->
@@ -349,19 +423,28 @@ onMounted(() => fetchConfig())
             </select>
           </div>
           <input v-model="avatarForm.description" class="form-input" placeholder="描述（可选）" />
-          <input v-model="avatarForm.image_url" class="form-input" placeholder="图片URL（可选，后续支持本地上传）" />
+          <input
+            v-model="avatarForm.image_url"
+            class="form-input"
+            placeholder="图片URL（可选，后续支持本地上传）"
+          />
           <button class="btn-primary" @click="createAvatar">创建形象</button>
         </BaseCard>
 
         <div v-if="avatarLoading" class="loading">加载中...</div>
         <div v-else class="avatar-grid">
           <BaseCard
-            v-for="av in avatars" :key="av.id"
+            v-for="av in avatars"
+            :key="av.id"
             class="avatar-card"
             :class="{ active: av.is_active }"
           >
             <div class="avatar-preview">
-              <div v-if="av.image_url" class="avatar-image" :style="{ backgroundImage: `url(${av.image_url})` }"></div>
+              <div
+                v-if="av.image_url"
+                class="avatar-image"
+                :style="{ backgroundImage: `url(${av.image_url})` }"
+              ></div>
               <div v-else class="avatar-placeholder">
                 <span class="placeholder-icon">🐱</span>
               </div>
@@ -376,8 +459,20 @@ onMounted(() => fetchConfig())
               </div>
             </div>
             <div class="avatar-actions">
-              <button v-if="!av.is_active" class="btn-sm btn-primary" @click="activateAvatar(av.id)">使用</button>
-              <button v-if="av.avatar_type === 'custom'" class="btn-sm btn-danger" @click="deleteAvatar(av.id)">删除</button>
+              <button
+                v-if="!av.is_active"
+                class="btn-sm btn-primary"
+                @click="activateAvatar(av.id)"
+              >
+                使用
+              </button>
+              <button
+                v-if="av.avatar_type === 'custom'"
+                class="btn-sm btn-danger"
+                @click="deleteAvatar(av.id)"
+              >
+                删除
+              </button>
             </div>
           </BaseCard>
         </div>
@@ -387,57 +482,320 @@ onMounted(() => fetchConfig())
 </template>
 
 <style scoped lang="scss">
-.pet-page { padding: var(--space-4); display: flex; flex-direction: column; gap: var(--space-4); }
-.page-title { font-size: var(--text-2xl); font-weight: 800; color: var(--text-hi); font-family: var(--font-cute); }
-.page-sub { color: var(--text-mid); font-size: var(--text-sm); margin-top: 4px; }
+.pet-page {
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.page-title {
+  font-size: var(--text-2xl);
+  font-weight: 800;
+  color: var(--text-hi);
+  font-family: var(--font-cute);
+}
+.page-sub {
+  color: var(--text-mid);
+  font-size: var(--text-sm);
+  margin-top: 4px;
+}
 
-.tab-nav { display: flex; gap: var(--space-2); background: var(--bg-panel); padding: 6px; border-radius: var(--radius-lg); border: 1px solid var(--line); width: fit-content; flex-wrap: wrap; }
-.tab-btn { display: flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: var(--radius-md); border: none; background: transparent; color: var(--text-mid); font-size: var(--text-sm); font-weight: 600; cursor: pointer; transition: all 0.2s; &:hover { background: var(--bg-hover); } &.active { background: var(--primary); color: white; box-shadow: 0 2px 8px var(--primary-shadow); } }
-.tab-icon { font-size: 16px; }
+.tab-nav {
+  display: flex;
+  gap: var(--space-2);
+  background: var(--bg-panel);
+  padding: 6px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--line);
+  width: fit-content;
+  flex-wrap: wrap;
+}
+.tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  border: none;
+  background: transparent;
+  color: var(--text-mid);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  &:hover {
+    background: var(--bg-hover);
+  }
+  &.active {
+    background: var(--primary);
+    color: white;
+    box-shadow: 0 2px 8px var(--primary-shadow);
+  }
+}
+.tab-icon {
+  font-size: 16px;
+}
 
-.loading { text-align: center; padding: var(--space-8); color: var(--text-mid); }
-.section-title { font-size: var(--text-base); font-weight: 600; color: var(--text-hi); margin-bottom: 6px; }
-.section-desc { font-size: var(--text-sm); color: var(--text-mid); margin-bottom: var(--space-3); }
+.loading {
+  text-align: center;
+  padding: var(--space-8);
+  color: var(--text-mid);
+}
+.section-title {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text-hi);
+  margin-bottom: 6px;
+}
+.section-desc {
+  font-size: var(--text-sm);
+  color: var(--text-mid);
+  margin-bottom: var(--space-3);
+}
 
-.btn-primary { padding: 8px 18px; border-radius: var(--radius-md); border: none; background: var(--primary); color: white; font-size: var(--text-sm); font-weight: 600; cursor: pointer; &:hover { opacity: 0.9; } }
-.btn-secondary { padding: 8px 18px; border-radius: var(--radius-md); border: 1px solid var(--line); background: var(--bg-panel); color: var(--text-mid); font-size: var(--text-sm); cursor: pointer; margin-top: var(--space-3); }
-.btn-sm { padding: 4px 10px; border-radius: var(--radius-sm); border: 1px solid var(--line); background: var(--bg-panel); color: var(--text-mid); font-size: var(--text-xs); cursor: pointer; &.btn-primary { background: var(--primary); color: white; border-color: var(--primary); } &.btn-danger { background: var(--danger, #ff4d4f); color: white; border-color: var(--danger, #ff4d4f); } }
+.btn-primary {
+  padding: 8px 18px;
+  border-radius: var(--radius-md);
+  border: none;
+  background: var(--primary);
+  color: white;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+  &:hover {
+    opacity: 0.9;
+  }
+}
+.btn-secondary {
+  padding: 8px 18px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line);
+  background: var(--bg-panel);
+  color: var(--text-mid);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  margin-top: var(--space-3);
+}
+.btn-sm {
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--bg-panel);
+  color: var(--text-mid);
+  font-size: var(--text-xs);
+  cursor: pointer;
+  &.btn-primary {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+  }
+  &.btn-danger {
+    background: var(--danger, #ff4d4f);
+    color: white;
+    border-color: var(--danger, #ff4d4f);
+  }
+}
 
-.config-section { padding: var(--space-4); margin-bottom: var(--space-3); }
-.form-row { display: flex; gap: var(--space-3); margin-bottom: var(--space-3); align-items: center; flex-wrap: wrap; }
-.form-label { font-size: var(--text-sm); color: var(--text-hi); display: flex; align-items: center; gap: 6px; cursor: pointer; }
-.form-input, .form-select { flex: 1; min-width: 120px; padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid var(--line); background: var(--bg-input); color: var(--text-hi); font-size: var(--text-sm); }
-.form-range { flex: 1; }
+.config-section {
+  padding: var(--space-4);
+  margin-bottom: var(--space-3);
+}
+.form-row {
+  display: flex;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+  align-items: center;
+  flex-wrap: wrap;
+}
+.form-label {
+  font-size: var(--text-sm);
+  color: var(--text-hi);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+.form-input,
+.form-select {
+  flex: 1;
+  min-width: 120px;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line);
+  background: var(--bg-input);
+  color: var(--text-hi);
+  font-size: var(--text-sm);
+}
+.form-range {
+  flex: 1;
+}
 
-.save-btn { width: 100%; padding: 14px; border-radius: var(--radius-md); border: none; background: var(--primary); color: white; font-size: var(--text-base); font-weight: 600; cursor: pointer; &:hover { opacity: 0.9; } }
+.save-btn {
+  width: 100%;
+  padding: 14px;
+  border-radius: var(--radius-md);
+  border: none;
+  background: var(--primary);
+  color: white;
+  font-size: var(--text-base);
+  font-weight: 600;
+  cursor: pointer;
+  &:hover {
+    opacity: 0.9;
+  }
+}
 
 /* 状态感知 */
-.state-preview { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--space-3); margin-bottom: var(--space-3); }
-.state-item { display: flex; align-items: center; gap: 10px; padding: var(--space-2); background: var(--bg-hover); border-radius: var(--radius-md); }
-.state-icon { font-size: 24px; }
-.state-label { font-size: var(--text-xs); color: var(--text-mid); }
-.state-value { font-size: var(--text-sm); font-weight: 600; color: var(--text-hi); }
-.bubble-preview { display: flex; align-items: center; gap: 8px; padding: var(--space-3); background: var(--primary-soft); border-radius: var(--radius-md); margin-bottom: var(--space-3); font-size: var(--text-sm); color: var(--primary); }
-.bubble-icon { font-size: 18px; }
+.state-preview {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.state-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: var(--space-2);
+  background: var(--bg-hover);
+  border-radius: var(--radius-md);
+}
+.state-icon {
+  font-size: 24px;
+}
+.state-label {
+  font-size: var(--text-xs);
+  color: var(--text-mid);
+}
+.state-value {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-hi);
+}
+.bubble-preview {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: var(--space-3);
+  background: var(--primary-soft);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--primary);
+}
+.bubble-icon {
+  font-size: 18px;
+}
 
-.time-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; }
-.time-item { display: flex; justify-content: space-between; padding: 8px 12px; background: var(--bg-hover); border-radius: var(--radius-sm); font-size: var(--text-xs); }
-.time-range { color: var(--text-mid); }
-.time-action { color: var(--text-hi); font-weight: 600; }
+.time-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+}
+.time-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--bg-hover);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+}
+.time-range {
+  color: var(--text-mid);
+}
+.time-action {
+  color: var(--text-hi);
+  font-weight: 600;
+}
 
 /* 形象管理 */
-.content-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-3); }
-.form-card { padding: var(--space-4); margin-bottom: var(--space-3); }
-.avatar-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--space-3); }
-.avatar-card { padding: var(--space-3); text-align: center; &.active { border: 2px solid var(--primary); } }
-.avatar-preview { position: relative; width: 100%; height: 120px; margin-bottom: var(--space-2); border-radius: var(--radius-md); overflow: hidden; background: var(--bg-hover); }
-.avatar-image { width: 100%; height: 100%; background-size: contain; background-position: center; background-repeat: no-repeat; }
-.avatar-placeholder { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
-.placeholder-icon { font-size: 48px; }
-.active-badge { position: absolute; top: 6px; right: 6px; padding: 2px 8px; border-radius: var(--radius-pill); background: var(--primary); color: white; font-size: var(--text-xs); font-weight: 600; }
-.avatar-name { font-size: var(--text-base); font-weight: 600; color: var(--text-hi); margin-bottom: 4px; }
-.avatar-desc { font-size: var(--text-xs); color: var(--text-mid); margin-bottom: 8px; }
-.avatar-meta { display: flex; gap: 6px; justify-content: center; margin-bottom: 10px; }
-.tag { display: inline-block; padding: 2px 8px; border-radius: var(--radius-pill); background: var(--primary-soft); color: var(--primary); font-size: var(--text-xs); }
-.avatar-actions { display: flex; gap: 6px; justify-content: center; }
+.content-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-3);
+}
+.form-card {
+  padding: var(--space-4);
+  margin-bottom: var(--space-3);
+}
+.avatar-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-3);
+}
+.avatar-card {
+  padding: var(--space-3);
+  text-align: center;
+  &.active {
+    border: 2px solid var(--primary);
+  }
+}
+.avatar-preview {
+  position: relative;
+  width: 100%;
+  height: 120px;
+  margin-bottom: var(--space-2);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--bg-hover);
+}
+.avatar-image {
+  width: 100%;
+  height: 100%;
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+.avatar-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.placeholder-icon {
+  font-size: 48px;
+}
+.active-badge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--primary);
+  color: white;
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+.avatar-name {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text-hi);
+  margin-bottom: 4px;
+}
+.avatar-desc {
+  font-size: var(--text-xs);
+  color: var(--text-mid);
+  margin-bottom: 8px;
+}
+.avatar-meta {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  margin-bottom: 10px;
+}
+.tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-size: var(--text-xs);
+}
+.avatar-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+}
 </style>

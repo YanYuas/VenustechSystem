@@ -30,3 +30,37 @@ norecursedirs = ["data*", "var", ".venv", "migrations"]
 line-length = 110
 target-version = "py311"
 extend-exclude = ["migrations/versions"]
+
+# ============================================================
+# Ruff 规则口径（D-13）：只把「正确性」规则变成门禁，不做风格重排。
+#
+# 为什么不用 `ruff format` / 不启用 E5、W 等风格规则：
+#   本仓后端已有 1300+ 用例与 172 个模块，全量格式化会产出约 2000 行纯风格
+#   diff，把真实改动淹没，且与「业务逻辑零改动」的审计要求冲突。
+#   因此 select 只取 pyflakes（F）+ pycodestyle 的「错误类」前缀：
+#     E4 导入问题（E401 一行多导入 / E402 导入不在顶部）
+#     E7 语法与比较陷阱（E711/E712/E713/E714/E721/E722/E731/E741）
+#     E9 运行期错误（E901 语法错误 / E902 读文件失败 / E999 解析失败）
+#     F  pyflakes 全套（未定义名 / 未使用导入与变量 / 重定义 / f-string 无占位符）
+#   这些规则命中即代表「可能跑不起来」或「代码在骗人」，是值得 CI 拦下的。
+#
+# 不用 `--fix` 之外的自动格式化；`python -m ruff check` 即 CI 门禁。
+# ============================================================
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]
+
+ignore = [
+    # 行长（110）纯风格，不是正确性问题：全仓仍有大量超长行，
+    # 启用会制造大面积无意义 diff。改由人工评审 + IDE 提示。
+    "E501",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# 包级 re-export 入口：这些导入是「对外 API」，不是未使用导入。
+#   1) app/models/__init__.py —— 逐模块导入是架构守护 R6 的硬要求：
+#      没有在这里导入的 model 不会被注册到 Base.metadata，迁移就不会建表；
+#   2) app/repositories/__init__.py / app/schemas/__init__.py —— 同上，统一出口。
+# 若哪天改成显式 __all__，这里的三条豁免即可删除。
+"app/models/__init__.py" = ["F401"]
+"app/repositories/__init__.py" = ["F401"]
+"app/schemas/__init__.py" = ["F401"]

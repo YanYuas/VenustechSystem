@@ -74,11 +74,11 @@ class VaultService:
         salt = EncryptionManager.new_salt()
         key = EncryptionManager.derive_key(master_password, salt)
         fernet = Fernet(key)
-        row = self.config_repo.create(
+        self.config_repo.create(
             user_id=self.user_id,
             salt=salt.hex(),
             verifier=fernet.encrypt(_VERIFIER_PLAINTEXT.encode()).decode(),
-        )
+            )
         self.db.commit()
         _session_keys[self.user_id] = key
         return self.status()

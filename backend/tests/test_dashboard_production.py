@@ -10,7 +10,6 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta
 
-import pytest
 
 from app.models.document import Document
 from app.models.task import Task

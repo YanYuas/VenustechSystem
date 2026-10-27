@@ -6,7 +6,7 @@
 // - 统一错误上报（一期仅本地日志，二期可接入上报）
 // ============================================================
 import type { App } from 'vue'
-import { toast } from '@/composables/useToast'
+import { toast } from '@/kernel/ui/toast'
 
 let isOffline = false
 

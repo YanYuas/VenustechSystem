@@ -16,7 +16,6 @@ from __future__ import annotations
 
 from datetime import date
 
-import pytest
 
 from app.database import SessionLocal
 from app.models.review import Review
@@ -261,7 +260,6 @@ class TestReviewApiGroup2DeleteAutoFillConvert:
         assert r.json()["code"] == 1002
 
         # 查库：没有产生任务
-        from app.models.task import Task
         db = _db()
         try:
             assert count_rows(db, "tasks", user_id=default_user_id) == 0

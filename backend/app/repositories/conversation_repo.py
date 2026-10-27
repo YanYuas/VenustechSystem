@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 
 from app.models.conversation import Conversation, Message
 from app.repositories.base import BaseRepository

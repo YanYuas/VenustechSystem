@@ -136,13 +136,16 @@ git status                    # 期望：除了 .workbuddy/ 无其他待提交�
 git checkout -b feature/eo-kernel-fusion
 
 # ---------- 2. 启动（推荐：一键脚本 + 独立数据目录）----------
-powershell -ExecutionPolicy Bypass -File scripts\dev.ps1 -DataDir .\data-fusion
+# 唯一实现是 ops\start.ps1；scripts\dev.ps1 只是兼容转发壳（等价写法）
+powershell -ExecutionPolicy Bypass -File ops\start.ps1 -Mode dev -DataDir .\data-fusion
+# 只想看它会做什么、不启动进程：
+powershell -ExecutionPolicy Bypass -File ops\start.ps1 -Mode dev -DataDir .\data-fusion -WhatIf
 
 # 或者手动分两个终端：
-# 终端 A：后端（8765，--reload 自动重载）
-$env:VENUSTECH_DATA_DIR = "./data-fusion"
+# 终端 A：后端（8765，--reload 自动重载；解释器必须用项目 venv）
+$env:VENUSTECH_DATA_DIR = "D:\YanYuas\PersonalDevelopmentPortfolio\VenustechSystem\backend\data-fusion"
 cd backend
-python -m uvicorn app.main:app --reload --port 8765
+.venv\Scripts\python.exe -m uvicorn app.main:app --reload --port 8765
 
 # 终端 B：前端（5173，Vite HMR 热更新）
 cd frontend
@@ -150,8 +153,10 @@ npm run dev
 # 浏览器打开 http://localhost:5173  ← 实时看到分支上的改动
 ```
 
-> ✅ `scripts/dev.ps1` 已支持 `-DataDir` 参数（2026-09-15 新增），会把它注入后端进程的
-> `VENUSTECH_DATA_DIR`。不传该参数则沿用主库 `backend/data/app.db`。
+> ✅ 数据目录隔离由 `ops\start.ps1` 的 `-DataDir` 参数提供（`scripts\dev.ps1` 是兼容转发壳，
+> 参数原样透传）。相对路径按 `backend\` 解析，实际注入后端的 `VENUSTECH_DATA_DIR` 一定是
+> **绝对 Windows 路径**（Git-Bash 风格 `/d/...` 会丢盘符，导致后端打开另一个空库）。
+> 不传该参数则沿用主库 `backend/data/app.db`。
 > 该参数是分支开发的安全阀 —— 分支上随便跑新增迁移，主库不受影响。
 
 ---
@@ -174,7 +179,9 @@ npm run dev
 
 **分支开发在这个项目上是完全可行且推荐的**，因为它是本地优先应用——切分支就是切代码，开发服务器照常热更新，实时效果与主分支毫无差别。
 
-唯一的门槛是 `backend/data/app.db` 目前被纳入版本控制，会让"切分支"变成"切数据"。**先执行一次 `git rm --cached backend/data/app.db`，再用 `VENUSTECH_DATA_DIR` 给分支独立数据库**，之后就完全没有后顾之忧了。
+唯一的门槛曾经是 `backend/data/app.db` 被纳入版本控制，会让"切分支"变成"切数据"。
+该文件已于 2026-09-15 执行 `git rm --cached` 移出版本控制（见 `CONTRIBUTING.md` 数据与产物章节），
+现在只需用 `VENUSTECH_DATA_DIR`（或 `ops\start.ps1 -DataDir`）给分支独立数据库。
 
 ---
 
@@ -182,10 +189,11 @@ npm run dev
 
 | 事实 | 位置 |
 |------|------|
-| 启动自动迁移 | `backend/app/main.py:43` `run_migrations()` |
-| 数据目录可覆盖 | `backend/app/config.py:49` `data_dir` |
-| 数据库路径派生 | `backend/app/config.py:74-81` `db_path` / `db_url` |
-| 环境变量前缀 | `backend/app/config.py:63` `env_prefix="VENUSTECH_"` |
-| 开发启动脚本 | `scripts/dev.ps1:39,41`（未设 `VENUSTECH_DATA_DIR`） |
+| 启动自动迁移 | `backend/app/main.py:44` `run_migrations()` |
+| 数据目录可覆盖 | `backend/app/config.py:56` `data_dir` |
+| 数据库路径派生 | `backend/app/config.py:81-88` `db_path` / `db_url` |
+| 环境变量前缀 | `backend/app/config.py:70` `env_prefix="VENUSTECH_"` |
+| 启动器（唯一实现） | `ops/start.ps1` — `-Mode dev\|demo\|mobile`、`-DataDir`（→ 绝对 `VENUSTECH_DATA_DIR`）、`-WhatIf` |
+| 兼容转发壳 | `scripts/dev.ps1`（等价 `-Mode dev [-DataDir]`）、根目录 `start-*.bat` |
 | 前端开发环境 | `frontend/.env.development`（proxy `/api` → 8765） |
-| 数据库被跟踪 | `git ls-files backend/data/` → `backend/data/app.db` |
+| 数据库不再被跟踪 | `git ls-files backend/data/` → 空（2026-09-15 `git rm --cached`） |

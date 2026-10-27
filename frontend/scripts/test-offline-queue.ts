@@ -9,7 +9,7 @@ import {
   createQueueManager,
   type QueueEntry,
   type QueueStorage,
-} from '../src/utils/offlineQueueCore'
+} from '../src/kernel/offline/offlineQueueCore'
 
 let passed = 0
 let failed = 0

@@ -5,10 +5,9 @@
 # ============================================================
 from __future__ import annotations
 
-import pytest
 
 from app.database import SessionLocal
-from app.models.growth import GrowthEvent, GrowthState, SkillStat
+from app.models.growth import GrowthState, SkillStat
 from app.services.growth_service import GrowthService
 
 

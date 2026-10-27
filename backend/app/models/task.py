@@ -4,12 +4,16 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Index, Integer, String, Text, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, SoftDeleteMixin, TimestampMixin, UUIDMixin
 from app.models.types import JSONType
+
+if TYPE_CHECKING:  # 仅类型检查：Task 与 Project 互相引用，运行时导入会成环
+    from app.models.project import Project
 
 
 class Task(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):

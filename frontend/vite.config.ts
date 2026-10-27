@@ -16,6 +16,13 @@ export default defineConfig(({ mode }) => ({
     }),
     Components({
       resolvers: [ElementPlusResolver()],
+      // P3 起组件散落在 shared / features / app 三处（components/ 过渡目录已清空）。
+      // 用 globs 而不是 dirs：避免 deep 扫描把 features/*/views 也注册成全局组件。
+      globs: [
+        'src/shared/components/**/*.vue',
+        'src/features/*/components/**/*.vue',
+        'src/app/layout/*.vue',
+      ],
       dts: 'src/components.d.ts',
     }),
   ],

@@ -2,7 +2,7 @@
 // 维度导航配置 —— 前端UI重构 v1.0
 // 六大维度：首页 / 执行 / 知识 / 人生 / 资产 / 伙伴
 // ============================================================
-import type { NavItem } from '@/types/common'
+import type { NavItem } from '../types/common'
 
 export type DimensionId = 'dashboard' | 'execution' | 'knowledge' | 'life' | 'asset' | 'companion'
 
@@ -119,17 +119,17 @@ export const ROUTE_TO_DIMENSION: Record<string, DimensionId> = {
 
 export function getDimensionByRoute(path: string): Dimension | undefined {
   if (ROUTE_TO_DIMENSION[path]) {
-    return DIMENSIONS.find(d => d.id === ROUTE_TO_DIMENSION[path])
+    return DIMENSIONS.find((d) => d.id === ROUTE_TO_DIMENSION[path])
   }
   for (const [routePrefix, dimId] of Object.entries(ROUTE_TO_DIMENSION)) {
     if (path.startsWith(routePrefix + '/')) {
-      return DIMENSIONS.find(d => d.id === dimId)
+      return DIMENSIONS.find((d) => d.id === dimId)
     }
   }
   return undefined
 }
 
-export const MAIN_NAV_ITEMS: NavItem[] = DIMENSIONS.map(d => ({
+export const MAIN_NAV_ITEMS: NavItem[] = DIMENSIONS.map((d) => ({
   id: d.id,
   label: d.label,
   icon: d.icon,

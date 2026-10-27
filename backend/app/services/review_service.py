@@ -27,7 +27,7 @@ from app.schemas.review import (
     ReviewOut,
     UpsertReviewRequest,
 )
-from app.schemas.task import CreateTaskRequest, TaskOut
+from app.schemas.task import CreateTaskRequest
 from app.services.task_service import TaskService
 
 

@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import asyncio
+from typing import TYPE_CHECKING
 
 from app.core.event_bus import (
     EVENT_DOCUMENT_SAVED,
@@ -21,6 +22,9 @@ from app.repositories import (
     UserRepository,
 )
 from app.services.ai import AIService
+
+if TYPE_CHECKING:  # 仅类型检查：Future 只用于回调注解，运行时不需要该模块
+    import concurrent.futures
 
 logger = get_logger("event_handlers")
 

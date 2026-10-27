@@ -5,7 +5,6 @@
 from __future__ import annotations
 
 import logging
-import os
 from pathlib import Path
 
 from fastapi import APIRouter, Query
@@ -73,7 +72,7 @@ def read_log(
     # 按级别过滤
     if level:
         level_upper = level.upper()
-        lines = [l for l in lines if level_upper in l.upper()]
+        lines = [line for line in lines if level_upper in line.upper()]
 
     return success({
         "filename": filename,

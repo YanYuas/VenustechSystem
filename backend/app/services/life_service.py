@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from sqlalchemy.orm import Session
 
 from app.core.event_bus import EVENT_HABIT_CHECKIN, EVENT_MOOD_LOGGED, EVENT_DIARY_CREATED, event_bus

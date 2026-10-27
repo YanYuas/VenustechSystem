@@ -310,13 +310,6 @@ def check_domain_map(domains: dict) -> None:
         if module not in seen_modules:
             warn("R8-domain-stale", f"domains.json 登记的模块 {module} 找不到对应实现文件")
 
-    # 前端 views 目录
-    views = FRONTEND_SRC / "views"
-    declared = {k: v for k, v in domains["frontend_views"].items() if not k.startswith("$")}
-    if views.is_dir():
-        for d in sorted(p for p in views.iterdir() if p.is_dir()):
-            if d.name not in declared:
-                err("R8-view-unmapped", f"views/{d.name}/ 未在 domains.json.frontend_views 登记", rel(d))
 
     # 前端 features 目录（ADR-0007：一个领域一个包）
     features = FRONTEND_SRC / "features"
@@ -329,8 +322,6 @@ def check_domain_map(domains: dict) -> None:
 
 
 # ---------------------------------------------------------------- R14 前端分层
-TRANSITIONAL_AREAS = {"types", "utils", "components", "constants", "directives"}
-LEGACY_UPWARD_AREAS = {"api", "views", "composables", "stores"}
 
 
 def _frontend_target_area(spec: str, src_file: Path) -> tuple[str, str]:
@@ -351,11 +342,11 @@ def _frontend_target_area(spec: str, src_file: Path) -> tuple[str, str]:
 def check_frontend_layers() -> None:
     """R14: kernel / shared / features 依赖方向（ADR-0007）。
 
-    kernel  → 只能依赖 kernel（types/utils 等过渡依赖只告警）
+    kernel  → 只能依赖 kernel
     shared  → kernel / shared
     features→ kernel / shared / 自身；跨 feature 只允许 `@/features/<other>`（index 入口）
-             不得 import 过渡期目录 api/views/composables/stores（反向依赖）
-    历史包袱（features→types/utils/components）先降级为 WARN，P3 归位后转 ERROR。
+    P4 起旧过渡目录（types/utils/components/api/views/composables/stores/constants/
+    directives）已全部删除：对这些路径的任何依赖都是 ERROR，没有 WARN 豁免。
     """
     rules = {
         "kernel": {"kernel"},
@@ -387,12 +378,8 @@ def check_frontend_layers() -> None:
                             err("R14-frontend-cross-feature",
                                 f"跨 feature 必须经对方 index.ts（禁止深链）: {spec}", rel(f))
                     continue
-                if target in TRANSITIONAL_AREAS:
-                    warn("R14-frontend-transitional",
-                         f"{area} 仍依赖过渡目录 @/{target}（P3 归位）: {spec}", rel(f))
-                else:
-                    err("R14-frontend-layers",
-                        f"{area} 不得依赖 {target}: import {spec}", rel(f))
+                err("R14-frontend-layers",
+                    f"{area} 不得依赖 {target}: import {spec}", rel(f))
 
 
 # ---------------------------------------------------------------- R11/R12 事务与迁移基线

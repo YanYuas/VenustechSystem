@@ -230,7 +230,7 @@ class TestGroup2VersionBacklinkDelete:
         fixture = seed_document_fixture(db_session, test_user.id)
         db_session.commit()
         # fixture 里 "数模论文分类方案" 内容含 [[最小覆盖圆算法]]
-        source_doc = fixture["docs"]["classification_plan"]
+        fixture["docs"]["classification_plan"]
         target_doc = fixture["docs"]["mec_algorithm"]
 
         # 注意：fixture 是直接造数据，没走 service，所以反向链接还没同步。
@@ -266,11 +266,11 @@ class TestGroup2VersionBacklinkDelete:
             title="链接文档", content="[[A]] 和 [[B]]",
         ))
         # 创建目标文档 A 和 B
-        doc_a = svc.create_document(test_user.id, CreateDocumentRequest(title="A", content="a"))
-        doc_b = svc.create_document(test_user.id, CreateDocumentRequest(title="B", content="b"))
+        svc.create_document(test_user.id, CreateDocumentRequest(title="A", content="a"))
+        svc.create_document(test_user.id, CreateDocumentRequest(title="B", content="b"))
 
         # 更新 content：去掉 A，保留 B，加 C
-        doc_c = svc.create_document(test_user.id, CreateDocumentRequest(title="C", content="c"))
+        svc.create_document(test_user.id, CreateDocumentRequest(title="C", content="c"))
         svc.update_document(test_user.id, out.id, UpdateDocumentRequest(content="[[B]] 和 [[C]]"))
 
         # 查库验证：只有 2 条反链（B 和 C），A 的反链被删除了
@@ -355,7 +355,7 @@ class TestGroup3ListFolderInbox:
         防什么：tag 过滤如果用了精确匹配整个 tags 数组（而不是包含匹配），
         多标签文档会查不到。
         """
-        fixture = seed_document_fixture(db_session, test_user.id)
+        seed_document_fixture(db_session, test_user.id)
         db_session.commit()
 
         svc = DocumentService(db_session)
@@ -372,7 +372,7 @@ class TestGroup3ListFolderInbox:
         防什么：分页逻辑如果 page 越界时返回第一页（而不是空），前端翻到
         最后一页后继续翻会看到重复数据。
         """
-        fixture = seed_document_fixture(db_session, test_user.id)
+        seed_document_fixture(db_session, test_user.id)
         db_session.commit()
 
         svc = DocumentService(db_session)
@@ -391,7 +391,7 @@ class TestGroup3ListFolderInbox:
         防什么：folders_tree 如果漏了 _ensure_inbox，收集箱不会出现在树里；
         如果排序错了，收集箱不会置顶。
         """
-        fixture = seed_document_fixture(db_session, test_user.id)
+        seed_document_fixture(db_session, test_user.id)
         db_session.commit()
 
         svc = DocumentService(db_session)
@@ -474,7 +474,7 @@ class TestGroup4FolderDeleteVersion:
         """
         from app.core.exceptions import DuplicateFolderNameException
 
-        fixture = seed_document_fixture(db_session, test_user.id)
+        seed_document_fixture(db_session, test_user.id)
         db_session.commit()
 
         svc = DocumentService(db_session)
@@ -585,7 +585,7 @@ class TestGroup5BacklinkSearchAuth:
         防什么：all_tags 如果用了 DISTINCT 但没拆分数组，会返回整个 JSON
         字符串而不是单个标签。
         """
-        fixture = seed_document_fixture(db_session, test_user.id)
+        seed_document_fixture(db_session, test_user.id)
         db_session.commit()
 
         svc = DocumentService(db_session)
@@ -602,7 +602,7 @@ class TestGroup5BacklinkSearchAuth:
         防什么：search_documents 如果只搜 title 不搜 content，或者 LIKE 模式
         拼错了，会漏结果或返回错误结果。
         """
-        fixture = seed_document_fixture(db_session, test_user.id)
+        seed_document_fixture(db_session, test_user.id)
         db_session.commit()
 
         svc = DocumentService(db_session)
@@ -619,7 +619,6 @@ class TestGroup5BacklinkSearchAuth:
         防什么：_owned_doc 如果只检查文档是否存在而不检查 user_id，
         就会泄露或篡改别人的文档。NotFound（而不是 Forbidden）是为了不泄露存在性。
         """
-        from tests.factories import make_task  # 用不到，占位
         # 直接造其他用户的文档
         other_doc = Document(
             user_id=other_user.id, title="机密文档", content="机密内容",
@@ -845,7 +844,7 @@ class TestGroup7SubfolderSearchCascade:
         防什么：search 过滤如果只搜 title 不搜 content，内容里有关键词的
         文档会被漏掉；或者用了 AND 而不是 OR，需要同时出现在标题和内容里。
         """
-        fixture = seed_document_fixture(db_session, test_user.id)
+        seed_document_fixture(db_session, test_user.id)
         db_session.commit()
 
         svc = DocumentService(db_session)
@@ -1045,7 +1044,7 @@ class TestGroup9RenameParentDanglingTag:
         """
         fixture = seed_document_fixture(db_session, test_user.id)
         db_session.commit()
-        folder_a = fixture["folders"]["math_modeling"]
+        fixture["folders"]["math_modeling"]
         folder_b = fixture["folders"]["research"]
 
         svc = DocumentService(db_session)

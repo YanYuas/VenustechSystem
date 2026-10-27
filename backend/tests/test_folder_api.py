@@ -8,7 +8,6 @@
 # ============================================================
 from __future__ import annotations
 
-import pytest
 
 from app.database import SessionLocal
 from app.models.folder import Folder
@@ -292,7 +291,7 @@ class TestFolderApiGroup2ValidationAuthInbox:
         db = _db()
         try:
             inbox = db.scalars(
-                select(Folder).where(Folder.user_id == default_user_id, Folder.is_inbox == True)
+                select(Folder).where(Folder.user_id == default_user_id, Folder.is_inbox.is_(True))
             ).first()
             inbox_id = inbox.id
         finally:

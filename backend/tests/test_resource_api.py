@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import uuid
 
-import pytest
 
 BASE = "/api/v1/resource"
 

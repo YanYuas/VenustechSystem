@@ -138,31 +138,6 @@
     "app/services/sync/engine.py": "platform",
     "app/services/sync/adapters.py": "platform"
   },
-  "frontend_views": {
-    "$comment": "src/views/<目录> → 领域。新增页面目录必须登记。",
-    "Dashboard": "insight",
-    "Report": "insight",
-    "Task": "execution",
-    "Project": "execution",
-    "Workflow": "execution",
-    "Workspace": "execution",
-    "Document": "knowledge",
-    "Learning": "knowledge",
-    "Resource": "knowledge",
-    "Experience": "knowledge",
-    "Review": "knowledge",
-    "Growth": "growth",
-    "Identity": "growth",
-    "Life": "growth",
-    "Conversation": "assistant",
-    "Assistant": "assistant",
-    "AiHot": "assistant",
-    "Avatar": "companion",
-    "Asset": "asset",
-    "Vault": "asset",
-    "Settings": "platform",
-    "NotFound": "platform"
-  },
   "root_contract": {
     "$comment": "根目录只允许以下条目。新增根级文件前先想清楚它属于哪一层：源码进 backend/frontend，运维进 ops，脚本进 scripts，文档进 docs，运行期数据进 var。目录/文件两列分开校验。",
     "files": [
@@ -197,7 +172,33 @@
     ]
   },
   "frontend_features": {
-    "$comment": "src/features/<领域>/ → 领域。新增 feature 包必须登记；一个领域一个包（ADR-0007）。",
-    "pet": "companion"
+    "$comment": "src/features/<领域>/ → 领域（ADR-0007：一个领域一个包，feature 只能依赖 kernel/shared/自身，跨 feature 只走 index）。新增 feature 包必须登记。",
+    "aihot": "assistant",
+    "asset": "asset",
+    "assistant": "assistant",
+    "auth": "platform",
+    "avatar": "companion",
+    "conversation": "assistant",
+    "dashboard": "insight",
+    "document": "knowledge",
+    "experience": "knowledge",
+    "growth": "growth",
+    "identity": "growth",
+    "learning": "knowledge",
+    "life": "growth",
+    "notification": "platform",
+    "panel": "assistant",
+    "pet": "companion",
+    "project": "execution",
+    "report": "insight",
+    "resource": "knowledge",
+    "review": "knowledge",
+    "settings": "platform",
+    "sync": "platform",
+    "system": "platform",
+    "task": "execution",
+    "vault": "asset",
+    "workflow": "execution",
+    "workspace": "execution"
   }
 }

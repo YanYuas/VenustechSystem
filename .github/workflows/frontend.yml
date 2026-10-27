@@ -5,7 +5,9 @@
 #   此前 .github/workflows 只有 android-build.yml（且只在 frontend/** 变更时
 #   打 APK），typecheck / vitest / build 三条最容易悄悄坏掉的链路从未进门禁。
 #
-# 覆盖 gates（对应 scripts/check_all.py 的第 6/7/8/12 项 + 第 5 项）：
+# 覆盖 gates（对应 scripts/check_all.py 的第 6/7/8/12 项 + 第 5 项 + D-13）：
+#   D-13 前端 lint          -> npm run lint（ESLint 9 flat，含 ADR-0007 分层边界）
+#   D-13 前端格式检查        -> npm run format:check（prettier --check src）
 #   6  前端类型检查        -> npm run typecheck（vue-tsc --noEmit）
 #   12 前端单元测试        -> npm test（vitest run）
 #   7  离线队列行为测试    -> scripts/test-offline-queue.ts（esbuild 转译后 node 跑）
@@ -37,7 +39,7 @@ concurrency:
 
 jobs:
   frontend:
-    name: typecheck + vitest + build
+    name: lint + format + typecheck + vitest + build
     runs-on: ubuntu-latest
     timeout-minutes: 25
     defaults:
@@ -70,6 +72,14 @@ jobs:
       - name: Install dependencies (npm ci)
         timeout-minutes: 10
         run: npm ci --no-audit --no-fund
+
+      - name: Lint (eslint src --max-warnings=0, incl. ADR-0007 boundaries)
+        timeout-minutes: 10
+        run: npm run lint
+
+      - name: Format check (prettier --check src)
+        timeout-minutes: 10
+        run: npm run format:check
 
       - name: Typecheck (vue-tsc --noEmit)
         run: npm run typecheck

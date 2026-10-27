@@ -20,7 +20,6 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
-import pytest
 from sqlalchemy import select
 
 from app.database import SessionLocal
@@ -168,7 +167,7 @@ class TestApiGroup1CRUD:
             # "整理数模论文分类" 带2条子任务
             target = fixture["tasks"]["pending_medium_no_due"]
             target_id = target.id
-            target_sub_count = 2
+            2
         finally:
             db.close()
 
@@ -742,7 +741,7 @@ class TestApiGroup5MiscEdge:
         try:
             fixture = seed_task_fixture(db, default_user_id)
             db.commit()
-            task_a_id = fixture["tasks"]["in_progress_high"].id  # 有子任务
+            fixture["tasks"]["in_progress_high"].id  # 有子任务
             task_b_id = fixture["tasks"]["pending_low_tomorrow"].id  # 无子任务
             sub_of_a_id = fixture["subtasks"]["paper_0"].id
         finally:

@@ -9,8 +9,14 @@
 import { describe, expect, it } from 'vitest'
 
 import {
-  APP, AUTOMATION_LEVELS, ROUTES, SHORTCUTS, STORAGE_KEYS,
-  TASK_PRIORITY, TASK_STATUS, THEME_PACKS,
+  APP,
+  AUTOMATION_LEVELS,
+  ROUTES,
+  SHORTCUTS,
+  STORAGE_KEYS,
+  TASK_PRIORITY,
+  TASK_STATUS,
+  THEME_PACKS,
 } from '@/shared/constants'
 
 // ============================================================
@@ -47,15 +53,16 @@ describe('第2组：任务状态与优先级映射', () => {
   it('TASK_STATUS 覆盖后端状态机的 4 个合法状态', () => {
     // 后端 workflow_service 的状态集合：pending / in_progress / waiting / completed
     // （"todo" 是非法状态，曾导致任务永久卡死 —— 见 tests/ROADMAP 第一轮修复）
-    expect(Object.keys(TASK_STATUS).sort()).toEqual(
-      ['completed', 'in_progress', 'pending', 'waiting'],
-    )
+    expect(Object.keys(TASK_STATUS).sort()).toEqual([
+      'completed',
+      'in_progress',
+      'pending',
+      'waiting',
+    ])
   })
 
   it('TASK_PRIORITY 覆盖 4 档优先级', () => {
-    expect(Object.keys(TASK_PRIORITY).sort()).toEqual(
-      ['high', 'low', 'medium', 'urgent'],
-    )
+    expect(Object.keys(TASK_PRIORITY).sort()).toEqual(['high', 'low', 'medium', 'urgent'])
   })
 
   it('每个状态/优先级都有中文标签与颜色 token', () => {
