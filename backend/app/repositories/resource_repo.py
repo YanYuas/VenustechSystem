@@ -26,3 +26,7 @@ class InboxItemRepository(BaseRepository[InboxItem]):
     def list_processed(self, user_id: str) -> list[InboxItem]:
         return self.list(user_id=user_id, status="processed")
 
+    def clear_identity(self, identity_id: str) -> None:
+        """把某身份的引用清回「未归类」（身份软删除时用；只 flush）。"""
+        self.nullify("identity_id", identity_id=identity_id)
+

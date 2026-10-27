@@ -20,6 +20,7 @@ from app.repositories import (
     InboxItemRepository,
     ProjectMemoryRepository,
     PromptRepository,
+    ReviewRepository,
     SkillRepository,
     SOPRepository,
     TemplateRepository,
@@ -140,6 +141,7 @@ class DashboardService:
         self.prompt_repo = PromptRepository(db)
         self.skill_repo = SkillRepository(db)
         self.memory_repo = ProjectMemoryRepository(db)
+        self.review_repo = ReviewRepository(db)
 
     def get(self) -> DashboardDataOut:
         now = datetime.now()
@@ -458,18 +460,12 @@ class DashboardService:
     def _build_streak(self) -> StreakData:
         """连续打卡：基于复盘记录统计连续天数 + 本周7天打卡情况"""
         from datetime import timedelta
-        from sqlalchemy import select
-        from app.models.review import Review
 
         today = datetime.now().date()
-        # 查最近30天的复盘日期
-        rows = self.db.scalars(
-            select(Review.review_date).where(
-                Review.user_id == self.user.id,
-                Review.review_date >= today - timedelta(days=30),
-            ).order_by(Review.review_date.desc())
+        # 查最近30天的复盘日期（D-06：查询下沉到 ReviewRepository）
+        review_dates = set(
+            self.review_repo.list_recent_dates(self.user.id, today - timedelta(days=30))
         )
-        review_dates = {r for r in rows if r}
 
         # 计算连续打卡天数（从今天往前数）
         streak_days = 0

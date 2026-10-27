@@ -12,17 +12,14 @@ import zipfile
 from datetime import date, datetime
 from pathlib import Path
 
-from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.core.exceptions import ValidationException
 from app.core.logger import get_logger
 from app.database import engine
-from app.models.conversation import Conversation
-from app.models.document import Document
-from app.models.task import Task
 from app.repositories import (
+    BackupRepository,
     ConversationRepository,
     DocumentRepository,
     TaskRepository,
@@ -49,6 +46,7 @@ class BackupService:
         self.task_repo = TaskRepository(db)
         self.doc_repo = DocumentRepository(db)
         self.conv_repo = ConversationRepository(db)
+        self.backup_repo = BackupRepository(db)
 
     def export(self, tag: str | None = None) -> dict:
         """导出全量备份 ZIP（DB + SHA256 清单，不含 API Key）。
@@ -62,7 +60,7 @@ class BackupService:
         name = f"backup-{stamp}" + (f"-{tag}" if tag else "") + ".zip"
         zip_path = backup_dir / name
         # 数据入库后先 checkpoint，保证 WAL 落盘
-        self.db.execute(text("PRAGMA wal_checkpoint(TRUNCATE)"))
+        self.backup_repo.checkpoint_wal()
         self.db.commit()
         db_bytes = self.settings.db_path.read_bytes()
         created_at = datetime.now().isoformat()
@@ -208,7 +206,7 @@ class BackupService:
             )
 
         # 1. 先 checkpoint，确保当前 WAL 落盘
-        self.db.execute(text("PRAGMA wal_checkpoint(TRUNCATE)"))
+        self.backup_repo.checkpoint_wal()
         self.db.commit()
 
         # 2. 释放引擎持有的连接句柄：否则旧连接仍指向改名后的旧文件，
@@ -243,19 +241,12 @@ class BackupService:
         }
 
     def stats(self) -> dict:
-        doc_count = self.db.scalar(
-            select(func.count()).select_from(Document).where(Document.user_id == self.user_id)
-        ) or 0
-        task_count = self.db.scalar(
-            select(func.count()).select_from(Task).where(Task.user_id == self.user_id)
-        ) or 0
-        conv_count = self.db.scalar(
-            select(func.count()).select_from(Conversation).where(Conversation.user_id == self.user_id)
-        ) or 0
+        # D-06：计数/最近文档全部经各域 Repository（备份服务是聚合读）
+        doc_count = self.doc_repo.count_by_user(self.user_id)
+        task_count = self.task_repo.count_user(self.user_id)
+        conv_count = self.conv_repo.count_by_user(self.user_id)
         # 标签数：取最近500篇文档统计（避免全量扫描）
-        recent_docs = self.db.scalars(
-            select(Document).where(Document.user_id == self.user_id).limit(500)
-        )
+        recent_docs = self.doc_repo.recent(self.user_id, limit=500)
         tags: set[str] = set()
         for d in recent_docs:
             tags.update(d.tags or [])

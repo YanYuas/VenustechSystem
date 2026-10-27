@@ -6,7 +6,7 @@
   "description": "启明星系统统一 Web 服务（静态托管 + /api 代理 + 访问令牌）",
   "scripts": {
     "start": "node server.js",
-    "test": "node --test test/",
+    "test": "node --test",
     "token:rotate": "node rotate-token.mjs"
   },
   "dependencies": {

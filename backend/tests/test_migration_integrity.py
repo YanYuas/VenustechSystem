@@ -5,8 +5,9 @@
      （表 / 列 / 类型 / 可空 / 主键 / 唯一约束 / 外键 / 索引），防止未来「加了模型
      忘了写迁移」；
   2. 0001 是冻结的显式 DDL，**不再出现** `create_all` / `drop_all`；
-  3. 迁移链线性、单 head（0021），无分叉、无缺口；
-  4. 模拟老库 / 部分升级库，验证 0021 能把缺失的表/列/索引补齐，且不丢数据、
+  3. 迁移链线性、单 head（0022），无分叉、无缺口；
+  4. 模拟老库 / 部分升级库，验证 0021 能把缺失的表/列/索引补齐，且不丢数据；
+   0022 负责归一历史遗留的 tasks.status="todo"（否则响应枚举校验会 500），
      可重复执行。
 
 为什么要单独守这些：
@@ -34,7 +35,7 @@ import pytest
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 MIGRATIONS_DIR = BACKEND_DIR / "migrations"
 VERSIONS_DIR = MIGRATIONS_DIR / "versions"
-HEAD_REVISION = "0021"
+HEAD_REVISION = "0022"
 
 # ORM 声明数量（冻结基线快照的规模；变化说明有人改了 0001 历史文件）
 BASELINE_TABLE_COUNT = 49
@@ -341,7 +342,7 @@ def test_migration_chain_is_linear_single_head():
     by_id = {rev.revision: rev for rev in revisions}
 
     assert script.get_heads() == [HEAD_REVISION]
-    assert len(by_id) == 21, f"迁移数量异常：{len(by_id)}"
+    assert len(by_id) == 22, f"迁移数量异常：{len(by_id)}"
 
     bases = [rev.revision for rev in revisions if rev.down_revision is None]
     assert bases == ["0001"]

@@ -1,64 +1,6 @@
 // ============================================================
-// 全局自定义指令
-// v-focus —— 元素挂载时自动聚焦
-// v-lazy —— 图片懒加载（占位）
+// @deprecated 迁移批次 P1（ADR-0007），P4 删除。
+// 这是**薄转发壳**：只做 re-export，禁止在此写任何实现（避免"两个真相"）。
+// 实现已迁至 `@/shared/directives`（全局自定义指令：focus / click-outside / copy）。
 // ============================================================
-import type { App, Directive } from 'vue'
-
-/** 自动聚焦 */
-const focus: Directive = {
-  mounted(el: HTMLElement) {
-    el.focus()
-  },
-}
-
-/** 点击元素外部触发 */
-const clickOutside: Directive = {
-  mounted(el: HTMLElement, binding) {
-    el._clickOutsideHandler = (e: MouseEvent) => {
-      if (!el.contains(e.target as Node)) {
-        binding.value(e)
-      }
-    }
-    document.addEventListener('click', el._clickOutsideHandler)
-  },
-  unmounted(el: HTMLElement) {
-    if (el._clickOutsideHandler) {
-      document.removeEventListener('click', el._clickOutsideHandler)
-    }
-  },
-}
-
-/** 文本复制 */
-const copy: Directive = {
-  mounted(el: HTMLElement, binding) {
-    el.style.cursor = 'copy'
-    el._copyHandler = () => {
-      const text = binding.value ?? el.textContent ?? ''
-      navigator.clipboard.writeText(text).catch((err) => {
-        console.error('[Copy] 复制失败', err)
-      })
-    }
-    el.addEventListener('click', el._copyHandler)
-  },
-  unmounted(el: HTMLElement) {
-    if (el._copyHandler) {
-      el.removeEventListener('click', el._copyHandler)
-      el._copyHandler = undefined
-    }
-  },
-}
-
-export function setupDirectives(app: App) {
-  app.directive('focus', focus)
-  app.directive('click-outside', clickOutside)
-  app.directive('copy', copy)
-}
-
-// 扩展 HTMLElement 类型
-declare global {
-  interface HTMLElement {
-    _clickOutsideHandler?: (e: MouseEvent) => void
-    _copyHandler?: () => void
-  }
-}
+export * from '@/shared/directives'

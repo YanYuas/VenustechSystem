@@ -5,17 +5,18 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta
 
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import NotFoundException, ValidationException
 from app.core.utils import local_day_bounds_utc
 from app.models.base import utcnow
-from app.models.conversation import Conversation
-from app.models.document import Document
 from app.models.project import Project, ProjectMilestone
-from app.models.review import Review
-from app.models.task import Task
+from app.repositories import (
+    ConversationRepository,
+    DocumentRepository,
+    ReviewRepository,
+    TaskRepository,
+)
 from app.repositories.identity_repo import IdentityRepository
 from app.repositories.project_repo import MilestoneRepository, ProjectRepository
 from app.schemas.project import (
@@ -35,6 +36,12 @@ class ProjectService:
         self.db = db
         self.repo = ProjectRepository(db)
         self.milestone_repo = MilestoneRepository(db)
+        # 详情/时间线/导出要跨 4 个域读，删除要跨 4 个域解除关联 ——
+        # D-06：全部经各域 Repository，service 不直连 ORM。
+        self.task_repo = TaskRepository(db)
+        self.doc_repo = DocumentRepository(db)
+        self.conv_repo = ConversationRepository(db)
+        self.review_repo = ReviewRepository(db)
 
     def _ensure_identity_owned(self, user_id: str, identity_id: str) -> None:
         """身份轴写入前校验（三期 B）：identity_id 无外键约束，归属在此把关。"""
@@ -63,10 +70,8 @@ class ProjectService:
             raise ValidationException(f"无效的项目状态: {data.status}")
         if data.identity_id is not None:
             self._ensure_identity_owned(user_id, data.identity_id)
-        p = Project(user_id=user_id, **data.model_dump())
-        self.db.add(p)
+        p = self.repo.create(user_id=user_id, **data.model_dump())
         self.db.commit()
-        self.db.refresh(p)
         return self._to_dict(p, {"task_count": 0, "completed_count": 0, "progress": 0})
 
     def update(self, user_id: str, project_id: str, data: ProjectUpdate) -> dict | None:
@@ -85,13 +90,13 @@ class ProjectService:
 
     def delete(self, user_id: str, project_id: str) -> bool:
         p = self._owned(user_id, project_id)
-        # 解除任务/文档/对话/复盘关联（不删除内容）
-        from sqlalchemy import update as sa_update
-        for model in (Task, Document, Conversation, Review):
-            self.db.execute(
-                sa_update(model).where(model.project_id == project_id).values(project_id=None)
-            )
-        self.db.delete(p)
+        # 解除任务/文档/对话/复盘关联（不删除内容）。
+        # D-06：每张表由所属领域的 Repository 解除，本服务只编排。
+        self.task_repo.clear_project(project_id)
+        self.doc_repo.clear_project(project_id)
+        self.conv_repo.clear_project(project_id)
+        self.review_repo.clear_project(project_id)
+        self.repo.delete(p)
         self.db.commit()
         return True
 
@@ -168,12 +173,7 @@ class ProjectService:
             return v.isoformat() if v else None
 
         # 任务（按状态→优先级排序）
-        tasks = self.db.scalars(
-            select(Task)
-            .where(Task.project_id == project_id)
-            .order_by(Task.status, Task.priority.desc(), Task.created_at.desc())
-            .limit(100)
-        ).all()
+        tasks = self.task_repo.list_by_project(project_id, limit=100)
         result["tasks"] = [
             {
                 "id": t.id, "title": t.title, "status": t.status, "priority": t.priority,
@@ -184,12 +184,7 @@ class ProjectService:
         ]
 
         # 文档（列表卡片字段，不拉 content 大字段）
-        docs = self.db.execute(
-            select(Document.id, Document.title, Document.updated_at, Document.tags, Document.word_count)
-            .where(Document.project_id == project_id)
-            .order_by(Document.updated_at.desc())
-            .limit(50)
-        ).all()
+        docs = self.doc_repo.list_project_cards(project_id, limit=50)
         result["documents"] = [
             {
                 "id": d.id, "title": d.title, "updated_at": _iso(d.updated_at),
@@ -199,24 +194,14 @@ class ProjectService:
         ]
 
         # 对话
-        convs = self.db.scalars(
-            select(Conversation)
-            .where(Conversation.project_id == project_id)
-            .order_by(Conversation.updated_at.desc())
-            .limit(50)
-        ).all()
+        convs = self.conv_repo.list_project_by_updated(project_id, limit=50)
         result["conversations"] = [
             {"id": c.id, "title": c.title or "未命名对话", "updated_at": _iso(c.updated_at)}
             for c in convs
         ]
 
         # 复盘
-        reviews = self.db.scalars(
-            select(Review)
-            .where(Review.project_id == project_id)
-            .order_by(Review.review_date.desc())
-            .limit(50)
-        ).all()
+        reviews = self.review_repo.list_project_for_detail(project_id, limit=50)
         result["reviews"] = [
             {
                 "id": r.id, "type": r.type, "review_date": r.review_date.isoformat(),
@@ -242,10 +227,8 @@ class ProjectService:
 
     def create_milestone(self, user_id: str, project_id: str, data: MilestoneCreate) -> dict:
         self._owned(user_id, project_id)
-        m = ProjectMilestone(project_id=project_id, **data.model_dump())
-        self.db.add(m)
+        m = self.milestone_repo.create(project_id=project_id, **data.model_dump())
         self.db.commit()
-        self.db.refresh(m)
         return self._milestone_to_dict(m)
 
     def update_milestone(self, user_id: str, milestone_id: str, data: MilestoneUpdate) -> dict:
@@ -264,7 +247,7 @@ class ProjectService:
 
     def delete_milestone(self, user_id: str, milestone_id: str) -> None:
         m = self._owned_milestone(user_id, milestone_id)
-        self.db.delete(m)
+        self.milestone_repo.delete(m)
         self.db.commit()
 
     # ---------- 内部 ----------
@@ -319,29 +302,23 @@ class ProjectService:
         }
 
     def timeline(self, user_id: str, project_id: str) -> list[dict]:
-        """项目时间线（M06 F05）"""
+        """项目时间线（M06 F05）；D-06：五类事件全部经各域 Repository 取数。"""
         self._owned(user_id, project_id)
-        from sqlalchemy import select
-        from app.models.task import Task
-        from app.models.document import Document
-        from app.models.conversation import Conversation
-        from app.models.review import Review
-        from app.models.project import ProjectMilestone
         events = []
-        tasks = self.db.scalars(select(Task).where(Task.project_id == project_id, Task.status == "completed").order_by(Task.completed_at.desc().nullslast()).limit(20))
+        tasks = self.task_repo.list_completed_by_project(project_id, limit=20)
         for t in tasks:
             if t.completed_at:
                 events.append({"type": "task_completed", "title": f"完成任务：{t.title}", "time": t.completed_at.isoformat(), "icon": "check"})
-        docs = self.db.scalars(select(Document).where(Document.project_id == project_id).order_by(Document.created_at.desc()).limit(20))
+        docs = self.doc_repo.list_project_documents(project_id, limit=20)
         for d in docs:
             events.append({"type": "document_created", "title": f"创建文档：{d.title}", "time": d.created_at.isoformat(), "icon": "doc"})
-        convs = self.db.scalars(select(Conversation).where(Conversation.project_id == project_id).order_by(Conversation.created_at.desc()).limit(20))
+        convs = self.conv_repo.list_project_by_created(project_id, limit=20)
         for c in convs:
             events.append({"type": "conversation", "title": f"AI对话：{c.title or '未命名'}", "time": c.created_at.isoformat(), "icon": "send"})
-        reviews = self.db.scalars(select(Review).where(Review.project_id == project_id).order_by(Review.created_at.desc()).limit(20))
+        reviews = self.review_repo.list_project_for_timeline(project_id, limit=20)
         for r in reviews:
             events.append({"type": "review", "title": f"复盘记录：{r.title or '未命名复盘'}", "time": r.created_at.isoformat(), "icon": "refresh"})
-        milestones = self.db.scalars(select(ProjectMilestone).where(ProjectMilestone.project_id == project_id).order_by(ProjectMilestone.created_at.desc()).limit(20))
+        milestones = self.milestone_repo.list_for_timeline(project_id, limit=20)
         for m in milestones:
             status = "完成" if m.completed else "创建"
             events.append({"type": "milestone", "title": f"{status}里程碑：{m.name}", "time": (m.completed_at or m.created_at).isoformat(), "icon": "target"})
@@ -349,20 +326,15 @@ class ProjectService:
         return events[:30]
 
     def export(self, user_id: str, project_id: str) -> dict:
-        """项目导出（M06 F07）"""
+        """项目导出（M06 F07）；D-06：四类数据经各域 Repository 取数。"""
         project = self._owned(user_id, project_id)
-        from sqlalchemy import select
-        from app.models.task import Task
-        from app.models.document import Document
-        from app.models.conversation import Conversation
-        from app.models.review import Review
         from datetime import datetime
-        tasks = self.db.scalars(select(Task).where(Task.project_id == project_id))
+        tasks = self.task_repo.list_all_by_project(project_id)
         tasks_data = [{"id": t.id, "title": t.title, "status": t.status, "priority": t.priority, "due_date": str(t.due_date) if t.due_date else None, "created_at": t.created_at.isoformat()} for t in tasks]
-        docs = self.db.scalars(select(Document).where(Document.project_id == project_id))
+        docs = self.doc_repo.list_all_by_project(project_id)
         docs_data = [{"id": d.id, "title": d.title, "content": d.content or "", "tags": list(d.tags or []), "created_at": d.created_at.isoformat()} for d in docs]
-        convs = self.db.scalars(select(Conversation).where(Conversation.project_id == project_id))
+        convs = self.conv_repo.list_all_by_project(project_id)
         convs_data = [{"id": c.id, "title": c.title, "created_at": c.created_at.isoformat()} for c in convs]
-        reviews = self.db.scalars(select(Review).where(Review.project_id == project_id))
+        reviews = self.review_repo.list_all_by_project(project_id)
         reviews_data = [{"id": r.id, "title": r.title, "content": r.content or "", "review_date": str(r.review_date) if r.review_date else None, "created_at": r.created_at.isoformat()} for r in reviews]
         return {"project": {"id": project.id, "name": project.name, "description": project.description, "status": project.status, "created_at": project.created_at.isoformat()}, "tasks": tasks_data, "documents": docs_data, "conversations": convs_data, "reviews": reviews_data, "exported_at": datetime.now().isoformat()}

@@ -18,7 +18,8 @@ export { learningApi } from './learning'
 export { lifeApi } from './life'
 export { assetApi } from './asset'
 export { growthApi } from './growth'
-export { petApi } from './pet'
+// petApi 已真实迁移到 features/pet（迁移批次 P2，ADR-0007），本桶不再转发；
+// 跨域请从 '@/features/pet' 导入。
 export { systemApi } from './system'
 export { settingsApi, NOTIFY_KEYS } from './settings'
 export { identityApi } from './identity'

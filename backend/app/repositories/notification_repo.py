@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import select
+from sqlalchemy import case, func, select
 
 from app.models.notification import Notification
 from app.repositories.base import BaseRepository
@@ -17,6 +17,19 @@ class NotificationRepository(BaseRepository[Notification]):
             q = q.where(Notification.is_read.is_(False))
         q = q.order_by(Notification.created_at.desc()).offset(skip).limit(limit)
         return list(self.db.scalars(q))
+
+    def stats_user(self, user_id: str) -> tuple[int, int]:
+        """总数 + 未读数合并为一条聚合 SQL（30s 轮询端点用）。"""
+        total, unread = self.db.execute(
+            select(
+                func.count(),
+                func.coalesce(
+                    func.sum(case((Notification.is_read.is_(False), 1), else_=0)),
+                    0,
+                ),
+            ).where(Notification.user_id == user_id)
+        ).one()
+        return int(total), int(unread)
 
     def count_unread(self, user_id: str) -> int:
         from sqlalchemy import func

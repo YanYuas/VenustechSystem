@@ -16,14 +16,16 @@ from app.core.exceptions import (
     NotFoundException,
     ValidationException,
 )
-from app.models.document import Backlink, Document
+from app.models.document import Document
 from app.models.folder import Folder
 from app.repositories import (
-    IdentityRepository,
     BacklinkRepository,
+    ConversationRepository,
     DocumentRepository,
     DocumentVersionRepository,
     FolderRepository,
+    IdentityRepository,
+    TaskRepository,
 )
 from app.schemas.common import PaginatedData
 from app.schemas.document import (
@@ -57,6 +59,9 @@ class DocumentService:
         self.doc_repo = DocumentRepository(db)
         self.ver_repo = DocumentVersionRepository(db)
         self.link_repo = BacklinkRepository(db)
+        # 全局搜索跨任务/对话/文档三域 —— D-06：各域经各自 Repository
+        self.task_repo = TaskRepository(db)
+        self.conv_repo = ConversationRepository(db)
 
     # ---------- 文件夹 ----------
     def _ensure_inbox(self, user_id: str) -> Folder:
@@ -122,7 +127,7 @@ class DocumentService:
             # 文档移至收集箱
             for doc in self.doc_repo.list_documents(user_id, folder_id=folder.id, limit=10000):
                 doc.folder_id = inbox.id
-            self.db.delete(folder)
+            self.folder_repo.delete(folder)
             self.db.commit()
         except Exception:
             self.db.rollback()
@@ -148,10 +153,7 @@ class DocumentService:
         folder_ids = {d.folder_id for d in docs if d.folder_id}
         folder_map: dict[str, str] = {}
         if folder_ids:
-            from sqlalchemy import select
-            from app.models.folder import Folder
-            rows = self.db.scalars(select(Folder).where(Folder.id.in_(folder_ids)))
-            folder_map = {f.id: f.name for f in rows}
+            folder_map = self.folder_repo.name_map(list(folder_ids))
         items = [self._doc_out(d, folder_map) for d in docs]
         return PaginatedData(
             list=items,
@@ -233,10 +235,10 @@ class DocumentService:
         doc = self._owned_doc(doc_id, user_id)
         # 清理关联反向链接（作为来源或目标）
         for bl in self.link_repo.list_sources(doc.id):
-            self.db.delete(bl)
+            self.link_repo.delete(bl)
         for bl in self.link_repo.list_targets(doc.id):
-            self.db.delete(bl)
-        self.db.delete(doc)
+            self.link_repo.delete(bl)
+        self.doc_repo.delete(doc)
         self.db.commit()
 
     # ---------- 版本历史 ----------
@@ -309,12 +311,7 @@ class DocumentService:
 
     # ---------- 内部工具 ----------
     def _search_tasks(self, user_id: str, keyword: str) -> list[SearchTaskHit]:
-        from sqlalchemy import select
-        from app.models.task import Task
-        like = f"%{keyword}%"
-        rows = self.db.scalars(
-            select(Task).where(Task.user_id == user_id, Task.title.like(like)).limit(10)
-        )
+        rows = self.task_repo.search_by_title(user_id, keyword, limit=10)
         return [SearchTaskHit(id=t.id, title=t.title, type="task", status=t.status) for t in rows]
 
     def _search_documents(self, user_id: str, keyword: str) -> list[SearchDocumentHit]:
@@ -328,12 +325,7 @@ class DocumentService:
         ]
 
     def _search_conversations(self, user_id: str, keyword: str) -> list[SearchConversationHit]:
-        from sqlalchemy import select
-        from app.models.conversation import Conversation
-        like = f"%{keyword}%"
-        rows = self.db.scalars(
-            select(Conversation).where(Conversation.user_id == user_id, Conversation.title.like(like)).limit(10)
-        )
+        rows = self.conv_repo.search_by_title(user_id, keyword, limit=10)
         return [
             SearchConversationHit(id=c.id, title=c.title or "未命名对话", updated_at=c.updated_at, type="conversation")
             for c in rows
@@ -352,11 +344,7 @@ class DocumentService:
 
     def graph(self, user_id: str) -> dict:
         """文档关系图谱：返回所有文档节点及双向链接边（M03 P2）。"""
-        from sqlalchemy import select as sa_select
-
-        docs = list(self.db.scalars(
-            sa_select(Document).where(Document.user_id == user_id)
-        ))
+        docs = self.doc_repo.list_all_by_user(user_id)
         doc_map = {d.id: d for d in docs}
         nodes = [
             {
@@ -369,9 +357,7 @@ class DocumentService:
             for d in docs
         ]
         # 所有已解析的链接（target_doc_id 非空）
-        backlinks = list(self.db.scalars(
-            sa_select(Backlink).where(Backlink.source_doc_id.in_(doc_map.keys()))
-        ))
+        backlinks = self.link_repo.list_by_sources(list(doc_map.keys()))
         edges = []
         for bl in backlinks:
             if bl.target_doc_id and bl.target_doc_id in doc_map:
@@ -402,30 +388,24 @@ class DocumentService:
         本方法**只 flush 不 commit**：它只是「保存文档」用例里的第二步，
         提交必须由调用方在用例末尾（正文 + 版本 + 双链全部完成后）做一次，
         否则双链重建失败时正文/版本已经落库，回滚不回去。
-        """
-        from sqlalchemy import delete, select as sa_select
 
-        self.db.execute(delete(Backlink).where(Backlink.source_doc_id == doc.id))
+        D-06：删旧链 + 批量插新链下沉到 BacklinkRepository，标题解析走
+        DocumentRepository.title_id_map（一次 IN 查询）。
+        """
+        links: list[dict] = []
         if doc.content:
             titles = list({m.group(1).strip() for m in LINK_PATTERN.finditer(doc.content)})
             if titles:
-                # 一次 IN 查询解析所有目标文档
-                targets = {
-                    t.title: t.id
-                    for t in self.db.scalars(
-                        sa_select(Document).where(
-                            Document.user_id == user_id,
-                            Document.title.in_(titles),
-                        )
-                    )
-                }
-                for title in titles:
-                    self.db.add(Backlink(
-                        source_doc_id=doc.id,
-                        target_doc_id=targets.get(title),
-                        target_title=title,
-                    ))
-        self.db.flush()
+                targets = self.doc_repo.title_id_map(user_id, titles)
+                links = [
+                    {
+                        "source_doc_id": doc.id,
+                        "target_doc_id": targets.get(title),
+                        "target_title": title,
+                    }
+                    for title in titles
+                ]
+        self.link_repo.replace_source_links(doc.id, links)
 
     def _owned_doc(self, doc_id: str, user_id: str) -> Document:
         doc = self.doc_repo.get(doc_id)

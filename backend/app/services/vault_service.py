@@ -19,13 +19,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from cryptography.fernet import Fernet, InvalidToken
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import BusinessException, NotFoundException, ValidationException
 from app.models.base import utcnow
 from app.models.vault import VaultConfig, VaultItem
 from app.core.encryption import EncryptionManager
+from app.repositories import VaultConfigRepository, VaultItemRepository
 
 _VERIFIER_PLAINTEXT = "venustech-vault-verifier-v1"
 _UNLOCKED_TIMEOUT_HINT = "服务重启后需要重新解锁"
@@ -50,6 +50,9 @@ class VaultService:
     def __init__(self, db: Session, user_id: str):
         self.db = db
         self.user_id = user_id
+        # D-06：配置与凭据各走自己的 Repository
+        self.config_repo = VaultConfigRepository(db)
+        self.item_repo = VaultItemRepository(db)
 
     # ---------- 状态 ----------
 
@@ -71,12 +74,11 @@ class VaultService:
         salt = EncryptionManager.new_salt()
         key = EncryptionManager.derive_key(master_password, salt)
         fernet = Fernet(key)
-        row = VaultConfig(
+        row = self.config_repo.create(
             user_id=self.user_id,
             salt=salt.hex(),
             verifier=fernet.encrypt(_VERIFIER_PLAINTEXT.encode()).decode(),
         )
-        self.db.add(row)
         self.db.commit()
         _session_keys[self.user_id] = key
         return self.status()
@@ -116,12 +118,7 @@ class VaultService:
         new_salt = EncryptionManager.new_salt()
         new_key = EncryptionManager.derive_key(new_password, new_salt)
         new_fernet = Fernet(new_key)
-        items = self.db.scalars(
-            select(VaultItem).where(
-                VaultItem.user_id == self.user_id,
-                VaultItem.secret_encrypted.is_not(None),
-            )
-        ).all()
+        items = self.item_repo.list_with_secret(self.user_id)
         for item in items:
             plain_secret = old_fernet.decrypt(item.secret_encrypted.encode()).decode()
             item.secret_encrypted = new_fernet.encrypt(plain_secret.encode()).decode()
@@ -135,11 +132,7 @@ class VaultService:
 
     def list_items(self) -> list[dict]:
         self._require_unlocked()
-        rows = self.db.scalars(
-            select(VaultItem)
-            .where(VaultItem.user_id == self.user_id)
-            .order_by(VaultItem.category, VaultItem.name)
-        ).all()
+        rows = self.item_repo.list_by_user(self.user_id)
         return [self._item_out(r, with_secret=False) for r in rows]
 
     def create_item(self, *, name: str, category: str, username: str | None,
@@ -150,15 +143,13 @@ class VaultService:
         self._require_unlocked()
         self._ensure_identity_owned(identity_id)
         action = self._validate_action(action_type, action_host, action_user, action_port)
-        row = VaultItem(
+        row = self.item_repo.create(
             user_id=self.user_id, name=name.strip(), category=category,
             username=username, url=url, notes=notes, identity_id=identity_id,
             secret_encrypted=self._encrypt_secret(secret),
             **action,
         )
-        self.db.add(row)
         self.db.commit()
-        self.db.refresh(row)
         return self._item_out(row)
 
     def update_item(self, item_id: str, *, name: str | None = None,
@@ -201,7 +192,7 @@ class VaultService:
     def delete_item(self, item_id: str) -> dict:
         self._require_unlocked()
         row = self._owned_item(item_id)
-        self.db.delete(row)
+        self.item_repo.delete(row)
         self.db.commit()
         return {"deleted": True, "id": item_id}
 
@@ -302,9 +293,7 @@ class VaultService:
         return Fernet(key)
 
     def _config(self) -> VaultConfig | None:
-        return self.db.scalar(
-            select(VaultConfig).where(VaultConfig.user_id == self.user_id)
-        )
+        return self.config_repo.get_by_user(self.user_id)
 
     def _require_config(self) -> VaultConfig:
         config = self._config()
@@ -359,15 +348,13 @@ class VaultService:
             }
 
     def _owned_item(self, item_id: str) -> VaultItem:
-        row = self.db.get(VaultItem, item_id)
+        row = self.item_repo.get(item_id)
         if row is None or row.user_id != self.user_id or row.deleted_at is not None:
             raise NotFoundException("凭据不存在")
         return row
 
     def _count_items(self) -> int:
-        return len(self.db.scalars(
-            select(VaultItem.id).where(VaultItem.user_id == self.user_id)
-        ).all())
+        return self.item_repo.count_by_user(self.user_id)
 
     def _ensure_identity_owned(self, identity_id: str | None) -> None:
         if identity_id is None:

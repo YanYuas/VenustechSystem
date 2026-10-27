@@ -6,17 +6,15 @@ from __future__ import annotations
 
 from datetime import date
 
-from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import NotFoundException, ValidationException
 from app.core.utils import local_day_bounds_utc
-from app.models.document import Document
 from app.models.review import Review
-from app.models.task import Task
 from app.repositories import (
     DocumentRepository,
     IdentityRepository,
+    ProjectRepository,
     ReviewRepository,
     TaskRepository,
 )
@@ -40,6 +38,7 @@ class ReviewService:
         self.repo = ReviewRepository(db)
         self.task_repo = TaskRepository(db)
         self.doc_repo = DocumentRepository(db)
+        self.project_repo = ProjectRepository(db)
 
     def list(
         self, type_: str | None = None, page: int = 1, page_size: int = 20
@@ -90,16 +89,10 @@ class ReviewService:
         # completed_at/created_at 为 naive UTC，本地日边界须换算成 UTC 再比较（否则错位一个时区）
         day_start, day_end = local_day_bounds_utc(today)
 
-        # SQL 层按日期过滤，避免全量查询
+        # SQL 层按日期过滤，避免全量查询（查询下沉到 Repository）
         # 今天完成的任务 + 今天到期的未完成任务
-        task_rows = self.db.scalars(
-            select(Task).where(
-                Task.user_id == self.user_id,
-                or_(
-                    and_(Task.status == "completed", Task.completed_at >= day_start, Task.completed_at < day_end),
-                    and_(Task.status != "completed", Task.due_date == today),
-                ),
-            )
+        task_rows = self.task_repo.list_autofill_candidates(
+            self.user_id, day_start, day_end, today
         )
         completed = []
         unfinished = []
@@ -114,25 +107,13 @@ class ReviewService:
                 })
 
         # 今天创建的文档
-        doc_rows = self.db.scalars(
-            select(Document).where(
-                Document.user_id == self.user_id,
-                Document.created_at >= day_start,
-                Document.created_at < day_end,
-            )
-        )
+        doc_rows = self.doc_repo.list_created_between(self.user_id, day_start, day_end)
         docs_created = [
             {"id": d.id, "title": d.title, "created_at": d.created_at} for d in doc_rows
         ]
 
         # 逾期任务数
-        overdue = self.db.scalar(
-            select(func.count()).select_from(Task).where(
-                Task.user_id == self.user_id,
-                Task.status != "completed",
-                Task.due_date < today,
-            )
-        ) or 0
+        overdue = self.task_repo.count_overdue_for_user(self.user_id, today)
 
         return AutoFillData(
             completed_tasks=completed,
@@ -184,9 +165,8 @@ class ReviewService:
         """项目轴写入前校验：None/空串=未关联；有值必须归属当前用户。"""
         if not project_id:
             return None
-        from app.models.project import Project
-        project = self.db.get(Project, project_id)
-        if project is None or project.user_id != self.user_id or project.deleted_at is not None:
+        project = self.project_repo.get_by_id(self.user_id, project_id)
+        if project is None or project.deleted_at is not None:
             raise ValidationException("项目不存在")
         return project_id
 

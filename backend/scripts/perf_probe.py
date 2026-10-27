@@ -92,7 +92,7 @@ with TestClient(app) as client:  # with 上下文才触发 lifespan（迁移+种
     bench("[bulk] GET /experience", "GET", "/api/v1/experience")
     bench("[bulk] GET /report", "GET", "/api/v1/report")
 
-    from app.core.sync import SyncEngine
+    from app.services.sync import SyncEngine
 
     eng = SyncEngine(db, uid)
     t0 = time.perf_counter()

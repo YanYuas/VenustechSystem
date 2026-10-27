@@ -6,14 +6,19 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta, timezone
 
-from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.event_bus import EVENT_TASK_COMPLETED, EVENT_TASK_CREATED, event_bus
 from app.core.exceptions import NotFoundException, TaskStateException, ValidationException
 from app.models.base import utcnow
-from app.models.task import FocusSession, Task
-from app.repositories import IdentityRepository, SubtaskRepository, TaskRepository
+from app.models.task import Task
+from app.repositories import (
+    FocusSessionRepository,
+    IdentityRepository,
+    ProjectRepository,
+    SubtaskRepository,
+    TaskRepository,
+)
 from app.schemas.common import PaginatedData
 from app.schemas.task import (
     BatchTaskRequest,
@@ -61,6 +66,8 @@ class TaskService:
         self.db = db
         self.repo = TaskRepository(db)
         self.sub_repo = SubtaskRepository(db)
+        self.focus_repo = FocusSessionRepository(db)
+        self.project_repo = ProjectRepository(db)
 
     # ---------- 内部工具 ----------
     @staticmethod
@@ -129,10 +136,12 @@ class TaskService:
             raise ValidationException("身份不存在")
 
     def _ensure_project_owned(self, user_id: str, project_id: str) -> None:
-        """项目写入前校验：project_id 有外键，但提前校验给出友好错误而非 500。"""
-        from app.models.project import Project
-        project = self.db.get(Project, project_id)
-        if project is None or project.user_id != user_id or project.deleted_at is not None:
+        """项目写入前校验：project_id 有外键，但提前校验给出友好错误而非 500。
+
+        D-06：查询下沉到 ProjectRepository.get_by_id（已含 user_id 过滤）。
+        """
+        project = self.project_repo.get_by_id(user_id, project_id)
+        if project is None or project.deleted_at is not None:
             raise ValidationException("项目不存在")
 
     @staticmethod
@@ -351,7 +360,7 @@ class TaskService:
                     if task.status != "completed":
                         self._apply_status(task, "completed")
                 elif data.action == "delete":
-                    self.db.delete(task)
+                    self.repo.delete(task)
                 elif data.action == "move_project":
                     self._ensure_project_active(task)
                     task.project_id = data.project_id
@@ -371,16 +380,14 @@ class TaskService:
         task = self._owned(task_id, user_id)
         if task.status == "completed":
             raise TaskStateException("已完成的任务不能启动专注会话")
-        session = FocusSession(
+        session = self.focus_repo.create(
             task_id=task.id, user_id=user_id, start_time=utcnow()
         )
-        self.db.add(session)
         self.db.commit()
-        self.db.refresh(session)
         return self._focus_session_out(session)
 
     def focus_stop(self, user_id: str, session_id: str) -> FocusSessionOut:
-        session = self.db.get(FocusSession, session_id)
+        session = self.focus_repo.get(session_id)
         if session is None or session.user_id != user_id:
             raise NotFoundException("专注会话不存在")
         if session.end_time is not None:
@@ -405,13 +412,7 @@ class TaskService:
 
     def focus_sessions(self, user_id: str, task_id: str) -> list[FocusSessionOut]:
         task = self._owned(task_id, user_id)
-        from sqlalchemy import select as sa_select
-        rows = self.db.scalars(
-            sa_select(FocusSession)
-            .where(FocusSession.task_id == task.id)
-            .order_by(FocusSession.start_time.desc())
-            .limit(50)
-        )
+        rows = self.focus_repo.list_by_task(task.id, limit=50)
         return [self._focus_session_out(s) for s in rows]
 
     @staticmethod
@@ -425,18 +426,13 @@ class TaskService:
     # ---------- 重复任务（M02 F05）：惰性生成到期实例 ----------
 
     def generate_recurring_instances(self, user_id: str) -> int:
-        """为重复任务生成到期实例（启动/每日触发，幂等：已有当日实例不重复生成）。"""
-        from sqlalchemy import select as sa_select
+        """为重复任务生成到期实例（启动/每日触发，幂等：已有当日实例不重复生成）。
+
+        D-06：模板查询 / 幂等判重 / 批量写入全部经 TaskRepository。
+        """
         today = date.today()
-        templates = list(
-            self.db.scalars(
-                sa_select(Task).where(
-                    Task.user_id == user_id,
-                    Task.recurrence.is_not(None),
-                )
-            )
-        )
-        created = 0
+        templates = self.repo.list_recurring_templates(user_id)
+        payloads: list[dict] = []
         for t in templates:
             rule = t.recurrence or {}
             rtype = rule.get("type")
@@ -448,28 +444,22 @@ class TaskService:
             if target is None:
                 continue
             # 幂等：同模板同目标日已存在实例则跳过（按 title+due_date 粗粒度判重）
-            exists = self.db.scalar(
-                sa_select(func.count()).select_from(Task).where(
-                    Task.user_id == user_id,
-                    Task.title == t.title,
-                    Task.due_date == target,
-                )
-            )
-            if exists:
+            if self.repo.exists_instance(user_id, t.title, target):
                 continue
-            self.db.add(Task(
-                user_id=user_id,
-                title=t.title,
-                description=t.description,
-                status="pending",
-                priority=t.priority,
-                project_tag=t.project_tag,
-                project_id=t.project_id,
-                due_date=target,
-                recurrence=t.recurrence,
-            ))
-            created += 1
+            payloads.append({
+                "user_id": user_id,
+                "title": t.title,
+                "description": t.description,
+                "status": "pending",
+                "priority": t.priority,
+                "project_tag": t.project_tag,
+                "project_id": t.project_id,
+                "due_date": target,
+                "recurrence": t.recurrence,
+            })
+        created = len(payloads)
         if created:
+            self.repo.create_many(payloads)
             self.db.commit()
         return created
 

@@ -5,6 +5,8 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 import DefaultLayout from '@/components/layout/DefaultLayout.vue'
 import { STORAGE_KEYS } from '@/constants'
+// 领域页面按 ADR-0007 从 feature 的唯一公开出口取（懒加载入口，保持路由级分包）
+import { petSettingsView } from '@/features/pet'
 
 const router = createRouter({
   history: createWebHashHistory(),
@@ -101,7 +103,7 @@ const router = createRouter({
         {
           path: 'pet',
           name: 'pet',
-          component: () => import('@/views/Pet/PetSettingsView.vue'),
+          component: petSettingsView,
           meta: { icon: 'pet', title: '桌宠设置', crumbs: ['桌宠设置'], hidden: true },
         },
         {

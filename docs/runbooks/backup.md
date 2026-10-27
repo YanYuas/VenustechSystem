@@ -50,3 +50,25 @@ Copy-Item "$data\.encryption_key" $dest
 - [ ] `setup.bat` 安装依赖
 - [ ] 若用手机访问：旧机的 `.qm-token` **不要**沿用，让新机重新生成后在手机端重填
 - [ ] 确认 `.git` 是否随项目目录备份（见 ADR/ARCHITECTURE D-12：`.git` 可能是外置 Junction）
+
+## 6. Git 历史备份（容易被忽略的一层）
+
+**坑**：本机 `.git` 是指向工作区外的 Junction（`C:\Users\21722\qimingxing-git-repo`）。
+直接复制 `D:\...\VenustechSystem` 目录**不会**备份提交历史 —— 换机后历史全丢，
+只剩工作区文件。
+
+可靠做法（备份历史，且能在任意机器恢复）：
+
+```powershell
+# 1) 打一个包含所有分支/tag 的单文件包（验证过：4.3MB）
+git bundle create "D:\Backups\venustech-$(Get-Date -Format yyyyMMdd).bundle" --all
+
+# 2) 校验包完整
+git bundle verify "D:\Backups\venustech-YYYYMMDD.bundle"
+
+# 恢复（在空目录里）：
+git clone "D:\Backups\venustech-YYYYMMDD.bundle" VenustechSystem-restored
+```
+
+> 建议：**数据备份（app.db + .encryption_key）与历史备份（bundle）分开做**，两者都不能由对方替代。
+> `var/backups/` 下已有本次生成的 bundle（gitignored），确认后请复制到仓库外长期保存。

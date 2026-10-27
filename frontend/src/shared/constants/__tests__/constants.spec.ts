@@ -11,7 +11,7 @@ import { describe, expect, it } from 'vitest'
 import {
   APP, AUTOMATION_LEVELS, ROUTES, SHORTCUTS, STORAGE_KEYS,
   TASK_PRIORITY, TASK_STATUS, THEME_PACKS,
-} from '@/constants'
+} from '@/shared/constants'
 
 // ============================================================
 // 第 1 组：主题包清单（与 ThemePack 类型 / useTheme / 设置页三方对齐）

@@ -39,6 +39,14 @@ class SettingRepository(BaseRepository[Setting]):
         )
         return self.db.scalar(q)
 
+    def list_by_key(self, user_id: str, key: str) -> list[Setting]:
+        """按 key 取全部行（密钥轮换遍历用；(user_id, key) 唯一但保持列表语义）。"""
+        q = select(Setting).where(
+            Setting.user_id == user_id,
+            Setting.key == key,
+        )
+        return list(self.db.scalars(q))
+
     def upsert(self, user_id: str, key: str, value: str | None) -> Setting:
         """写入一条配置（存在则更新，不存在则插入，软删除则复活）。
 

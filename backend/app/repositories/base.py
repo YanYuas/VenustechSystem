@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from typing import Generic, TypeVar
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import NotFoundException
@@ -90,6 +90,19 @@ class BaseRepository(Generic[ModelT]):
     def commit(self) -> None:
         """显式提交事务（供调用方在用例边界使用，本类内部不调用）。"""
         self.db.commit()
+
+    def nullify(self, column: str, **filters) -> None:
+        """把满足 filters 的行的 `column` 置 NULL（跨表解除引用用；只 flush）。
+
+        典型场景：删除项目时把 task/document/conversation/review 的
+        project_id 清空；软删除身份时把各表 identity_id 清回「未归类」。
+        放在基类是因为它是纯 DAO 动作（不碰业务语义），各域 repo 只需
+        声明自己哪张表要清哪个列，避免在 service 里写 UPDATE 语句。
+        """
+        model = self.model
+        conditions = [getattr(model, name) == value for name, value in filters.items()]
+        self.db.execute(update(model).where(*conditions).values({column: None}))
+        self.db.flush()
 
     def paginate(self, page: int = 1, page_size: int = 20, **filters) -> tuple[list[ModelT], int]:
         """分页查询，返回 (数据列表, 总数)"""

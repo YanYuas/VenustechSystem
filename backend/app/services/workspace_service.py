@@ -29,12 +29,12 @@ from typing import Any, Callable
 from datetime import datetime, timezone
 from pathlib import Path
 
-from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import NotFoundException, ValidationException
 from app.core.logger import get_logger
 from app.models.workspace import WorkspaceFile, WorkspaceRoot
+from app.repositories import WorkspaceFileRepository, WorkspaceRootRepository
 from app.repositories.identity_repo import IdentityRepository
 from app.services.settings_service import SettingsService
 
@@ -76,6 +76,9 @@ class WorkspaceService:
     def __init__(self, db: Session, user_id: str):
         self.db = db
         self.user_id = user_id
+        # D-06：根与文件索引各走自己的 Repository
+        self.root_repo = WorkspaceRootRepository(db)
+        self.file_repo = WorkspaceFileRepository(db)
 
     # ---------- 开关（引导流程的第一步） ----------
 
@@ -90,31 +93,21 @@ class WorkspaceService:
     # ---------- 根登记（引导路径 a） ----------
 
     def list_roots(self) -> list[dict]:
-        rows = self.db.scalars(
-            select(WorkspaceRoot)
-            .where(WorkspaceRoot.user_id == self.user_id)
-            .order_by(WorkspaceRoot.created_at)
-        ).all()
+        rows = self.root_repo.list_by_user(self.user_id)
         return [self._root_out(r) for r in rows]
 
     def register_root(self, raw_path: str, label: str | None, identity_id: str | None) -> dict:
         path = self._validate_root_path(raw_path)
         if identity_id is not None:
             self._ensure_identity_owned(identity_id)
-        exists = self.db.scalar(
-            select(WorkspaceRoot).where(
-                WorkspaceRoot.user_id == self.user_id, WorkspaceRoot.path == str(path)
-            )
-        )
+        exists = self.root_repo.get_by_path(self.user_id, str(path))
         if exists is not None:
             raise ValidationException(f"该路径已登记: {path}")
-        row = WorkspaceRoot(
+        row = self.root_repo.create(
             user_id=self.user_id, path=str(path), label=label,
             identity_id=identity_id, enabled=True,
         )
-        self.db.add(row)
         self.db.commit()
-        self.db.refresh(row)
         return self._root_out(row)
 
     def update_root(self, root_id: str, *, label: str | None = None,
@@ -134,8 +127,8 @@ class WorkspaceService:
     def delete_root(self, root_id: str) -> dict:
         """删除根并清空其索引（不碰磁盘上的任何文件）。"""
         root = self._owned_root(root_id)
-        self.db.execute(delete(WorkspaceFile).where(WorkspaceFile.root_id == root.id))
-        self.db.delete(root)
+        self.file_repo.delete_by_root(root.id)
+        self.root_repo.delete(root)
         self.db.commit()
         return {"deleted": True, "id": root_id}
 
@@ -190,23 +183,25 @@ class WorkspaceService:
             entries = svc._walk(base, on_progress=on_progress)
 
             _progress_set(root_id, phase="writing", found=len(entries), total=len(entries))
-            # 全量替换（个人规模千级，diff 不值得）；单事务，失败即回滚
-            db.execute(delete(WorkspaceFile).where(WorkspaceFile.root_id == root.id))
+            # 全量替换（个人规模千级，diff 不值得）；单事务，失败即回滚。
+            # D-06：删旧 + 批量写新下沉到 WorkspaceFileRepository。
             now = _utcnow()
             total_size = 0
+            payloads: list[dict] = []
             for rel, is_dir, size, mtime in entries:
-                db.add(WorkspaceFile(
-                    root_id=root.id,
-                    rel_path=rel,
-                    name=rel.rsplit("/", 1)[-1],
-                    ext=svc._ext_of(rel, is_dir),
-                    is_dir=is_dir,
-                    size=size,
-                    mtime=mtime,
-                    identity_id=root.identity_id,
-                    indexed_at=now,
-                ))
+                payloads.append({
+                    "root_id": root.id,
+                    "rel_path": rel,
+                    "name": rel.rsplit("/", 1)[-1],
+                    "ext": svc._ext_of(rel, is_dir),
+                    "is_dir": is_dir,
+                    "size": size,
+                    "mtime": mtime,
+                    "identity_id": root.identity_id,
+                    "indexed_at": now,
+                })
                 total_size += size
+            svc.file_repo.replace_root_entries(root.id, payloads)
             root.file_count = len(entries)
             root.total_size = total_size
             root.scan_status = "ok"
@@ -376,23 +371,10 @@ class WorkspaceService:
         page_size: int = 50,
     ) -> dict:
         root = self._owned_root(root_id)
-        q = select(WorkspaceFile).where(WorkspaceFile.root_id == root.id)
-        if search:
-            q = q.where(WorkspaceFile.name.contains(search))
-        if ext:
-            q = q.where(WorkspaceFile.ext == ext.lower())
-        # 计数下推 SQL（此前 len(.all()) 全量加载行只为计数 —— 大根目录下纯浪费）
-        from sqlalchemy import func
-
-        total = int(self.db.scalar(select(func.count()).select_from(WorkspaceFile).where(
-            WorkspaceFile.root_id == root.id,
-            *([WorkspaceFile.name.contains(search)] if search else []),
-            *([WorkspaceFile.ext == ext.lower()] if ext else []),
-        )) or 0)
-        q = q.order_by(WorkspaceFile.is_dir.desc(), WorkspaceFile.name).offset(
-            (page - 1) * page_size
-        ).limit(page_size)
-        rows = self.db.scalars(q).all()
+        # D-06：过滤 / 计数 / 分页全部下沉到 WorkspaceFileRepository
+        rows, total = self.file_repo.list_paginated(
+            root.id, search=search, ext=ext, page=page, page_size=page_size
+        )
         return {
             "root": self._root_out(root),
             "items": [self._file_out(f) for f in rows],
@@ -422,11 +404,7 @@ class WorkspaceService:
         if not raw or not raw.strip():
             raise ValidationException("路径不能为空")
         p = Path(raw.strip()).expanduser().resolve()
-        roots = self.db.scalars(
-            select(WorkspaceRoot).where(
-                WorkspaceRoot.user_id == self.user_id, WorkspaceRoot.enabled.is_(True)
-            )
-        ).all()
+        roots = self.root_repo.list_enabled(self.user_id)
         for root in roots:
             base = Path(root.path).resolve()
             if p == base or p.is_relative_to(base):
@@ -434,7 +412,7 @@ class WorkspaceService:
         raise ValidationException("路径不在任何已启用的工作区内（安全白名单拦截）")
 
     def _owned_root(self, root_id: str) -> WorkspaceRoot:
-        root = self.db.get(WorkspaceRoot, root_id)
+        root = self.root_repo.get(root_id)
         if root is None or root.user_id != self.user_id or root.deleted_at is not None:
             raise NotFoundException("工作区根不存在")
         return root

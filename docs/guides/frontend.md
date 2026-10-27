@@ -6,6 +6,17 @@
 
 ### 1.1 目录结构
 
+> ⚠️ **2026-10-27 起目录分层已变更，以 [ADR-0007](../architecture/ADR/0007-frontend-feature-architecture.md) 与
+> [`frontend/src/features/README.md`](../../frontend/src/features/README.md) 为准。**
+>
+> 新分层：`kernel/`（无业务底座：http/toast/modal/offline）→ `shared/`（设计系统与壳：
+> constants/directives，styles/components 待 P3）→ `features/<domain>/`（领域唯一所有权落点）。
+> 试点 `features/pet/` 已完成；其余领域仍按旧目录平铺，**正在 P3 分批迁移**。
+> 旧公共模块（`api/http.ts`、`composables/useToast.ts` 等 8 处）保留**薄转发壳**，P4 删除。
+>
+> 下面这棵树是**迁移中的历史快照**，数量与部分文件（如已删除的 BaseConfirm/BaseTooltip）
+> 已不代表现状 —— 用于理解历史结构，不要据此新增文件。
+
 ```
 frontend/
 ├── src/

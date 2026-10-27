@@ -43,3 +43,14 @@ class FolderRepository(BaseRepository[Folder]):
                 .where(Document.folder_id == folder_id)
             )
         )
+
+    # ---------- D-06 收口新增 ----------
+
+    def name_map(self, folder_ids: list[str]) -> dict[str, str]:
+        """批量取 id → 名称（文档列表消 N+1 用；一次 IN 查询）。"""
+        if not folder_ids:
+            return {}
+        rows = self.db.execute(
+            select(Folder.id, Folder.name).where(Folder.id.in_(folder_ids))
+        ).all()
+        return {fid: name for fid, name in rows}

@@ -77,6 +77,11 @@ backend/.smoke-tmp/
 .pytest-tmp*/
 .pytest-tmp/
 .pytest-tmp2/
+# pytest 的 basetemp 跟随 TMP/TEMP；本机 TMP 指向仓库根时会落在 backend/ 下
+pytest-of-*/
+backend/pytest-of-*/
+tmp?????????/
+backend/venustech_smoke/
 
 # ---------- 本地工具状态（智能体记忆/会话数据，非项目源码） ----------
 .workbuddy/

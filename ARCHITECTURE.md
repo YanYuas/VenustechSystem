@@ -123,25 +123,40 @@ models/<module>.py ── SQLAlchemy 模型 → SQLite（WAL）
 |---|---|---|---|---|
 | API | `app/api/` | HTTP 路由、参数校验、调用 service、返回信封 | services, schemas, core, root | **models**（运行时）、**repositories**、业务逻辑 |
 | Schema | `app/schemas/` | Pydantic DTO（入参/出参/分页） | schemas, core | services, models |
-| Service | `app/services/` | 业务规则、状态机、事务编排、事件发布 | repositories, models, schemas, core | **fastapi**、api |
-| Repository | `app/repositories/` | 数据访问（CRUD/查询） | models, core | services, api |
+| Service | `app/services/` | 业务规则、状态机、事务编排、事件发布 | repositories, models, schemas, core | **fastapi**、api、**直连 ORM（R13）** |
+| Repository | `app/repositories/` | **唯一数据访问入口**：CRUD/查询/批量写 | models, core | services, api、**commit（R11）** |
 | Model | `app/models/` | SQLAlchemy ORM、表结构 | models, core | 任何上层 |
 | Core | `app/core/` | **无业务语义的基础设施**：事件总线、加密、缓存、插件、日志、异常、响应、同步适配 | core, models | **services / repositories / api / schemas** |
 | 组合根 | `app/main.py`、`app/bootstrap/`、`api/deps.py` | 装配：lifespan、插件、订阅者、Session/User 依赖 | 任意 | 承载业务规则 |
 
 > `TYPE_CHECKING` 块内的 import 是**类型注解**，零运行时开销，不算违规（API 层合法引用 `User` 类型）。
 
-### 4.2 前端分层
+**Repository 收口（D-06，R13 机器强制）**：service 里不得出现 `select(...)`、`text(...)`、`db.execute/get/scalar(s)/add/add_all/delete/query`；查询与写入一律经 repository 的语义化方法（`identity_counts`、`clear_project`、`replace_source_links`…）。
+聚合服务（dashboard/report/backup/security）允许跨域**读**，但同样必须经各域 repository，不得自建跨表 SQL。
+唯一豁免：`app/services/sync/`（D-07 数据同步引擎，基础设施原语，按 `Base.metadata` 逐表搬运，不属领域 service；D-07 落地后重新评估）。
+新增 repository 时：文件命名 `<module>_repo.py`、继承 `BaseRepository[T]`、在 `app/repositories/__init__.py` 导出；模块名必须在 `docs/architecture/domains.json` 已登记（通常与同域 service 同名）。
+
+### 4.2 前端分层（ADR-0007：kernel / shared / features）
 
 ```
-views（页面，只渲染/交互）
-  → composables（视图逻辑，可测）
-    → api/*.ts（领域接口封装）
-      → api/http.ts（唯一 HTTP 漏斗）
+features/<domain>/views      页面（只渲染/交互）
+  → features/<domain>/composables   领域视图逻辑
+    → features/<domain>/api.ts      领域接口封装
+      → kernel/http                 唯一 HTTP 漏斗（baseURL/token/超时/重试/离线/SSE）
 ```
-- `views/` **不得** `import` 另一个 view 的实现（跨域页面跳转走 router）。
-- `components/common|layout` 是**共享 UI**，不得 import 业务 `api/`。
+
+| 区域 | 职责 | 允许依赖 | 禁止 |
+|---|---|---|---|
+| `kernel/` | 无业务语义技术底座：http、toast、modal、offline 队列 | 自身（types/utils 为过渡） | shared、features、api、views |
+| `shared/` | 设计系统与壳：constants、directives、common 组件、styles | kernel、shared | features、api、views、composables、stores |
+| `features/<domain>/` | **一个领域一个包 = 唯一所有权落点**：api / model / composables / components / views / `index.ts` | kernel、shared、**自身**；跨领域只走对方 `index.ts` | `@/api`、`@/views`、`@/composables`、`@/stores`（过渡期目录） |
+
+- 跨领域调用**只能**经对方 `features/<domain>/index.ts`（禁止深链；页面用懒加载入口避免主包污染）。
+- `views/` 不得 import 另一个 view 的实现（跨域页面跳转走 router）。
 - `types/` 是前后端契约的前端侧；新增字段时**两边同时改**（当前已知 13 处漂移，见 §10）。
+- 迁移采用 **strangler**：被搬走的公共模块在原路径保留**薄转发壳**（`export *`，壳内零实现），P4 统一删除。
+  现状：kernel 4 个模块 + shared 2 个 + 8 个旧路径壳；其余按 P3 逐域迁移（见 `frontend/src/features/README.md`）。
+- 该分层由守护 **R14** 强制（kernel 反向依赖 / shared→features / feature 深链跨域 = CI 红）。
 
 ### 4.3 违反会怎样
 
@@ -189,8 +204,8 @@ VenustechSystem/
 │   │   ├── database.py         引擎/Session/PRAGMA（WAL 在这里维护）
 │   │   ├── migrate.py          启动迁移；seed.py 演示数据
 │   │   └── migration_helpers.py
-│   ├── migrations/             Alembic（0001–0020，见 §10 D-05）
-│   ├── tests/                  1165 条测试（api/production/architecture/logging_contract）
+│   ├── migrations/             Alembic（0001 冻结基线 + 0002–0022；见 §10 D-05）
+│   ├── tests/                  1282 条测试（api/production/repository_contract/sync/architecture）
 │   ├── scripts/                后端专用：冒烟/探针/种子/演示数据
 │   ├── requirements.txt        ★ 运行时依赖唯一来源
 │   ├── requirements-dev.txt    测试/工具依赖
@@ -199,14 +214,16 @@ VenustechSystem/
 ├── frontend/                   Vue3 + TS + Vite（详见 §4.2）
 │   ├── src/
 │   │   ├── app/                main.ts / App.vue / router / errorHandler
-│   │   ├── views/              23 个页面目录（一域一目录）
-│   │   ├── composables/        视图逻辑（useXxx）
-│   │   ├── api/                30 个领域 API + http.ts（唯一漏斗）
-│   │   ├── components/         common(共享) / layout(壳) / 业务组件
-│   │   ├── stores/             Pinia（offlineQueue 是唯一活 store）
-│   │   ├── types/              与后端 schemas 对应的前端类型
-│   │   ├── styles/             4 套主题 × 明暗（CSS 变量）
-│   │   ├── constants/ directives/ utils/
+│   │   ├── kernel/             ★ 无业务语义底座：http(唯一漏斗) / ui(toast,modal) / offline
+│   │   ├── shared/             ★ 设计系统与壳：constants、directives（styles/components P3 归位）
+│   │   ├── features/           ★ 领域包：pet/（api·model·composables·components·views·index）
+│   │   ├── views/              其余页面目录（P3 逐域迁入 features/）
+│   │   ├── composables/        其余视图逻辑（P3 迁入 feature 或 kernel）
+│   │   ├── api/                其余领域 API + 8 个薄转发壳（P4 删除）
+│   │   ├── components/         common(共享) / layout(壳) / 业务组件（P3 归位）
+│   │   ├── stores/             Pinia（offlineQueue 转发壳）
+│   │   ├── types/ styles/      前后端契约类型、4 套主题 × 明暗（P3 归位）
+│   │   ├── constants/ directives/ utils/   过渡壳/工具（P3/P4）
 │   │   └── test/               vitest setup
 │   ├── public/                 manifest + sw.js（PWA）
 │   ├── android/                Capacitor 原生工程（构建产物，勿手改）
@@ -276,12 +293,12 @@ VenustechSystem/
 
 ## 9. 质量门禁与验证
 
-**唯一验证入口**：`python scripts/check_all.py`（13 项）；CI 必须 `--strict`（缺依赖=失败，不给假绿）。
+**唯一验证入口**：`python scripts/check_all.py`（14 项）；CI 必须 `--strict`（缺依赖=失败，不给假绿）。
 
 | 守护 | 命令 | 守什么 |
 |---|---|---|
-| 架构 | `scripts/audit_architecture.py` | 分层方向、core 隔离、领域归属、路由/模型注册、根目录契约、**事务边界(R11)**、**迁移基线(R12)**、前端边界 |
-| 后端测试 | `pytest backend/tests` | 1165 条：API 形状 + 生产行为 + 数据库基础设施 |
+| 架构 | `scripts/audit_architecture.py` | 分层方向、core 隔离、领域归属、路由/模型注册、根目录契约、**事务边界(R11)**、**迁移基线(R12)**、**service 零直连 ORM(R13)**、**前端 kernel/shared/features 分层(R14)**；R1/R2/R13/R14 均有负向测试证明会变红 |
+| 后端测试 | `pytest backend/tests` | 1282 条：API 形状 + 生产行为 + 仓储契约 + 同步引擎 + 数据库基础设施 |
 | 后端冒烟 | `backend/scripts/smoke_backend.py` | 真实启动 + 迁移 + 端到端断言 |
 | 版本一致 | `scripts/check_versions.py` | 5 处版本 == `VERSION` |
 | 文档链接 | `scripts/audit_docs_links.py` | 全量 md 相对链接与内联路径 |
@@ -310,15 +327,16 @@ CI：`.github/workflows/{backend,frontend,repo-guard}.yml` + `android-build.yml`
 | D-03 | **P0** | 备份导入 100% 失败：`FormData` 被 `JSON.stringify` 后发 JSON，后端要 multipart → 422 | `frontend/src/api/dashboard.ts` + `api/http.ts` ↔ `backend/app/api/backup.py` | ✅ 已修（2026-10-26）：`http.postForm` + 真实 multipart 运行时断言 11/11 |
 | D-04 | P1 | **事务边界下沉**：`BaseRepository` 每个方法内部 commit，service 再 commit → 多步操作无原子性 | `repositories/base.py` | ✅ 已修（2026-10-26）：repo 只 flush、service 控 commit、get_db 兜底；8 条原子性测试 + 守护 R11 |
 | D-05 | P1 | 迁移基线失效：`0001` 用 `create_all()`，11 张基线表无 DDL；升级库缺 11 个索引 | `migrations/versions/0001_initial.py` | ✅ 已修（2026-10-26）：0001 冻结显式 DDL（49 表/79 索引）+ 0021 对账 + 6 条完整性测试 + 守护 R12 |
-| D-06 | P1 | Repository 层名存实亡：16/31 service 直连 ORM；service 9441 行 vs repo 1412 行 | 审计报告 §2 | Phase 2（事务边界已修，下一轮收口 repo 覆盖） |
-| D-07 | P1 | `core/sync.py` 藏 389 行领域逻辑；core 内共 815 行业务代码 | 审计报告 §2 | Phase 2 |
+| D-06 | P1 | Repository 层名存实亡：16/31 service 直连 ORM；service 9441 行 vs repo 1412 行 | 审计报告 §2 | ✅ 已修（2026-10-27）：16 service / 156 调用点 → **0**；新增 7 个 repo、约 60 个语义化方法；守护 R13 |
+| D-07 | P1 | `core/sync.py` 藏 389 行领域逻辑；core 内共 815 行业务代码 | 审计报告 §2 | ✅ 已修（2026-10-27）：`core/sync.py` → `services/sync/`；core **0 依赖 models**；删除死代码 `core/cache.py`；R2 收紧 |
 | D-08 | P1 | 前端 13 处前后端契约漂移（几乎都是"后端有、前端类型没有"） | `frontend/src/types/*` vs `backend/app/schemas/*` | ✅ 已修 13/13（2026-10-26）；剩余：TaskStatus 需后端补 Literal、24 处 `| null` 语义待定 |
-| D-09 | P1 | 前端 god 组件：`SettingsView` 1577 行；16 个 view >500 行；`http.ts` 378 行 9 类职责 | 审计报告 §4–§6 | Phase 2 |
+| D-09 | P1 | 前端 god 组件：`SettingsView` 1577 行；16 个 view >500 行；`http.ts` 378 行 9 类职责 | 审计报告 §4–§6 | ✅ 已修（2026-10-27）：SettingsView **1701 → 291 行**；14 分区组件 + 3 composable；DOM 405 节点零差异；`http.ts` 迁入 `kernel/http` |
 | D-10 | P1 | 前端死代码约 1188 行（`AppHeader`/`AppSidebar`/`stores/app.ts` 等） | 审计报告 §7 | ✅ 已修（2026-10-26）：15 文件 / 1625 行，typecheck ×5 全绿 |
 | D-11 | P2 | 5 个启动器重复实现 venv/端口/令牌逻辑（4 份 venv 解析、2 种令牌生成） | `*.bat` + `scripts/dev.ps1` | Phase 2 |
 | D-12 | P2 | `.git` 是 Junction 指向 `C:\Users\21722\qimingxing-git-repo`：备份项目目录 ≠ 备份历史 | 文件系统 | Phase 1（写备份 runbook） |
 | D-13 | P2 | 无 lint：ESLint/Prettier/ruff 全缺 | — | Phase 2 |
 | D-14 | P2 | `server.js` 是唯一鉴权点却零测试 | `ops/server/server.js` | ✅ 已修（2026-10-26）：`ops/server/test` 16 用例 + CI edge-server job |
+| D-15 | **P0（隐性）** | 架构守护 R1/R2 长期**空转**：`layer_of_file()` 拿仓库相对路径比 `app/` 前缀（永不匹配），且 `TYPE_CHECKING` 豁免标记传入未使用 → `--strict` 恒绿 | `scripts/audit_architecture.py` | ✅ 已修（2026-10-27）：路径基准改为 `backend/`、TYPE_CHECKING 真正豁免；新增 4 条负向 + 2 条回归测试 |
 
 > 原则：**先修 P0/P1 的"正确性"，再谈结构搬迁**。在事务边界、迁移基线、备份导入还有问题时做领域分包，只是把混乱打包进更漂亮的新目录。
 
@@ -330,8 +348,8 @@ CI：`.github/workflows/{backend,frontend,repo-guard}.yml` + `android-build.yml`
 |---|---|---|---|
 | **Phase 0** | 架构可见、可守、可查 | 本文 + `domains.json` + AST 守护 + 债务基线 + CI 三件套 + 文档 IA + 版本/依赖/配置单一来源 + `core` 去业务化 + 根目录契约 | ✅ 本轮完成 |
 | **Phase 1** | 修正确性 P0/P1 | D-01/03/04/05/08/10/14 ✅ 完成；D-02 ✅ 已评估（runbook + 守护，**远端处置待你执行**）；D-06/07/09 转入 Phase 2 | ✅ 本轮完成（2026-10-26，1229 测试全绿） |
-| **Phase 2** | 收口领域边界 | Repository 收口（D-06）、`core/sync` 领域逻辑下沉（D-07）、前端 `kernel/shared/features` 分层试点（单领域先迁） | 待批 |
-| **Phase 3** | 可持续交付 | lint、`server.js` 测试、启动器单一实现、发布/备份 runbook、`.git` 位置治理 | 待批 |
+| **Phase 2** | 收口领域边界 | D-06 仓储收口（156→0，R13）、D-07 sync 下沉（core 0 models 依赖）、D-09 SettingsView 拆分（1701→291）、前端 `kernel/shared/features` + pet 试点（R14）、D-15 守护空转修复 | ✅ 本轮完成（2026-10-27，1282 测试 + 86 前端测试全绿） |
+| **Phase 3** | 可持续交付 | D-11 启动器单一实现、D-12 `.git` 备份治理、D-13 lint（ESLint/Prettier/ruff 进 CI）、前端其余 25 域迁入 features、删除 8 个薄转发壳、`kernel` 过渡依赖归位 | 待批 |
 
 **明确不做（以及为什么）**：
 

@@ -496,6 +496,13 @@ class TaskService:
 - 接收 `Session`，**不管理请求级事务生命周期**（请求结束由 `api/deps.get_db` 统一 commit/rollback）
 - **用例边界显式提交**：多步写在全部完成后调用一次 `self.db.commit()`；发布领域事件前必须先 commit
   （订阅者用独立 Session 读取，未提交则读不到）—— 固定顺序「写完 → commit → publish」
+- **零直连 ORM（D-06 / 架构守护 R13）**：service 不得出现 `select(...)`、`text(...)`、
+  `db.execute/get/scalar(s)/add/add_all/delete/query`；查询与写入一律经 repository 的语义化方法。
+  允许 `commit/flush/refresh`（事务边界归 service）。
+  - 聚合服务（dashboard/report/backup/security）跨域**读**也必须经各域 repository；
+  - 需要「按身份分组计数」「解除项目/身份引用」这类跨域动作时，在各域 repository 加语义化方法
+    （如 `identity_counts()` / `clear_project()` / `clear_identity()`），不要在 service 里写 UPDATE；
+  - 唯一豁免：`app/services/sync/`（D-07 同步引擎，基础设施原语）。
 - 返回 Pydantic Schema 对象
 - **更新操作必须使用字段白名单**：定义 `_UPDATABLE_FIELDS` 集合，防止通过 `setattr` 越权修改 `user_id`/`is_focus` 等内部字段
 
@@ -514,6 +521,14 @@ class TaskRepository(BaseRepository[Task]):
 - 继承 `BaseRepository[T]` 获得通用 CRUD
 - **只 `flush()`，绝不 `commit()`**：提交权在 service/请求边界，这样多步操作才能整体回滚
   （架构守护 R11 强制：repositories 内出现 `db.commit()` 即失败）
+- **是 service 访问数据的唯一入口（D-06）**：service 出现 `select(...)`/`db.execute(...)` 会被
+  R13 判失败。新增查询时在对应域 repo 加**语义化方法**（`list_project_for_timeline`、
+  `identity_counts`、`stats_user`…），不要暴露通用 `query(...)`。
+- 跨表解除引用用基类的 `self.nullify("project_id", project_id=...)`（只 flush，一次 UPDATE）；
+  跨域动作由**各域 repo 各清自己的表**，不要在一个 repo 里 UPDATE 别的域的表。
+- 新增 repo 文件命名 `<module>_repo.py` 并在 `app/repositories/__init__.py` 导出；
+  模块名必须已在 `docs/architecture/domains.json` 登记（R8 强制）。
+- repository 返回 ORM 实体；序列化成 Pydantic 由 service 负责（保持本层无 schema 依赖）。
 
 ### 9.5 Model 层规范
 ```python

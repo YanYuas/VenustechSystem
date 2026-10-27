@@ -1,9 +1,14 @@
 // ============================================================
-// 桌宠 API（二期 P1）
-// 配置 + 形象管理 + 状态感知
+// features/pet/model.ts —— 桌宠领域模型（迁移批次 P2，ADR-0007）
+//
+// 领域类型的**唯一落点**：从原 `api/pet.ts` 的内联类型抽出，
+// 并收编原先散落在组件里的 `PetAction`（此前 composable 反向 import 组件的类型）。
+//
+// 约定：model.ts 只含类型/纯语义定义，不 import 任何运行时模块。
+// 跨域使用请从 `@/features/pet` 导入，不要深链本文件。
 // ============================================================
-import { http } from './http'
 
+/** 桌宠配置（后端 /pet/config） */
 export interface PetConfig {
   id: string
   user_id: string
@@ -31,6 +36,7 @@ export interface PetConfig {
   updated_at: string
 }
 
+/** 桌宠形象（后端 /pet/avatars） */
 export interface PetAvatar {
   id: string
   user_id: string
@@ -49,6 +55,7 @@ export interface PetAvatar {
   updated_at: string
 }
 
+/** 状态感知结果（后端 /pet/state） */
 export interface PetState {
   time_state: string
   time_label: string
@@ -79,47 +86,31 @@ export interface PetStats {
   decayed: boolean
 }
 
+/** 桌宠当前四维数值（不含 updated_at/decayed 的纯数值视图，组件内部持有） */
+export type PetVitals = Pick<PetStats, 'intimacy' | 'satiety' | 'mood' | 'energy'>
+
 /** 互动时的**增量**（不是绝对值） */
 export type PetStatsDelta = Partial<
   Record<'intimacy' | 'satiety' | 'mood' | 'energy', number>
 >
 
-export const petApi = {
-  // 配置
-  getConfig() {
-    return http.get<PetConfig>('/pet/config')
-  },
-  updateConfig(data: Partial<PetConfig>) {
-    return http.patch<PetConfig>('/pet/config', data)
-  },
-
-  // 形象
-  listAvatars() {
-    return http.get<PetAvatar[]>('/pet/avatars')
-  },
-  createAvatar(data: Partial<PetAvatar>) {
-    return http.post<PetAvatar>('/pet/avatars', data)
-  },
-  updateAvatar(id: string, data: Partial<PetAvatar>) {
-    return http.patch<PetAvatar>(`/pet/avatars/${id}`, data)
-  },
-  deleteAvatar(id: string) {
-    return http.delete<void>(`/pet/avatars/${id}`)
-  },
-  activateAvatar(id: string) {
-    return http.post<PetConfig>(`/pet/avatars/${id}/activate`)
-  },
-
-  // 状态感知
-  getState() {
-    return http.get<PetState>('/pet/state')
-  },
-
-  // 四维陪伴数值（S6-2：从 localStorage 迁入数据库）
-  getStats() {
-    return http.get<PetStats>('/pet/stats')
-  },
-  updateStats(delta: PetStatsDelta) {
-    return http.put<PetStats>('/pet/stats', delta)
-  },
-}
+/**
+ * 桌宠动作名。
+ *
+ * 迁移说明：原先定义在 `components/pet/DesktopPet.vue` 的 `<script setup>` 里，
+ * 导致 `usePetEvent` 反过来 import 组件（composable → component 反向依赖）。
+ * P2 起收编到领域 model，组件与 composable 都从这里取。
+ */
+export type PetAction =
+  | 'idle'
+  | 'happy'
+  | 'thinking'
+  | 'working'
+  | 'celebrate'
+  | 'sleep'
+  | 'wave'
+  | 'dance'
+  | 'read'
+  | 'run'
+  | 'shy'
+  | 'surprised'

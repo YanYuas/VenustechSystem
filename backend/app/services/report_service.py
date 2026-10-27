@@ -4,21 +4,31 @@
 # 只读聚合：从已有模块的表里数数，不新增任何写入。
 # 前端把 ReportOut 渲染为单文件 HTML 供下载留存
 # （内联样式、零外部依赖 —— 数据主权：报告归用户自己所有）。
+#
+# D-06 收口说明（聚合服务如何不直连 ORM）：
+#   本服务是 insight 领域的**只读聚合器**，需要跨 7 个域取数。
+#   收口后的规则是：跨域读也必须经各域 Repository 的公开方法，
+#   service 里不再出现 select()/db.execute()。为此各域 repo 增补了
+#   语义化方法（如 identity_counts / count_identity_unassigned /
+#   count_by_user），本文件只做编排与组装。
 # ============================================================
 from __future__ import annotations
 
-from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.base import utcnow
-from app.models.asset import ProjectMemory, PromptTemplate, Skill as SkillAsset, SOP
-from app.models.avatar import AvatarMemory
-from app.models.document import Document
-from app.models.identity import Identity
-from app.models.life import Diary
-from app.models.review import Review
-from app.models.task import Task
-from app.repositories import IdentityRepository
+from app.repositories import (
+    AvatarMemoryRepository,
+    DiaryRepository,
+    DocumentRepository,
+    IdentityRepository,
+    ProjectMemoryRepository,
+    PromptRepository,
+    ReviewRepository,
+    SOPRepository,
+    SkillRepository,
+    TaskRepository,
+)
 from app.schemas.report import (
     ArchiveAxis,
     ExperienceRecentItem,
@@ -39,6 +49,17 @@ class ReportService:
         self.db = db
         self.user_id = user_id
         self.nickname = nickname
+        # 各域只读 Repository（跨域读的唯一入口）
+        self.identity_repo = IdentityRepository(db)
+        self.task_repo = TaskRepository(db)
+        self.doc_repo = DocumentRepository(db)
+        self.diary_repo = DiaryRepository(db)
+        self.review_repo = ReviewRepository(db)
+        self.avatar_memory_repo = AvatarMemoryRepository(db)
+        self.project_memory_repo = ProjectMemoryRepository(db)
+        self.sop_repo = SOPRepository(db)
+        self.prompt_repo = PromptRepository(db)
+        self.skill_repo = SkillRepository(db)
 
     def get(self) -> ReportOut:
         identity_axis = self._identity_axis()
@@ -46,9 +67,11 @@ class ReportService:
         archive_axis = self._archive_axis()
         recent = self._recent_experience()
 
-        growth_axis.tasks_completed_total = self._count(Task, Task.status == "completed")
-        growth_axis.diaries_total = self._count(Diary)
-        growth_axis.reviews_total = self._count(Review)
+        growth_axis.tasks_completed_total = self.task_repo.count_user(
+            self.user_id, status="completed"
+        )
+        growth_axis.diaries_total = self.diary_repo.count_by_user(self.user_id)
+        growth_axis.reviews_total = self.review_repo.count_user(self.user_id)
 
         return ReportOut(
             generated_at=utcnow(),
@@ -62,7 +85,7 @@ class ReportService:
     # ---------- 身份轴 ----------
 
     def _identity_axis(self) -> IdentityAxis:
-        identities = IdentityRepository(self.db).list_user(self.user_id)
+        identities = self.identity_repo.list_user(self.user_id)
         rows = [
             IdentityStat(
                 id=i.id, name=i.name, slug=i.slug,
@@ -74,52 +97,43 @@ class ReportService:
         index = {r.id: r for r in rows}
 
         # 每张源表一次 GROUP BY（个人规模，6 次轻查询可忽略）
-        for rid, cnt in self._group_counts(Task.identity_id, Task.status != "completed"):
+        for rid, cnt in self.task_repo.identity_counts(
+            self.user_id, completed=False
+        ).items():
             if rid in index:
                 index[rid].tasks_open = cnt
-        for rid, cnt in self._group_counts(Task.identity_id, Task.status == "completed"):
+        for rid, cnt in self.task_repo.identity_counts(
+            self.user_id, completed=True
+        ).items():
             if rid in index:
                 index[rid].tasks_completed = cnt
-        for rid, cnt in self._group_counts(Document.identity_id):
+        for rid, cnt in self.doc_repo.identity_counts(self.user_id).items():
             if rid in index:
                 index[rid].documents = cnt
-        for rid, cnt in self._group_counts(Diary.identity_id):
+        for rid, cnt in self.diary_repo.identity_counts(self.user_id).items():
             if rid in index:
                 index[rid].diaries = cnt
-        for rid, cnt in self._group_counts(Review.identity_id):
+        for rid, cnt in self.review_repo.identity_counts(self.user_id).items():
             if rid in index:
                 index[rid].reviews = cnt
-        avatar_counts = dict(self._group_counts(AvatarMemory.identity_id))
-        pm_counts = dict(self._group_counts(ProjectMemory.identity_id))
+        avatar_counts = self.avatar_memory_repo.identity_counts(self.user_id)
+        pm_counts = self.project_memory_repo.identity_counts(self.user_id)
         for rid in index:
             index[rid].memories = avatar_counts.get(rid, 0) + pm_counts.get(rid, 0)
 
         unassigned = UnassignedStat(
-            tasks_open=self._count(Task, Task.identity_id.is_(None), Task.status != "completed"),
-            documents=self._count(Document, Document.identity_id.is_(None)),
-            diaries=self._count(Diary, Diary.identity_id.is_(None)),
-            reviews=self._count(Review, Review.identity_id.is_(None)),
+            tasks_open=self.task_repo.count_identity_unassigned(
+                self.user_id, completed=False
+            ),
+            documents=self.doc_repo.count_identity_unassigned(self.user_id),
+            diaries=self.diary_repo.count_identity_unassigned(self.user_id),
+            reviews=self.review_repo.count_identity_unassigned(self.user_id),
             memories=(
-                self._count(AvatarMemory, AvatarMemory.identity_id.is_(None))
-                + self._count(ProjectMemory, ProjectMemory.identity_id.is_(None))
+                self.avatar_memory_repo.count_identity_unassigned(self.user_id)
+                + self.project_memory_repo.count_identity_unassigned(self.user_id)
             ),
         )
         return IdentityAxis(identities=rows, unassigned=unassigned)
-
-    def _group_counts(self, col, *extra):
-        """按 identity_id 分组计数（跳过 NULL）。"""
-        q = select(col, func.count()).where(
-            getattr(col.parent.class_, "user_id") == self.user_id,
-            col.is_not(None),
-            *extra,
-        ).group_by(col)
-        return [(rid, int(c)) for rid, c in self.db.execute(q).all()]
-
-    def _count(self, model, *extra) -> int:
-        q = select(func.count()).select_from(model).where(
-            model.user_id == self.user_id, *extra
-        )
-        return int(self.db.scalar(q) or 0)
 
     # ---------- 成长轴 ----------
 
@@ -155,12 +169,12 @@ class ReportService:
         return ArchiveAxis(
             workspace_enabled=enabled,
             roots=roots,
-            documents_total=self._count(Document),
-            sops_total=self._count(SOP),
-            prompts_total=self._count(PromptTemplate),
-            skills_total=self._count(SkillAsset),
-            project_memories_total=self._count(ProjectMemory),
-            avatar_memories_total=self._count(AvatarMemory),
+            documents_total=self.doc_repo.count_by_user(self.user_id),
+            sops_total=self.sop_repo.count_by_user(self.user_id),
+            prompts_total=self.prompt_repo.count_by_user(self.user_id),
+            skills_total=self.skill_repo.count_by_user(self.user_id),
+            project_memories_total=self.project_memory_repo.count_by_user(self.user_id),
+            avatar_memories_total=self.avatar_memory_repo.count_by_user(self.user_id),
         )
 
     # ---------- 近期经历（报告的叙事面） ----------
@@ -169,11 +183,7 @@ class ReportService:
         out = ExperienceService(self.db, self.user_id).list(page=1, page_size=limit)
         names = {
             i.id: i.name
-            for i in self.db.scalars(
-                select(Identity).where(
-                    Identity.user_id == self.user_id, Identity.deleted_at.is_(None)
-                )
-            )
+            for i in self.identity_repo.list_user(self.user_id)
         }
         return [
             ExperienceRecentItem(

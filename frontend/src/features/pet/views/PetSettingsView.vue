@@ -1,12 +1,12 @@
 <script setup lang="ts">
 // ============================================================
-// 桌宠设置（二期 P1）
+// 桌宠设置（二期 P1；迁移批次 P2 → features/pet/views，ADR-0007）
 // 显示设置 + 状态感知 + 语音TTS + 形象管理
 // ============================================================
 import { ref, onMounted } from 'vue'
-import { petApi } from '@/api/pet'
-import { useToast } from '@/composables'
-import type { PetConfig, PetAvatar, PetState } from '@/api/pet'
+import { petApi } from '../api'
+import { useToast } from '@/kernel/ui/toast'
+import type { PetConfig, PetAvatar, PetState } from '../model'
 import BaseCard from '@/components/common/BaseCard.vue'
 
 const toast = useToast()

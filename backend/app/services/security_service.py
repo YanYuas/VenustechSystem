@@ -9,14 +9,16 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.encryption import EncryptionManager, get_encryption
 from app.core.exceptions import BusinessException, ValidationException
 from app.config import get_settings
-from app.models.settings import Setting
-from app.models.user import User
+from app.repositories import (
+    AuditLogRepository,
+    SettingRepository,
+    UserRepository,
+)
 
 # 需要跟随密钥轮换重加密的（模型/表, 密文列）。
 #
@@ -93,13 +95,10 @@ class SecurityService:
                 per_table[table] = per_table.get(table, 0) + 1
 
         # 2) 设置类密文（assistant.deepseek_key）—— 无前缀，直接由本管理器加密
-        setting_rows: list[tuple[Setting, str]] = []
-        srows = self.db.scalars(
-            select(Setting).where(
-                Setting.user_id == self.user_id,
-                Setting.key == "assistant.deepseek_key",
-            )
-        ).all()
+        setting_rows: list[tuple] = []
+        srows = SettingRepository(self.db).list_by_key(
+            self.user_id, "assistant.deepseek_key"
+        )
         for s in srows:
             if not (s.value or "").strip():
                 continue
@@ -156,9 +155,8 @@ class SecurityService:
         """
         if table == "users":
             # api_key_encrypted 存在 users 行上（单用户模型下即本用户）
-            return list(
-                self.db.scalars(select(User).where(User.id == self.user_id)).all()
-            )
+            row = UserRepository(self.db).get(self.user_id)
+            return [row] if row is not None else []
         return []
 
 
@@ -188,16 +186,19 @@ def audit(db: Session, user_id: str, action: str, *, target: str | None = None,
     """写一条审计记录。审计本身永不抛异常（不能因为记日志打断业务）。
 
     写入后按 AUDIT_KEEP 修剪最旧记录（与 settings_history 的 200 条策略同思路）。
+    D-06：SQL 全部下沉到 AuditLogRepository；本函数的「独立提交」语义不变
+    （审计要留痕，即使业务事务随后回滚）。
     """
-    from app.models.audit import AUDIT_ACTIONS, AuditLog
+    from app.models.audit import AUDIT_ACTIONS
 
     if action not in AUDIT_ACTIONS:
         action = "plugin.error"  # 未登记动作降级归类，绝不静默丢弃
+    repo = AuditLogRepository(db)
     try:
-        db.add(AuditLog(
+        repo.create_entry(
             user_id=user_id, action=action, target=(target or "")[:200] or None,
             ok=ok, detail=(detail or "")[:1000] or None, ip=ip,
-        ))
+        )
         db.commit()
     except Exception:
         db.rollback()
@@ -205,36 +206,16 @@ def audit(db: Session, user_id: str, action: str, *, target: str | None = None,
 
     # 修剪：只保留最近 AUDIT_KEEP 条（失败不影响业务，仅记日志）
     try:
-        from sqlalchemy import delete, func, select
-
-        total = db.scalar(
-            select(func.count()).select_from(AuditLog).where(AuditLog.user_id == user_id)
-        ) or 0
-        if total > AUDIT_KEEP:
-            stale = db.scalars(
-                select(AuditLog.id)
-                .where(AuditLog.user_id == user_id)
-                .order_by(AuditLog.created_at.asc())
-                .limit(total - AUDIT_KEEP)
-            ).all()
-            if stale:
-                db.execute(delete(AuditLog).where(AuditLog.id.in_(list(stale))))
-                db.commit()
+        stale = repo.stale_ids(user_id, AUDIT_KEEP)
+        if stale:
+            repo.delete_by_ids(stale)
+            db.commit()
     except Exception:
         db.rollback()
 
 
 def list_audit(db: Session, user_id: str, limit: int = 50) -> list[dict]:
-    from sqlalchemy import select
-
-    from app.models.audit import AuditLog
-
-    rows = db.scalars(
-        select(AuditLog)
-        .where(AuditLog.user_id == user_id, AuditLog.deleted_at.is_(None))
-        .order_by(AuditLog.created_at.desc())
-        .limit(min(limit, 200))
-    ).all()
+    rows = AuditLogRepository(db).list_user(user_id, limit=min(limit, 200))
     return [
         {
             "id": r.id, "action": r.action, "target": r.target, "ok": r.ok,

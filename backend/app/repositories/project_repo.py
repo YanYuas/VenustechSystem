@@ -25,6 +25,10 @@ class ProjectRepository(BaseRepository[Project]):
         stmt = select(Project).where(Project.id == project_id, Project.user_id == user_id)
         return self.db.execute(stmt).scalar_one_or_none()
 
+    def clear_identity(self, identity_id: str) -> None:
+        """把某身份的引用清回「未归类」（身份软删除时用；只 flush）。"""
+        self.nullify("identity_id", identity_id=identity_id)
+
     def get_task_stats(self, project_id: str) -> dict:
         """获取项目的任务统计"""
         total = self.db.execute(
@@ -113,5 +117,15 @@ class MilestoneRepository(BaseRepository[ProjectMilestone]):
             select(ProjectMilestone)
             .where(ProjectMilestone.project_id == project_id)
             .order_by(ProjectMilestone.sort_order, ProjectMilestone.created_at)
+        )
+        return list(self.db.scalars(q))
+
+    def list_for_timeline(self, project_id: str, limit: int = 20) -> list[ProjectMilestone]:
+        """项目时间线用：最近创建的里程碑（created_at 倒序）。"""
+        q = (
+            select(ProjectMilestone)
+            .where(ProjectMilestone.project_id == project_id)
+            .order_by(ProjectMilestone.created_at.desc())
+            .limit(limit)
         )
         return list(self.db.scalars(q))

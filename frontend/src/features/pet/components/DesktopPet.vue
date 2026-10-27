@@ -1,12 +1,13 @@
 <script setup lang="ts">
 // ============================================================
-// 桌面桌宠 —— 启明星助手（一期基础版）
+// 桌面桌宠 —— 启明星助手（一期基础版；迁移批次 P2 → features/pet/components，ADR-0007）
 // 功能: 二次元平面形象 + 多种动作 + 点击互动 + 任务完成庆祝
 // ============================================================
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import AppIcon from '@/components/common/AppIcon.vue'
-import { PET_ACTION_EVENT } from '@/composables/usePetEvent'
-import { petApi } from '@/api'
+import { PET_ACTION_EVENT } from '../composables/usePetEvent'
+import { petApi } from '../api'
+import type { PetAction, PetVitals } from '../model'
 
 const props = withDefaults(defineProps<{
   position?: { x: number; y: number }
@@ -21,7 +22,7 @@ const emit = defineEmits<{
   (e: 'move', pos: { x: number; y: number }): void
 }>()
 
-export type PetAction = 'idle' | 'happy' | 'thinking' | 'working' | 'celebrate' | 'sleep' | 'wave' | 'dance' | 'read' | 'run' | 'shy' | 'surprised'
+// PetAction 已收编到领域 model（原先是本组件内 export，导致 composable 反向依赖组件）
 const action = ref<PetAction>('idle')
 const message = ref('')
 const showMessage = ref(false)
@@ -191,13 +192,8 @@ function closeMenu() { showMenu.value = false }
 // S6-2：数值从 localStorage 迁入数据库（后端 /pet/stats）。
 // 这样它才会进备份、换设备不归零、清缓存不丢 —— 陪伴数据是用户投入
 // 时间最多、最不可再生的那部分，不该放在易失存储里。
-interface PetStats {
-  intimacy: number    // 亲密度 0-100
-  satiety: number     // 饱食度 0-100（旧代码叫 hunger，语义取反容易读错）
-  mood: number        // 心情 0-100
-  energy: number      // 精力 0-100
-}
-const stats = ref<PetStats>({ intimacy: 60, satiety: 60, mood: 60, energy: 60 })
+// 类型取自领域 model 的 PetVitals（= 后端 PetStats 的四个数值字段）。
+const stats = ref<PetVitals>({ intimacy: 60, satiety: 60, mood: 60, energy: 60 })
 
 // 注：数值的上下限收敛(0-100)由后端负责（见 pet_service.update_stats），
 // 前端不再本地 clamp —— 否则又会出现两套边界规则。
@@ -219,7 +215,7 @@ async function loadStats() {
 }
 
 /** 互动：把**增量**提交给后端，用返回值刷新（后端会先衰减再叠加） */
-async function applyStats(delta: Partial<PetStats>) {
+async function applyStats(delta: Partial<PetVitals>) {
   try {
     const res = await petApi.updateStats(delta)
     stats.value = {

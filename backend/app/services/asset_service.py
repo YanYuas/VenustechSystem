@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.core.event_bus import EVENT_SOP_USED, EVENT_PROMPT_USED, EVENT_PROJECT_MEMORY_CREATED, event_bus
 from app.core.exceptions import NotFoundException, ValidationException
-from app.repositories import SOPRepository, SOPVersionRepository, PromptRepository, SkillRepository, ProjectMemoryRepository
+from app.repositories import SOPRepository, SOPVersionRepository, PromptRepository, SkillRepository, ProjectMemoryRepository, ProjectRepository
 from app.repositories.identity_repo import IdentityRepository
 from app.schemas.asset import CreateSOPRequest, CreatePromptTemplateRequest, CreateSkillRequest, CreateProjectMemoryRequest
 
@@ -44,6 +44,7 @@ class AssetService:
         self.prompt_repo = PromptRepository(db)
         self.skill_repo = SkillRepository(db)
         self.memory_repo = ProjectMemoryRepository(db)
+        self.project_repo = ProjectRepository(db)
 
     # ==================== 通用守卫 ====================
 
@@ -84,11 +85,10 @@ class AssetService:
         project_id 完全不校验，两个后果 —— 传不存在的 id 会撞外键抛
         IntegrityError（未经捕获 → 500「服务器内部错误」），传他人的 id
         则被静默接受（跨用户挂靠）。对齐 task_service._ensure_project_owned。
+        D-06：查询下沉到 ProjectRepository.get_by_id（已含 user_id 过滤）。
         """
-        from app.models.project import Project
-
-        project = self.db.get(Project, project_id)
-        if project is None or project.user_id != user_id or project.deleted_at is not None:
+        project = self.project_repo.get_by_id(user_id, project_id)
+        if project is None or project.deleted_at is not None:
             raise ValidationException("项目不存在")
 
     # ==================== SOP 流程 ====================

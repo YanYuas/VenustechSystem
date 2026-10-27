@@ -18,6 +18,11 @@
   R8  领域归属完整：每个文件属于已登记模块；每个登记模块真实存在
   R9  根目录契约：根目录只允许 domains.json.root_contract 列出的条目
   R10 前端 views 不得横向 import 另一个 view 的具体实现
+  R11 repository 只 flush，不得 commit（提交权在 service / get_db）
+  R12 迁移基线 0001 必须冻结为显式 DDL（不得 create_all/drop_all）
+  R13 service 零直连 ORM（查询/写入一律经 repository）
+  R14 前端 kernel/shared/features 分层（ADR-0007）：kernel 不依赖上层、
+      shared 只依赖 kernel、feature 只依赖 kernel/shared/自身，跨 feature 只走 index
 
 已知技术债
   见 scripts/architecture_baseline.json。基线内的违规降级为 WARN（不失败），
@@ -54,7 +59,10 @@ LAYER_RULES: dict[str, set[str]] = {
     "services": {"services", "repositories", "models", "schemas", "core", "root"},
     "repositories": {"repositories", "models", "core", "root"},
     "models": {"models", "core"},
-    "core": {"core", "models"},
+    # core 是最底层基础设施：只允许依赖自身与 root 级基础设施（config/database/
+    # migrate/migration_helpers）。**不得依赖 models** —— D-07 把同步领域逻辑
+    # 下沉到 services/sync 后，core 已 0 依赖 models；保留这条禁令防止回潮。
+    "core": {"core", "root"},
     "root": ALL_LAYERS,
     "bootstrap": ALL_LAYERS,
     "plugins_builtin": ALL_LAYERS,
@@ -109,24 +117,28 @@ def iter_runtime_imports(path: Path) -> list[tuple[str, int]]:
             for child in node.orelse:  # `if not TYPE_CHECKING:` 的 else 是真运行时代码
                 visit(child, in_guard)
             return
-        if isinstance(node, ast.Import):
-            for a in node.names:
-                if a.name.startswith("app"):
-                    found.append(("app" + a.name[3:], node.lineno))
-        elif isinstance(node, ast.ImportFrom):
-            mod = node.module or ""
-            if node.level:
-                # 相对 import：按文件位置还原成 app.xxx
-                base = path.relative_to(BACKEND).with_suffix("").parts
-                anchor = list(base[: len(base) - node.level])
-                mod = ".".join(anchor + ([mod] if mod else []))
-            if mod == "app" or mod.startswith("app."):
-                found.append((mod, node.lineno))
+        # 关键：TYPE_CHECKING 块内是**类型注解**，零运行时开销，不算运行依赖。
+        # 旧实现把 in_guard 一路传下去却从不使用，导致 api 层合法的
+        # `if TYPE_CHECKING: from app.models.user import User`
+        # 被误报成运行时依赖（R1 假红）。
+        if not in_guard:
+            if isinstance(node, ast.Import):
+                for a in node.names:
+                    if a.name.startswith("app"):
+                        found.append(("app" + a.name[3:], node.lineno))
+            elif isinstance(node, ast.ImportFrom):
+                mod = node.module or ""
+                if node.level:
+                    # 相对 import：按文件位置还原成 app.xxx
+                    base = path.relative_to(BACKEND).with_suffix("").parts
+                    anchor = list(base[: len(base) - node.level])
+                    mod = ".".join(anchor + ([mod] if mod else []))
+                if mod == "app" or mod.startswith("app."):
+                    found.append((mod, node.lineno))
         for child in ast.iter_child_nodes(node):
             visit(child, in_guard)
 
     visit(tree)
-    # 去掉 `if TYPE_CHECKING:` 内被误收的（visit 已处理，这里做保底去重）
     return found
 
 
@@ -135,13 +147,25 @@ def layer_of_module(mod: str) -> str:
     if len(parts) < 2:
         return "root"
     top = parts[1]
-    if top in ("main", "config", "database", "migrate", "seed", "migration_helpers", "bootstrap"):
-        return "root" if top != "bootstrap" else "bootstrap"
+    # app/main.py 与 app/seed.py 是装配/种子入口 = 组合根，不是普通 root
+    if top in ("main", "seed", "bootstrap"):
+        return "bootstrap"
+    if top in ("config", "database", "migrate", "migration_helpers"):
+        return "root"
     return top if top in ALL_LAYERS else "root"
 
 
 def layer_of_file(p: Path) -> str:
-    r = rel(p)
+    # 统一成相对 backend 的路径（"app/..."）。
+    #
+    # 历史 bug（2026-10-27 由 D-07 成员发现并在本轮修复）：
+    #   旧实现 `r = rel(p)` 得到的是「相对仓库根」的 "backend/app/..."，
+    #   却拿 "app/..." 前缀去比较 → 永远不匹配 → 所有文件都被判成 root，
+    #   于是 R1/R2 的分层检查整体空转，`--strict` 恒为 0 违规。
+    #   现在改相对 BACKEND，并加负向测试锁死（tests/test_architecture.py）。
+    r = p.relative_to(BACKEND).as_posix()
+    if r in ("app/main.py", "app/seed.py"):
+        return "bootstrap"
     if r.startswith("app/bootstrap/"):
         return "bootstrap"
     for lay in ("api", "schemas", "services", "repositories", "models", "core", "plugins_builtin"):
@@ -294,6 +318,82 @@ def check_domain_map(domains: dict) -> None:
             if d.name not in declared:
                 err("R8-view-unmapped", f"views/{d.name}/ 未在 domains.json.frontend_views 登记", rel(d))
 
+    # 前端 features 目录（ADR-0007：一个领域一个包）
+    features = FRONTEND_SRC / "features"
+    declared_feat = {k: v for k, v in domains.get("frontend_features", {}).items() if not k.startswith("$")}
+    if features.is_dir():
+        for d in sorted(p for p in features.iterdir() if p.is_dir()):
+            if d.name not in declared_feat:
+                err("R8-feature-unmapped",
+                    f"features/{d.name}/ 未在 domains.json.frontend_features 登记", rel(d))
+
+
+# ---------------------------------------------------------------- R14 前端分层
+TRANSITIONAL_AREAS = {"types", "utils", "components", "constants", "directives"}
+LEGACY_UPWARD_AREAS = {"api", "views", "composables", "stores"}
+
+
+def _frontend_target_area(spec: str, src_file: Path) -> tuple[str, str]:
+    """把 import spec 解析成 (顶层区域, 子名)。相对路径按文件位置解析。"""
+    if spec.startswith("@/"):
+        parts = spec[2:].split("/")
+        return parts[0], (parts[1] if len(parts) > 1 else "")
+    if spec.startswith("."):
+        target = (src_file.parent / spec).resolve()
+        try:
+            parts = target.relative_to(FRONTEND_SRC).parts
+            return parts[0], (parts[1] if len(parts) > 1 else "")
+        except ValueError:
+            return "external", ""
+    return "external", ""
+
+
+def check_frontend_layers() -> None:
+    """R14: kernel / shared / features 依赖方向（ADR-0007）。
+
+    kernel  → 只能依赖 kernel（types/utils 等过渡依赖只告警）
+    shared  → kernel / shared
+    features→ kernel / shared / 自身；跨 feature 只允许 `@/features/<other>`（index 入口）
+             不得 import 过渡期目录 api/views/composables/stores（反向依赖）
+    历史包袱（features→types/utils/components）先降级为 WARN，P3 归位后转 ERROR。
+    """
+    rules = {
+        "kernel": {"kernel"},
+        "shared": {"kernel", "shared"},
+        "features": {"kernel", "shared", "features"},
+    }
+    for area, allowed in rules.items():
+        base = FRONTEND_SRC / area
+        if not base.is_dir():
+            continue
+        for f in sorted(list(base.rglob("*.ts")) + list(base.rglob("*.vue"))):
+            if "__tests__" in f.parts or f.name.endswith(".d.ts"):
+                continue
+            text = f.read_text(encoding="utf-8", errors="ignore")
+            own_feature = ""
+            if area == "features":
+                try:
+                    own_feature = f.relative_to(base).parts[0]
+                except ValueError:
+                    own_feature = ""
+            for spec in IMPORT_RE.findall(text):
+                target, sub = _frontend_target_area(spec, f)
+                if target == "external":
+                    continue  # 第三方包（vue/pinia/...）不是分层违规
+                if target in allowed:
+                    if area == "features" and target == "features" and sub and sub != own_feature:
+                        # 跨 feature：只允许 index（@/features/<other>），禁止深链
+                        if spec.rstrip("/").count("/") > 2:
+                            err("R14-frontend-cross-feature",
+                                f"跨 feature 必须经对方 index.ts（禁止深链）: {spec}", rel(f))
+                    continue
+                if target in TRANSITIONAL_AREAS:
+                    warn("R14-frontend-transitional",
+                         f"{area} 仍依赖过渡目录 @/{target}（P3 归位）: {spec}", rel(f))
+                else:
+                    err("R14-frontend-layers",
+                        f"{area} 不得依赖 {target}: import {spec}", rel(f))
+
 
 # ---------------------------------------------------------------- R11/R12 事务与迁移基线
 def check_transaction_and_migration() -> None:
@@ -342,6 +442,78 @@ def check_transaction_and_migration() -> None:
             err("R12-migration-baseline",
                 f"0001 基线不得使用 {banned}（必须冻结为显式 DDL）",
                 rel(baseline))
+
+
+# ---------------------------------------------------------------- R13 service 零直连 ORM
+# 审计 D-06：service 层只能通过 repository 访问数据（写入 + 查询）。
+# 禁止出现：
+#   1. SQLAlchemy 表达式构造：select(...) / text(...)（text 还意味着裸 SQL）
+#   2. 会话级查询/写入：<x>.db.execute / get / scalar / scalars /
+#      add / add_all / delete / query
+# 允许：
+#   · commit / flush / refresh（事务边界归 service，见 D-04 约定）；
+#   · 修改 repository 返回实体的属性（result.status = ...）。
+#
+# 为什么用 AST 而不是文本正则：docstring/注释里出现 "select(" 太常见，
+# 正则会产生假阳性（本脚本自身注释里就有很多）。AST 只看真实调用。
+#
+# 已知豁免：app/services/sync/ 是 D-07 的数据同步引擎 —— 它是**基础设施
+# 原语**，刻意按 Base.metadata 逐表搬运，不属于任何领域 service；D-07 落地
+# 后再评估是否拆出专用 Query/Writer 模块。豁免显式登记于此，避免"静默跳过"。
+R13_EXEMPT_DIRS = ("services/sync/",)
+
+# 会话对象上禁止 service 直接调用的方法（查询 + 写入；commit/flush/refresh 不在此列）
+R13_SESSION_METHODS = {
+    "execute", "get", "scalar", "scalars",
+    "add", "add_all", "delete", "query",
+}
+
+
+def _is_db_receiver(node: ast.AST) -> bool:
+    """调用接收者是否为数据库会话：`db` 或 `xxx.db`。"""
+    if isinstance(node, ast.Name):
+        return node.id == "db"
+    if isinstance(node, ast.Attribute):
+        return node.attr == "db"
+    return False
+
+
+def check_service_no_direct_orm() -> None:
+    """R13：services/**/*.py 不得直连 ORM（查询与写入都必须经 repository）。"""
+    for path in sorted((APP / "services").rglob("*.py")):
+        r = path.relative_to(APP).as_posix()
+        if any(r.startswith(d) for d in R13_EXEMPT_DIRS):
+            continue
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8-sig"))
+        except SyntaxError as e:
+            # 解析失败 = 规则失效（合规假象），必须报出而不是跳过
+            err("R13-service-no-direct-orm", f"无法解析 {r}: {e}", r)
+            continue
+
+        def visit(node: ast.AST) -> None:
+            if isinstance(node, ast.Call):
+                fn = node.func
+                if isinstance(fn, ast.Name) and fn.id in {"select", "text"}:
+                    err(
+                        "R13-service-no-direct-orm",
+                        f"service 不得直连 ORM：{fn.id}() —— 查询/裸 SQL 请下沉到 repository",
+                        f"{r}:{node.lineno}",
+                    )
+                elif (
+                    isinstance(fn, ast.Attribute)
+                    and fn.attr in R13_SESSION_METHODS
+                    and _is_db_receiver(fn.value)
+                ):
+                    err(
+                        "R13-service-no-direct-orm",
+                        f"service 不得直连 ORM：db.{fn.attr}() —— 请改走 repository 的语义化方法",
+                        f"{r}:{node.lineno}",
+                    )
+            for child in ast.iter_child_nodes(node):
+                visit(child)
+
+        visit(tree)
 
 
 # ---------------------------------------------------------------- R9 根目录契约
@@ -459,7 +631,9 @@ def main() -> int:
     check_domain_map(domains)
     check_root_contract(domains)
     check_frontend_boundaries()
+    check_frontend_layers()
     check_transaction_and_migration()
+    check_service_no_direct_orm()
     return apply_baseline(args.strict)
 
 

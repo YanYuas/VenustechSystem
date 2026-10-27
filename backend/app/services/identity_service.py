@@ -20,7 +20,19 @@ from sqlalchemy.orm import Session
 from app.core.exceptions import BusinessException, NotFoundException, ValidationException
 from app.models.base import utcnow
 from app.models.identity import Identity
-from app.repositories import IdentityRepository
+from app.repositories import (
+    AvatarMemoryRepository,
+    DiaryRepository,
+    DocumentRepository,
+    IdentityRepository,
+    InboxItemRepository,
+    ProjectMemoryRepository,
+    ProjectRepository,
+    ReviewRepository,
+    TaskRepository,
+    VaultItemRepository,
+    WorkspaceRootRepository,
+)
 from app.schemas.identity import CreateIdentityRequest, IdentityOut, UpdateIdentityRequest
 
 MAX_IDENTITIES = 12
@@ -90,38 +102,33 @@ class IdentityService:
         return self._out(row)
 
     def delete(self, identity_id: str) -> dict:
-        """软删除身份，并把 8 张业务表的引用清回「未归类」。
+        """软删除身份，并把 10 张业务表的引用清回「未归类」。
 
         为什么清引用：悬空 identity_id 会让记录在「按身份」和「未归类」
         两个视图里都不可见（identity_id 非空但身份已删）——两不靠比
         归错类更糟。文档口径一直是"悬空读作未归类"，那就把数据真的
         变成未归类，读取端无需任何特判。
+
+        D-06 收口：清理动作下沉到**各域 Repository**（每张表由它的
+        所属领域负责 clear_identity），本服务只做编排 —— 身份域不应
+        直接 UPDATE 别人的表。
         """
-        from sqlalchemy import update as sa_update
-
-        from app.models.asset import ProjectMemory
-        from app.models.avatar import AvatarMemory
-        from app.models.document import Document
-        from app.models.life import Diary
-        from app.models.project import Project
-        from app.models.resource import InboxItem
-        from app.models.review import Review
-        from app.models.task import Task
-        from app.models.vault import VaultItem
-        from app.models.workspace import WorkspaceRoot
-
         row = self._get_owned(identity_id)
         # 10 处引用全部清回「未归类」（含保险箱凭据与工作区根 ——
         # 漏掉任何一处，前端就会显示一个查无此身份的悬空标签）
-        for model in (
-            Task, Project, Document, Diary, Review,
-            AvatarMemory, ProjectMemory, InboxItem, VaultItem, WorkspaceRoot,
+        for repo in (
+            TaskRepository(self.db),          # 任务
+            ProjectRepository(self.db),       # 项目
+            DocumentRepository(self.db),      # 文档
+            DiaryRepository(self.db),         # 日记
+            ReviewRepository(self.db),        # 复盘
+            AvatarMemoryRepository(self.db),  # 分身记忆
+            ProjectMemoryRepository(self.db), # 项目记忆
+            InboxItemRepository(self.db),     # 收集箱
+            VaultItemRepository(self.db),     # 保险箱凭据
+            WorkspaceRootRepository(self.db), # 工作区根
         ):
-            self.db.execute(
-                sa_update(model)
-                .where(model.identity_id == identity_id)
-                .values(identity_id=None)
-            )
+            repo.clear_identity(identity_id)
         row.deleted_at = utcnow()
         self.db.commit()
         return {"deleted": True, "id": identity_id}

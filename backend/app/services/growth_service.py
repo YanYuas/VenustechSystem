@@ -31,10 +31,14 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timezone
 
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.growth import EXP_MAX, GrowthEvent, GrowthState, SkillStat
+from app.models.growth import EXP_MAX, GrowthState
+from app.repositories import (
+    GrowthEventRepository,
+    GrowthStateRepository,
+    SkillStatRepository,
+)
 from app.services.rules.domain_engine import js_round
 from app.services.rules.skill_cats import SKILL_CAT_BY_ID, SKILL_CATS
 
@@ -190,24 +194,17 @@ class GrowthService:
 
     def __init__(self, db: Session):
         self.db = db
+        # D-06：三张成长表各走自己的 Repository
+        self.state_repo = GrowthStateRepository(db)
+        self.event_repo = GrowthEventRepository(db)
+        self.skill_repo = SkillStatRepository(db)
 
     # ---------- 状态读取 ----------
 
     def get_or_create_state(self, user_id: str) -> GrowthState:
-        state = self.db.scalar(
-            select(GrowthState).where(
-                GrowthState.user_id == user_id,
-                GrowthState.deleted_at.is_(None),
-            )
-        )
+        state = self.state_repo.get_by_user(user_id)
         if state is None:
-            state = GrowthState(user_id=user_id, exp=0, level=1)
-            self.db.add(state)
-            # 只 flush：本方法是 award() 的**中间步骤**，若在结算途中提交，
-            # 后续写 GrowthEvent/SkillStat 失败就会留下「有等级、无流水」的
-            # 中间态。提交由 award() 末尾一次完成（读路径由 get_db 兜底）。
-            self.db.flush()
-            self.db.refresh(state)
+            state = self.state_repo.create(user_id=user_id, exp=0, level=1)
         return state
 
     def get_state(self, user_id: str) -> dict:
@@ -251,12 +248,7 @@ class GrowthService:
                     "skill_cat_ids": []}
 
         # 幂等检查（先查再插，避免依赖异常做流程控制）
-        existing = self.db.scalar(
-            select(GrowthEvent).where(
-                GrowthEvent.user_id == user_id,
-                GrowthEvent.source_key == source_key,
-            )
-        )
+        existing = self.event_repo.get_by_source_key(user_id, source_key)
         if existing is not None:
             logger.debug("EXP 已结算，跳过: {}", source_key)
             return {"granted": False, "exp": existing.exp, "level_up": False,
@@ -264,14 +256,14 @@ class GrowthService:
 
         skill_ids = auto_classify(classified_text) if classified_text else []
 
-        self.db.add(GrowthEvent(
+        self.event_repo.create(
             user_id=user_id,
             source_key=source_key,
             event_type=event_type,
             exp=exp,
             label=label,
             skill_cat_ids=skill_ids or None,
-        ))
+        )
         self._bump_skills(user_id, skill_ids)
 
         state = self.get_or_create_state(user_id)
@@ -295,26 +287,16 @@ class GrowthService:
     def _bump_skills(self, user_id: str, category_ids: list[str]) -> None:
         """技能计数 +1（同类只加一次）。"""
         for cat_id in category_ids:
-            row = self.db.scalar(
-                select(SkillStat).where(
-                    SkillStat.user_id == user_id,
-                    SkillStat.category_id == cat_id,
-                )
-            )
+            row = self.skill_repo.get_by_category(user_id, cat_id)
             if row is None:
-                self.db.add(SkillStat(user_id=user_id, category_id=cat_id, count=1))
+                self.skill_repo.create(user_id=user_id, category_id=cat_id, count=1)
             else:
                 row.count += 1
 
     # ---------- 流水与技能树 ----------
 
     def list_events(self, user_id: str, limit: int = 20) -> list[dict]:
-        rows = self.db.scalars(
-            select(GrowthEvent)
-            .where(GrowthEvent.user_id == user_id)
-            .order_by(GrowthEvent.created_at.desc())
-            .limit(limit)
-        ).all()
+        rows = self.event_repo.list_user(user_id, limit=limit)
         return [
             {
                 "id": r.id,
@@ -329,12 +311,7 @@ class GrowthService:
 
     def get_skill_tree(self, user_id: str) -> list[dict]:
         """技能树：返回有计数的分类（按计数降序）。"""
-        rows = self.db.scalars(
-            select(SkillStat).where(
-                SkillStat.user_id == user_id,
-                SkillStat.count > 0,
-            )
-        ).all()
+        rows = self.skill_repo.list_counted(user_id)
         items: list[dict] = []
         for r in rows:
             cat = SKILL_CAT_BY_ID.get(r.category_id)

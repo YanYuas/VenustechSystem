@@ -30,7 +30,7 @@
 |---|---|---|
 | [ARCHITECTURE.md](../ARCHITECTURE.md) | 现行 | **架构唯一入口**（位于仓库根）：分层、模块边界、依赖规则、§12 决策记录索引 |
 | [domains.json](architecture/domains.json) | 现行 | 领域 / 模块划分的机器可读描述（脚本与 CI 消费） |
-| `ADR/`（架构决策记录） | 现行 | [ADR 目录](architecture/ADR/)：0001 分层模块化单体 / 0002 core 最底层 / 0003 架构即代码 / 0004 运行期数据与密钥 / 0005 版本与依赖单一来源 / 0006 文档 IA（本索引的依据） |
+| `ADR/`（架构决策记录） | 现行 | [ADR 目录](architecture/ADR/)：0001 分层模块化单体 / 0002 core 最底层 / 0003 架构即代码 / 0004 运行期数据与密钥 / 0005 版本与依赖单一来源 / 0006 文档 IA（本索引的依据）/ **0007 前端 kernel/shared/features 分层（pet 试点已完成）** |
 | [legacy/02-技术架构.md](architecture/legacy/02-技术架构.md) | 🗄️ archived | v1.0 技术架构草案（Electron / asyncpg 等方案已推翻） |
 | [legacy/02-技术架构-v2.0.md](architecture/legacy/02-技术架构-v2.0.md) | 🗄️ archived | 2026-08-27 技术架构 v2.0（已被 ARCHITECTURE.md 取代） |
 | [legacy/PROJECT_STRUCTURE.md](architecture/legacy/PROJECT_STRUCTURE.md) | 🗄️ archived | 九大业务板块结构快照（数量数字已过时） |

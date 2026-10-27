@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user, get_db
 from app.core.exceptions import ValidationException
 from app.core.response import success
-from app.core.sync import SyncEngine
+from app.services.sync import SyncEngine
 
 if TYPE_CHECKING:
     from app.models.user import User
@@ -78,7 +78,7 @@ def export(data: ExportRequest, db: Session = Depends(get_db), user: User = Depe
 @router.post("/preview", summary="预览导入将发生的变化（只算不改库）")
 def preview_sync(data: ImportRequest, db: Session = Depends(get_db),
                  user: User = Depends(get_current_user)):
-    from app.core.sync import SyncEngine
+    from app.services.sync import SyncEngine
     path = Path(data.path)
     if not path.exists():
         raise ValidationException(f"文件不存在: {path}")

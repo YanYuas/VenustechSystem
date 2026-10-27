@@ -53,3 +53,18 @@ from app.repositories.avatar_repo import AvatarMemoryRepository, AvatarInspirati
 from app.repositories.pet_repo import PetConfigRepository, PetAvatarRepository
 from app.repositories.settings_repo import SettingRepository
 from app.repositories.identity_repo import IdentityRepository
+
+# D-06 Repository 收口：补齐此前没有 Repository 的模型
+from app.repositories.audit_repo import AuditLogRepository
+from app.repositories.backup_repo import BackupRepository
+from app.repositories.growth_repo import (
+    GrowthEventRepository,
+    GrowthStateRepository,
+    SkillStatRepository,
+)
+from app.repositories.settings_history_repo import SettingHistoryRepository
+from app.repositories.vault_repo import VaultConfigRepository, VaultItemRepository
+from app.repositories.workspace_repo import WorkspaceFileRepository, WorkspaceRootRepository
+
+# task 域：番茄钟会话此前直连 ORM
+from app.repositories.task_repo import FocusSessionRepository

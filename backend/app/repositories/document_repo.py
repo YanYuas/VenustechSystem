@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import Text, cast, func, or_, select
+from sqlalchemy import Text, cast, delete, func, or_, select
 
 from app.models.document import Backlink, Document, DocumentVersion
 from app.repositories.base import BaseRepository
@@ -87,6 +87,91 @@ class DocumentRepository(BaseRepository[Document]):
             select(Document).where(Document.user_id == user_id, Document.title == title)
         )
 
+    # ---------- D-06 收口新增：供 service 用的语义化查询 ----------
+
+    def count_by_user(self, user_id: str) -> int:
+        return self.count(user_id=user_id)
+
+    def list_all_by_user(self, user_id: str) -> list[Document]:
+        """关系图谱用：某用户全部文档节点。"""
+        return list(self.db.scalars(select(Document).where(Document.user_id == user_id)))
+
+    def title_id_map(self, user_id: str, titles: list[str]) -> dict[str, str]:
+        """[[标题]] 双链解析：标题 → 文档 id（一次 IN 查询）。"""
+        if not titles:
+            return {}
+        rows = self.db.scalars(
+            select(Document).where(
+                Document.user_id == user_id,
+                Document.title.in_(titles),
+            )
+        )
+        return {d.title: d.id for d in rows}
+
+    def list_project_cards(self, project_id: str, limit: int = 50) -> list:
+        """项目详情用：只取卡片字段（不拉 content 大字段），按更新时间倒序。"""
+        q = (
+            select(Document.id, Document.title, Document.updated_at,
+                   Document.tags, Document.word_count)
+            .where(Document.project_id == project_id)
+            .order_by(Document.updated_at.desc())
+            .limit(limit)
+        )
+        return list(self.db.execute(q).all())
+
+    def list_project_documents(self, project_id: str, limit: int = 20) -> list[Document]:
+        """项目时间线用：最近创建的文档。"""
+        q = (
+            select(Document)
+            .where(Document.project_id == project_id)
+            .order_by(Document.created_at.desc())
+            .limit(limit)
+        )
+        return list(self.db.scalars(q))
+
+    def list_all_by_project(self, project_id: str) -> list[Document]:
+        """项目导出用：全量文档（不排序、不分页）。"""
+        return list(
+            self.db.scalars(select(Document).where(Document.project_id == project_id))
+        )
+
+    def list_created_between(self, user_id: str, start, end) -> list[Document]:
+        """每日复盘自动填充：某时间段内创建的文档。"""
+        q = select(Document).where(
+            Document.user_id == user_id,
+            Document.created_at >= start,
+            Document.created_at < end,
+        )
+        return list(self.db.scalars(q))
+
+    def identity_counts(self, user_id: str) -> dict[str, int]:
+        """按身份分组计数（跳过未归类）。"""
+        q = (
+            select(Document.identity_id, func.count())
+            .where(
+                Document.user_id == user_id,
+                Document.identity_id.is_not(None),
+            )
+            .group_by(Document.identity_id)
+        )
+        return {rid: int(count) for rid, count in self.db.execute(q).all()}
+
+    def count_identity_unassigned(self, user_id: str) -> int:
+        """未归类文档数。"""
+        q = select(func.count()).select_from(Document).where(
+            Document.user_id == user_id,
+            Document.identity_id.is_(None),
+        )
+        return int(self.db.scalar(q) or 0)
+
+    def clear_identity(self, identity_id: str) -> None:
+        """把某身份的引用清回「未归类」（身份软删除时用；只 flush）。"""
+        self.nullify("identity_id", identity_id=identity_id)
+
+    def clear_project(self, project_id: str) -> None:
+        """解除文档与项目的关联（项目删除时用；只 flush）。"""
+        self.nullify("project_id", project_id=project_id)
+
 
 class DocumentVersionRepository(BaseRepository[DocumentVersion]):
     model = DocumentVersion
@@ -130,4 +215,23 @@ class BacklinkRepository(BaseRepository[Backlink]):
         """删除某文档的出链（只 flush；事务由调用方闭合）。"""
         for bl in self.list_sources(source_doc_id):
             self.db.delete(bl)
+        self.db.flush()
+
+    def list_by_sources(self, source_ids: list[str]) -> list[Backlink]:
+        """关系图谱用：批量取出这些源文档的出链（一次 IN 查询）。"""
+        if not source_ids:
+            return []
+        q = select(Backlink).where(Backlink.source_doc_id.in_(source_ids))
+        return list(self.db.scalars(q))
+
+    def replace_source_links(self, source_doc_id: str, links: list[dict]) -> None:
+        """重建某文档的全部出链（先删后插，同一事务内一次 flush）。
+
+        参数 links 是 Backlink 字段字典（source_doc_id / target_doc_id /
+        target_title）。语义等价于「保存文档」用例里的第二步，提交由
+        调用方在用例末尾完成（见 D-04 事务约定）。
+        """
+        self.db.execute(delete(Backlink).where(Backlink.source_doc_id == source_doc_id))
+        if links:
+            self.db.add_all([Backlink(**link) for link in links])
         self.db.flush()

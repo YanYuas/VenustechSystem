@@ -6,7 +6,8 @@
 import { ref, computed, onBeforeUnmount } from 'vue'
 import { taskApi } from '@/api'
 import { useToast } from '@/composables/useToast'
-import { emitPetAction } from '@/composables/usePetEvent'
+// 跨域触发桌宠动作走 features/pet 唯一公开出口（ADR-0007 规则 3）
+import { emitPetAction } from '@/features/pet'
 import BaseButton from '@/components/common/BaseButton.vue'
 import AppIcon from '@/components/common/AppIcon.vue'
 

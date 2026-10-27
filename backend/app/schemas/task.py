@@ -4,8 +4,21 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
+
+# ---------- 枚举（Phase 2 契约对齐 D-08） ----------
+# 输出侧收紧为 Literal：让"非法状态被写进库"在响应校验时立刻暴露（测试变红）。
+# 历史遗留的 status="todo" 由迁移 0022 归一为 "pending"，否则响应校验会 500。
+#
+# 输入侧（Create/UpdateTaskRequest）刻意保持 `str | None`，不要"顺手"也改成 Literal：
+#   · priority 有既定的容错语义 —— 非法值由 service 回退为 "medium"
+#     （见 test_task_api.py::test_create_task_invalid_priority_falls_back_to_medium_via_api）；
+#   · status 的业务校验在 service 的状态机里做，要返回业务码而非 422。
+#   改成 Literal 会把 400/3001 变成 422，破坏既有接口契约与测试。
+TaskStatus = Literal["pending", "in_progress", "waiting", "completed"]
+TaskPriority = Literal["low", "medium", "high", "urgent"]
 
 
 class SubtaskOut(BaseModel):
@@ -22,8 +35,8 @@ class TaskOut(BaseModel):
     id: str
     title: str
     description: str | None = None
-    status: str
-    priority: str
+    status: TaskStatus
+    priority: TaskPriority
     project_tag: str | None = None
     project_id: str | None = None
     project_name: str | None = None
@@ -136,4 +149,4 @@ class FocusTaskOut(BaseModel):
     stage: str = ""
     progress: int = 0
     next_step: str = ""
-    status: str
+    status: TaskStatus

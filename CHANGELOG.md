@@ -7,6 +7,45 @@
 
 ## [Unreleased]
 
+### Changed — Phase 2：收口领域边界（Repository / sync / 前端分层，2026-10-27）
+
+本轮目标：把"分层正确"升级为"边界被机器守住"。**后端测试 1229 → 1282，前端测试 86，全部通过。**
+
+**D-06 Repository 收口（service 零直连 ORM）**
+- 16 个 service 的 **156 个直连 ORM 调用点 → 0**（AST 口径）。
+- 新增 7 个 repository：`growth`（State/Event/SkillStat）、`vault`、`workspace`（Root/File）、`audit`、`settings_history`、`backup`（WAL checkpoint）、`task`（FocusSession）；现有 repo 增加约 60 个**业务语义化方法**（`identity_counts` / `clear_project` / `replace_source_links` / `list_autofill_candidates` / `stats_user` …）。
+- 基类新增纯 DAO 工具 `BaseRepository.nullify()`（解除引用，只 flush），避免在 service 写 UPDATE。
+- 聚合服务（dashboard/report/backup/security）跨域读全部改经各域 repo，不再直接 `select(Base.metadata.tables)`。
+- 新增守护 **R13**：service 出现 `select()/text()/db.execute|get|scalar|scalars|add|add_all|delete|query` 即 CI 红（`services/sync/` 为显式豁免）；8 条原子性测试 + 19 条仓储契约测试补位。
+
+**D-07 `core/sync` 领域逻辑下沉**
+- `core/sync.py`（389 行，表分级策略/密文列白名单/settings 前缀过滤/导出游标）整体迁入 `services/sync/`（`engine.py` + `adapters.py` + `__init__.py`），行为零变化；`api/sync.py` 与 2 个脚本的 import 更新。
+- `core/sync_adapters.py` 并非死代码（smoke 脚本在用），随之下沉而非删除；**真正的死代码 `core/cache.py` 已删除**。
+- 结果：`core/` **0 依赖 models/database**；架构守护 **R2 收紧**为 `core → {core, root(config/database)}`，禁止依赖 models 回潮。
+- 新增 29 条 sync 测试（策略/快照/差分/加密列剥离/游标/公开面）。
+
+**D-09 SettingsView 拆分（1701 → 291 行）**
+- 拆出 `components/settings/` 14 个分区组件、`composables/useSettings{Config,Diagnostics,Sync}.ts`、纯逻辑 `settingsUtils.ts` 与共享样式；父组件只留骨架与协调（**-82.9%**）。
+- 等价性证据：DOM 405 节点 vs 405 节点（结构/文本/class/条件 **0 差异**）、sass 规则集 99 vs 99、emit 35/35 有监听、5 个 loader 时机不变；新增 7 条纯逻辑 vitest（前端 79 → 86）。
+- 代价：`SettingsView` chunk 31,979 → 38,590 B（+6.6 KB，1 个巨组件拆成 15 个模块的固有成本）。
+
+**前端 kernel / shared / features + pet 单领域试点（ADR-0007）**
+- `kernel/`：http（单点漏斗）、ui（toast/modal）、offline（队列）真实迁移；`shared/`：constants、directives 真实迁移。
+- `features/pet/`：api / model / composable / component / view / `index.ts` **真实迁移，旧路径全删无壳**；6 处引用方改走 feature 入口；view 用懒加载入口，主包不受污染。
+- 旧公共路径保留 **8 个薄转发壳**（`export *`、壳内零实现、标 `@deprecated P1/P4 删除`），避免 30+ 文件 import 雪崩。
+- 新增守护 **R14**：kernel 反向依赖 shared/features、shared→features、跨 feature 深链 = CI 红；过渡依赖（kernel→types/utils 等 8 条）先 WARN，P3 归位后转 ERROR。`domains.json` 新增 `frontend_features` 登记。
+- 验证：typecheck 0 / vitest 86 / build 成功；`PetSettingsView` chunk **14,236 B，与迁移前同大小**，主入口 +28 B。
+
+**D-15 架构守护空转修复（本轮审计副产品，P0 隐性）**
+- 发现 `layer_of_file()` 用"仓库相对路径"与 `app/` 前缀比较（永不匹配）→ 所有文件被判 `root` 跳过，**R1/R2 自 Phase 0 起实际未生效**；且 `TYPE_CHECKING` 豁免标记传入却未使用（修复前暴露 28 条 api→models 假违规）。
+- 两处均已修复，并新增 **4 条负向测试 + 2 条回归测试**（R1/R2/R13/R14 各注入违规证明会变红；分层判定与 TYPE_CHECKING 豁免锁死）。
+- 现状：178 个后端模块、`--strict` 0 违规；R14 仅剩 8 条已登记过渡依赖。
+
+**数据契约收尾**
+- 新增迁移 `0022`：把历史遗留的 `tasks.status='todo'`（已修复 bug 的残留数据）归一为 `pending` —— 否则响应枚举校验会 500；实测真库副本 25 行任务无损。
+- `TaskOut.status/priority`、`FocusTaskOut.status` 收紧为 `Literal`；**请求侧刻意保持宽松**（priority 非法值有"回退 medium"的既有契约、status 由状态机返回业务码），已在 schema 注释写明原因。
+- `ops/server` 的 `npm test` 脚本修正为 `node --test`（目录参数在 Node 24 下会误判为模块）。
+
 ### Changed — Phase 1：修正正确性（3 个 P0 + 事务 / 迁移 / 契约 / 死代码，2026-10-26）
 
 本轮目标是"把架构纪律落到会出错的地方"。**后端测试 1215 → 1229 全绿**，新增 4 道守护。

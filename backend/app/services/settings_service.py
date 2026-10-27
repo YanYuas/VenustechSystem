@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 
 from app.core.exceptions import ValidationException
 from app.core.logger import get_logger
-from app.repositories import SettingRepository
+from app.repositories import SettingHistoryRepository, SettingRepository
 
 # key 格式：小写字母开头，允许小写字母/数字/下划线，可用点号分层
 KEY_PATTERN = re.compile(r"^[a-z][a-z0-9_]*(\.[a-z0-9_]+)*$")
@@ -53,6 +53,7 @@ class SettingsService:
         self.db = db
         self.user_id = user_id
         self.repo = SettingRepository(db)
+        self.history_repo = SettingHistoryRepository(db)
 
     # ---------- 读 ----------
 
@@ -86,44 +87,23 @@ class SettingsService:
 
     def _record_history(self, key: str, old_value: str | None,
                         new_value: str | None) -> None:
-        from app.models.settings_history import SettingHistory, mask_value
+        # D-06：写入 + 修剪全部下沉到 SettingHistoryRepository
+        from app.models.settings_history import mask_value
 
         if old_value == new_value:
             return
-        self.db.add(SettingHistory(
+        self.history_repo.add_entry(
             user_id=self.user_id, key=key,
             old_value=mask_value(key, old_value),
             new_value=mask_value(key, new_value),
-        ))
+        )
         # 保留最近 200 条：超出即删最旧
-        from sqlalchemy import delete, func, select
-
-        total = self.db.scalar(
-            select(func.count()).select_from(SettingHistory)
-            .where(SettingHistory.user_id == self.user_id)
-        ) or 0
-        if total > self.HISTORY_LIMIT:
-            oldest = self.db.scalars(
-                select(SettingHistory)
-                .where(SettingHistory.user_id == self.user_id)
-                .order_by(SettingHistory.created_at.asc())
-                .limit(total - self.HISTORY_LIMIT)
-            ).all()
-            for row in oldest:
-                self.db.execute(delete(SettingHistory).where(SettingHistory.id == row.id))
+        self.history_repo.trim(self.user_id, self.HISTORY_LIMIT)
 
     def history(self, limit: int = 50) -> list[dict]:
-        from sqlalchemy import select
-
-        from app.models.settings_history import SettingHistory
-
-        rows = self.db.scalars(
-            select(SettingHistory)
-            .where(SettingHistory.user_id == self.user_id,
-                   SettingHistory.deleted_at.is_(None))
-            .order_by(SettingHistory.created_at.desc())
-            .limit(min(limit, self.HISTORY_LIMIT))
-        ).all()
+        rows = self.history_repo.list_user(
+            self.user_id, limit=min(limit, self.HISTORY_LIMIT)
+        )
         return [
             {"id": r.id, "key": r.key, "old_value": r.old_value,
              "new_value": r.new_value,
@@ -133,17 +113,8 @@ class SettingsService:
 
     def rollback(self, history_id: str) -> dict:
         """单 key 回滚到该记录之前的旧值（F6.2）。"""
-        from sqlalchemy import select
-
-        from app.models.settings_history import SettingHistory
-
-        row = self.db.scalars(
-            select(SettingHistory).where(
-                SettingHistory.id == history_id,
-                SettingHistory.user_id == self.user_id,
-            )
-        ).first()
-        if row is None:
+        row = self.history_repo.get(history_id)
+        if row is None or row.user_id != self.user_id:
             raise ValidationException("历史记录不存在")
         # 脱敏值不可回滚（否则会把 *** 写回配置）
         if row.old_value is not None and row.old_value.endswith("***"):

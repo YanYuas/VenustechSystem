@@ -889,7 +889,7 @@ def main() -> int:
         check("sync package user binding", pkg["user_id"] is not None, str(pkg["user_id"]))
 
         # ---------- mod-platform P0：同步删除传导 ----------
-        from app.core.sync import SyncEngine as _SyncEngine
+        from app.services.sync import SyncEngine as _SyncEngine
         from app.models.user import User as _SyncUser
         _sdb2 = _Session()
         _uid2 = _sdb2.query(_SyncUser.id).first()[0]
@@ -1130,7 +1130,7 @@ def main() -> int:
         r = client.get("/api/v1/rules/domains")
         _dm = r.json()["data"]
         # ---------- mod-platform O10/F2.5：云适配器契约冻结 ----------
-        from app.core.sync_adapters import (
+        from app.services.sync.adapters import (
             LocalDirAdapter as _LDA, SyncAdapter as _SA,
             available_adapters as _adapters, get_adapter as _get_adapter,
         )
@@ -1155,7 +1155,7 @@ def main() -> int:
         check("adapter pull missing key raises KeyError", _ko, "no KeyError")
         _reject = False
         try:
-            from app.core.sync_adapters import register_adapter as _reg
+            from app.services.sync.adapters import register_adapter as _reg
             class _Bad:  # 不实现契约
                 pass
             _reg("bad", _Bad)  # type: ignore[arg-type]
@@ -1201,7 +1201,7 @@ def main() -> int:
         # PRD 8.4：全量 snapshot 在万行级 < 500ms
         import time as _time2
         import sqlalchemy as _sa
-        from app.core.sync import SyncEngine as _SE2
+        from app.services.sync import SyncEngine as _SE2
         from app.database import Base as _B2
         from app.database import SessionLocal as _S3
         from sqlalchemy import text as _t2
@@ -1332,7 +1332,7 @@ def main() -> int:
         _inj_db.close()
 
         # ---------- 考察修复：新表不得跨端同步（本地痕迹） ----------
-        from app.core.sync import policy_of as _policy_of, SyncPolicy as _SP
+        from app.services.sync import policy_of as _policy_of, SyncPolicy as _SP
         check("audit_logs excluded from sync",
               _policy_of("audit_logs") is not _SP.FULL, str(_policy_of("audit_logs")))
         check("settings_history excluded from sync",

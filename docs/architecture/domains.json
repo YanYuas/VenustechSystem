@@ -133,7 +133,10 @@
     "app/services/ai/ai_service.py": "assistant",
     "app/services/ai/client.py": "assistant",
     "app/services/ai/prompt_builder.py": "assistant",
-    "app/services/ai/__init__.py": "assistant"
+    "app/services/ai/__init__.py": "assistant",
+    "app/services/sync/__init__.py": "platform",
+    "app/services/sync/engine.py": "platform",
+    "app/services/sync/adapters.py": "platform"
   },
   "frontend_views": {
     "$comment": "src/views/<目录> → 领域。新增页面目录必须登记。",
@@ -155,7 +158,6 @@
     "Assistant": "assistant",
     "AiHot": "assistant",
     "Avatar": "companion",
-    "Pet": "companion",
     "Asset": "asset",
     "Vault": "asset",
     "Settings": "platform",
@@ -193,5 +195,9 @@
       ".git",
       ".arch-audit"
     ]
+  },
+  "frontend_features": {
+    "$comment": "src/features/<领域>/ → 领域。新增 feature 包必须登记；一个领域一个包（ADR-0007）。",
+    "pet": "companion"
   }
 }

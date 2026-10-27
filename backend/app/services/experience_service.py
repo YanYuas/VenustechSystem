@@ -17,13 +17,14 @@ from __future__ import annotations
 
 from datetime import date, datetime, time
 
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.asset import ProjectMemory
-from app.models.avatar import AvatarMemory
-from app.models.life import Diary
-from app.models.review import Review
+from app.repositories import (
+    AvatarMemoryRepository,
+    DiaryRepository,
+    ProjectMemoryRepository,
+    ReviewRepository,
+)
 from app.schemas.experience import ExperienceItem, ExperienceOut
 
 # 单源拉取上限：防御性 cap，个人规模远达不到
@@ -50,6 +51,11 @@ class ExperienceService:
     def __init__(self, db: Session, user_id: str):
         self.db = db
         self.user_id = user_id
+        # 只读视图：四源各自走所属领域的 Repository（D-06 收口）
+        self.diary_repo = DiaryRepository(db)
+        self.review_repo = ReviewRepository(db)
+        self.avatar_memory_repo = AvatarMemoryRepository(db)
+        self.project_memory_repo = ProjectMemoryRepository(db)
 
     def list(
         self,
@@ -69,7 +75,6 @@ class ExperienceService:
         counts: dict[str, int] = {}
 
         # ---------- 日记（occurred_at = diary_date）----------
-        q = select(Diary).where(Diary.user_id == self.user_id)
         rows.extend(
             ExperienceItem(
                 id=d.id, source="diary", source_label=SOURCE_LABELS["diary"],
@@ -78,11 +83,10 @@ class ExperienceService:
                 identity_id=d.identity_id,
                 occurred_at=_as_datetime(d.diary_date, d.created_at),
             )
-            for d in self.db.scalars(q.limit(_PER_SOURCE_CAP))
+            for d in self.diary_repo.list_by_user(self.user_id, limit=_PER_SOURCE_CAP)
         )
 
         # ---------- 复盘（occurred_at = review_date）----------
-        q = select(Review).where(Review.user_id == self.user_id)
         rows.extend(
             ExperienceItem(
                 id=r.id, source="review", source_label=SOURCE_LABELS["review"],
@@ -91,11 +95,10 @@ class ExperienceService:
                 identity_id=r.identity_id,
                 occurred_at=_as_datetime(r.review_date, r.created_at),
             )
-            for r in self.db.scalars(q.limit(_PER_SOURCE_CAP))
+            for r in self.review_repo.list_user(self.user_id, limit=_PER_SOURCE_CAP)
         )
 
         # ---------- 分身记忆（occurred_at = created_at）----------
-        q = select(AvatarMemory).where(AvatarMemory.user_id == self.user_id)
         rows.extend(
             ExperienceItem(
                 id=m.id, source="avatar_memory", source_label=SOURCE_LABELS["avatar_memory"],
@@ -104,11 +107,12 @@ class ExperienceService:
                 identity_id=m.identity_id,
                 occurred_at=m.created_at,
             )
-            for m in self.db.scalars(q.limit(_PER_SOURCE_CAP))
+            for m in self.avatar_memory_repo.list_by_user(
+                self.user_id, limit=_PER_SOURCE_CAP
+            )
         )
 
         # ---------- 项目记忆（occurred_at = created_at）----------
-        q = select(ProjectMemory).where(ProjectMemory.user_id == self.user_id)
         rows.extend(
             ExperienceItem(
                 id=m.id, source="project_memory", source_label=SOURCE_LABELS["project_memory"],
@@ -117,7 +121,9 @@ class ExperienceService:
                 identity_id=m.identity_id,
                 occurred_at=m.created_at,
             )
-            for m in self.db.scalars(q.limit(_PER_SOURCE_CAP))
+            for m in self.project_memory_repo.list_by_user(
+                self.user_id, limit=_PER_SOURCE_CAP
+            )
         )
 
         # ---------- 过滤 + 归并（内存；数据量个人规模可忽略）----------
