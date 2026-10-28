@@ -156,22 +156,22 @@ frontend/src/
 
 | 场景 | 命令（任选其一） | 端口 | 数据目录 |
 |---|---|---|---|
-| 环境初始化（仅首次） | `setup.bat` ＝ `ops\setup.ps1` | — | — |
-| 开发 | `start-dev.bat` ＝ `ops\start.ps1 -Mode dev` | 8765(--reload) + 5173 | `var\data` |
+| 环境初始化（仅首次） | `setup.bat` ＝ `ops/setup.ps1` | — | — |
+| 开发 | `start-dev.bat` ＝ `ops/start.ps1 -Mode dev` | 8765(--reload) + 5173 | `var\data` |
 | 演示（丰富示例数据） | `start-demo.bat` ＝ `-Mode demo` | 8765 + 5173 | `var\demo`（缺库自动 seed） |
 | 手机 / 局域网 | `start-mobile.bat` ＝ `-Mode mobile` | 8765(回环) + **3000**(对外) | `var\data` |
 
 ```powershell
 # 三种模式都可以先"预演"：只打印将要执行的命令 / 环境变量，不启动进程
-powershell -ExecutionPolicy Bypass -File ops\start.ps1 -Mode dev    -WhatIf
-powershell -ExecutionPolicy Bypass -File ops\start.ps1 -Mode demo   -WhatIf
-powershell -ExecutionPolicy Bypass -File ops\start.ps1 -Mode mobile -WhatIf
+powershell -ExecutionPolicy Bypass -File ops/start.ps1 -Mode dev    -WhatIf
+powershell -ExecutionPolicy Bypass -File ops/start.ps1 -Mode demo   -WhatIf
+powershell -ExecutionPolicy Bypass -File ops/start.ps1 -Mode mobile -WhatIf
 
 # 分支开发：数据目录隔离（相对仓库根，会被转成绝对 Windows 路径）
-powershell -ExecutionPolicy Bypass -File ops\start.ps1 -Mode dev -DataDir .\var\data-branch
+powershell -ExecutionPolicy Bypass -File ops/start.ps1 -Mode dev -DataDir .\var\data-branch
 
 # 兼容旧入口（等价于 -Mode dev [-DataDir]，仅供既有文档/肌肉记忆使用）
-powershell -ExecutionPolicy Bypass -File scripts\dev.ps1 -DataDir .\var\data-branch
+powershell -ExecutionPolicy Bypass -File scripts/dev.ps1 -DataDir .\var\data-branch
 ```
 
 > 启动器会做这些校验（都只在这一处实现）：项目 venv 是否存在、能否 `import uvicorn/fastapi`、
@@ -227,7 +227,7 @@ Remove-Item "C:\Users\21722\qimingxing-git-repo\*.lock" -Force
 
 ### Q: 后端启动报 `ModuleNotFoundError: app`？
 A: `app` 包只在 `backend\` 下，而 uvicorn 以 **CWD** 为 import 根 —— 所以必须让 CWD=`backend\`。
-   用一键启动器即可（`ops\start.ps1` 已固定后端 CWD，并统一用 `backend\.venv` 的解释器）；
+   用一键启动器即可（`ops/start.ps1` 已固定后端 CWD，并统一用 `backend\.venv` 的解释器）；
    手动排障时请 `cd backend` 后再跑 `.venv\Scripts\python.exe -m uvicorn app.main:app ...`，
    **不要**在仓库根直接跑 `python -m uvicorn app.main:app`。
 

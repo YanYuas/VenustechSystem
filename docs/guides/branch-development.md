@@ -137,10 +137,10 @@ git status                    # 期望：除了 .workbuddy/ 无其他待提交�
 git checkout -b feature/eo-kernel-fusion
 
 # ---------- 2. 启动（推荐：一键脚本 + 独立数据目录）----------
-# 唯一实现是 ops\start.ps1；scripts\dev.ps1 只是兼容转发壳（等价写法）
-powershell -ExecutionPolicy Bypass -File ops\start.ps1 -Mode dev -DataDir .\data-fusion
+# 唯一实现是 ops/start.ps1；scripts/dev.ps1 只是兼容转发壳（等价写法）
+powershell -ExecutionPolicy Bypass -File ops/start.ps1 -Mode dev -DataDir .\data-fusion
 # 只想看它会做什么、不启动进程：
-powershell -ExecutionPolicy Bypass -File ops\start.ps1 -Mode dev -DataDir .\data-fusion -WhatIf
+powershell -ExecutionPolicy Bypass -File ops/start.ps1 -Mode dev -DataDir .\data-fusion -WhatIf
 
 # 或者手动分两个终端：
 # 终端 A：后端（8765，--reload 自动重载；解释器必须用项目 venv）
@@ -154,7 +154,7 @@ npm run dev
 # 浏览器打开 http://localhost:5173  ← 实时看到分支上的改动
 ```
 
-> ✅ 数据目录隔离由 `ops\start.ps1` 的 `-DataDir` 参数提供（`scripts\dev.ps1` 是兼容转发壳，
+> ✅ 数据目录隔离由 `ops/start.ps1` 的 `-DataDir` 参数提供（`scripts/dev.ps1` 是兼容转发壳，
 > 参数原样透传）。相对路径按 `backend\` 解析，实际注入后端的 `VENUSTECH_DATA_DIR` 一定是
 > **绝对 Windows 路径**（Git-Bash 风格 `/d/...` 会丢盘符，导致后端打开另一个空库）。
 > 不传该参数则沿用主库 `var/data/app.db`。
@@ -182,7 +182,7 @@ npm run dev
 
 唯一的门槛曾经是真实库被纳入版本控制（当时在 `backend` 的 `data/` 下），会让"切分支"变成"切数据"。
 该文件已于 2026-09-15 执行 `git rm --cached` 移出版本控制（见 `CONTRIBUTING.md` 数据与产物章节），
-现在只需用 `VENUSTECH_DATA_DIR`（或 `ops\start.ps1 -DataDir`）给分支独立数据库。
+现在只需用 `VENUSTECH_DATA_DIR`（或 `ops/start.ps1 -DataDir`）给分支独立数据库。
 
 ---
 

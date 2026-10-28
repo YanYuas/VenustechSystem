@@ -51,6 +51,19 @@ HEADING = re.compile(r"^(#{1,6})\s+(.*)$", re.MULTILINE)
 
 SKIP_PREFIXES = ("http://", "https://", "mailto:", "tel:", "data:", "#", "//")
 
+# 运行期数据在 var/（整目录 gitignore）。文档当然要写它（用户要知道库在哪），
+# 但 CI 的干净克隆里必然不存在 —— 不能当成"失效路径"。
+RUNTIME_PREFIXES = ("var/",)
+
+
+def normalize_path(p: str) -> str:
+    r"""Windows 反斜杠写法在 Linux runner 上会被当成普通字符。
+
+    文档里 ops\start.ps1 这类反斜杠写法很自然，统一归一为 / 后再做存在性判断，
+    保证同一份文档在 Windows 与 Linux 上结论一致。
+    """
+    return p.replace("\\", "/")
+
 
 def md_files(extra_all: bool) -> list[Path]:
     files = [ROOT / "README.md"]
@@ -95,7 +108,7 @@ def check_file(path: Path) -> list[str]:
     for target in MD_LINK.findall(text):
         if target.startswith(SKIP_PREFIXES):
             continue
-        clean = unquote(target.split("#")[0])
+        clean = normalize_path(unquote(target.split("#")[0]))
         if not clean:
             continue  # 纯锚点
         dest = (path.parent / clean).resolve()
@@ -105,7 +118,7 @@ def check_file(path: Path) -> list[str]:
             continue
 
     for inline in INLINE_PATH.findall(text):
-        s = inline.strip()
+        s = normalize_path(inline.strip())
         if not s or " " in s or "|" in s:
             continue
         if not s.startswith(TOP_DIRS):
@@ -116,6 +129,8 @@ def check_file(path: Path) -> list[str]:
             continue
         # 允许前缀式引用（目录）：去掉末尾 `.`、`:`、`#...`
         probe = re.split(r"[:#]", s)[0].rstrip(".")
+        if probe.startswith(RUNTIME_PREFIXES):
+            continue  # 运行期路径（gitignored），允许在文档中出现而不存在于克隆
         if not (ROOT / probe).exists():
             report(inline, "内联路径")
 
