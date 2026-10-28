@@ -86,6 +86,21 @@ backend/pytest-of-*/
 tmp?????????/
 backend/venustech_smoke/
 backend/tmp*/
+backend/.arch-audit-x/
+
+# ---------- 本地工作区垃圾（结构契约见 scripts/audit_workspace_hygiene.py） ----------
+# 说明：var/* 已经覆盖整个 var/，下面几条是"显式声明"——审计与后来者一眼能看出
+# 哪些目录是"可随时删除的本地垃圾"，而不是被一条通配符默默吞掉。
+# --fix-local 只清理这一节的模式（以及 var/ 顶层散落文件），绝不碰 data/demo/legacy/backups。
+var/pytest-*/
+var/pytest-basetemp/
+var/.ruff-*/
+var/rebuild/
+var/tools/
+var/junk/
+var/probe-ps/
+var/sandbox_patch/
+
 
 # ---------- 本地工具状态（智能体记忆/会话数据，非项目源码） ----------
 .workbuddy/
@@ -95,6 +110,16 @@ backend/tmp*/
 .qm-token
 *.pem
 *.key
+
+# ---------- 测试覆盖率产物（pytest-cov / vitest；测试产物，可安全删除） ----------
+# 为什么显式写：后台并行 pytest-cov 会在 backend/ 生成一堆 .coverage.<machine>.<pid>.<rand>，
+# vitest --coverage 会生成 frontend/coverage/。它们默认不在 git 跟踪里，但没人忽略时
+# 一次 `git add -A` 就会入库（而且体积不小）。
+.coverage
+.coverage.*
+coverage/
+coverage.xml
+htmlcov/
 
 # ---------- 临时文件（构建/调试/提交信息） ----------
 backend/smoke_out.txt

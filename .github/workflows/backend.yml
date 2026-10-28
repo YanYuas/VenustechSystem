@@ -119,6 +119,20 @@ jobs:
         # -p no:cacheprovider：不写 .pytest_cache（runner 上无意义且会弄脏工作区）
         run: python -m pytest tests -q -p no:cacheprovider --tb=short
 
+      # Phase5 测试质量基建：覆盖率报告步骤。
+      # 口径：**只报告、不设 hard fail**（暂无 --cov-fail-under，先积累基线，
+      # 待覆盖率稳定后再单独决策是否设阈值）。与本地完全同一条命令：
+      #   pytest tests -q --cov=app --cov-report=term-missing
+      # continue-on-error：覆盖率基础设施自身失败（插件缺失等）不应阻断 PR 门禁。
+      - name: Coverage report (non-blocking)
+        if: always()
+        continue-on-error: true
+        working-directory: backend
+        timeout-minutes: 20
+        run: |
+          python -m pytest tests -q -p no:cacheprovider --tb=short \
+            --cov=app --cov-report=term-missing
+
       - name: Backend smoke (end-to-end + migration + regression)
         working-directory: backend
         timeout-minutes: 8

@@ -30,13 +30,15 @@ api  →  services  →  repositories  →  models
 ## 3. 提交前必须过
 
 ```bash
-python scripts/check_all.py --strict     # 15 项全绿（CI 同款）
+python scripts/check_all.py --strict     # 16 项全绿（CI 同款）
 ```
 
 单项速查：
 
 ```bash
 python scripts/audit_architecture.py          # 架构守护
+python scripts/audit_workspace_hygiene.py     # 目录卫生（tracked 泄漏/ignore 契约/root·var 白名单）
+python scripts/audit_workspace_hygiene.py --fix-local  # 清理本地垃圾（不碰 data/demo/legacy/backups）
 cd backend && python -m ruff check app tests  # 后端 lint（ruff 0.6.2，正确性规则 E4/E7/E9/F）
 cd backend && python -m pytest tests -q  # 后端测试（pytest 在 requirements-dev.txt）
 cd frontend && npm run lint && npm run format:check && npm run typecheck && npm test

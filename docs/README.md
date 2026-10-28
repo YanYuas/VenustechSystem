@@ -112,6 +112,7 @@
 | 场景 | 入口 |
 |---|---|
 | 备份与恢复（人工步骤 + 备份契约） | [runbooks/backup.md](runbooks/backup.md)（含 `ops/backup-git.ps1` 的 Git 全历史 bundle 备份） |
+| 启动与自检（dev/demo/mobile/setup + `-Verify`） | [runbooks/startup.md](runbooks/startup.md) |
 | **真实数据库被提交进 Git 历史（P0）** | [runbooks/security-incident-db-leak.md](runbooks/security-incident-db-leak.md) |
 | 访问令牌轮换（手机端配对） | `cd ops/server && npm run token:rotate` · 见 [README.md](../README.md) 部署章节 |
 | 一键启动（开发 / 演示 / 移动端） | 仓库根 `start-dev.bat` / `start-demo.bat` / `start-mobile.bat`（薄转发壳）→ 唯一实现 [ops/start.ps1](../ops/start.ps1)（`-Mode dev\|demo\|mobile [-DataDir] [-WhatIf]`） |

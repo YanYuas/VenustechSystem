@@ -2,7 +2,7 @@
 # 仓库守护 CI（GitHub Actions）
 #
 # 为什么需要（证据：.arch-audit/reports/ops-docs.md §7）：
-#   这些守护脚本（版本一致性 / 日志格式 / 测试质量 / 交付物 / 文档链接）
+#   这些守护脚本（版本一致性 / 日志格式 / 测试质量 / 交付物 / 文档链接 / 工作区结构）
 #   全部写在 scripts/ 下、由 check_all.py 串起来，但**只有人手动跑才会跑**。
 #   本项目最重要的工程教训是：一条铁律如果不能变成「CI 上会变红」的检查，
 #   它一定会被再犯（永真断言 or True 曾被称已删除却仍在代码里）。
@@ -70,6 +70,12 @@ jobs:
       - name: 交付物守护（一键脚本规范 / 冒烟水分）
         if: always()
         run: python scripts/audit_delivery.py
+
+      # 工作区结构：tracked 泄漏 + .gitignore 契约（CI 干净克隆里没有本地 var/ 数据，
+      # 所以 --ci 只查这两项；根目录/var 白名单是本地模式专属，见脚本 docstring）。
+      - name: 工作区结构守护（tracked 泄漏 / .gitignore 契约）
+        if: always()
+        run: python scripts/audit_workspace_hygiene.py --ci
 
       # ⚠️ 依赖 Lead 待交付脚本 scripts/audit_docs_links.py（文档 IA 重组配套产物）。
       # 缺失时显式失败是**预期行为**：门禁不可以「脚本不在就悄悄跳过」。

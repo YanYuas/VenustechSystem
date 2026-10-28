@@ -79,8 +79,14 @@ backend/app/
 
 ### 3.4 测试
 
-- pytest，测试放 `backend/tests/`
-- 当前 4 个测试文件，覆盖率待提升
+- pytest，测试放 `backend/tests/`（当前 60 个测试文件；最新条数以 `pytest --collect-only -q` 为准）
+- **测试规范唯一入口**：[`backend/tests/README.md`](../../backend/tests/README.md)（分层/命名/AAA/夹具/null 语义/覆盖率/慢测试登记）
+- 覆盖率（本地与 CI 同一条命令，CI 只报告不 hard fail）：
+
+```bash
+cd backend
+python -m pytest tests -q --cov=app --cov-report=term-missing
+```
 
 ## 4. 前端规范（Vue 3 + TypeScript）
 
@@ -216,6 +222,39 @@ python scripts/audit_hardcoded_colors.py
 # 版本检查
 python scripts/check_versions.py
 ```
+
+### 本地目录卫生（var/ 与本地垃圾）
+
+`git status` 永远是干净的 —— 因为 `.gitignore` 把 `var/`、`backend/*cache` 全忽略了。
+代价是：**垃圾会悄悄堆到几个 GB**（2026-10-28 实测 var/ 下 24 个 pytest basetemp ≈160MB、
+`.ruff-install` 32MB）。所以目录也有一条可执行规则：
+
+```bash
+# 检查：tracked 泄漏 / .gitignore 契约 / 根目录与 var/ 白名单
+python scripts/audit_workspace_hygiene.py
+
+# 清理：只删"明确废弃"的本地垃圾（pytest basetemp、ruff/pytest 缓存、
+# var/rebuild、var/tools、var/junk、backend/venustech_smoke 等）
+python scripts/audit_workspace_hygiene.py --fix-local
+
+# CI / 干净克隆：只查 tracked 泄漏 + ignore 契约（没有本地数据可查）
+python scripts/audit_workspace_hygiene.py --ci
+```
+
+**什么时候跑 `--fix-local`**：跑完大规模 pytest / check_all 之后、切分支前、
+发现磁盘占用异常时。它**绝不删除** `var/data`、`var/demo`、`var/legacy`、`var/backups`、
+`backend/.legacy-data-*`（数据回滚兜底，只打印"确认后可手动删"）。
+
+**var/ 顶层白名单**：`data/ demo/ legacy/ backups/ logs/ tmp/`（+ `.gitkeep`）。
+新东西要么放进这几个目录（临时文件进 `var/tmp/`），要么就别放在 `var/`。
+其中 `var/logs/` 是启动器/服务日志目录：白名单内、`--fix-local` **不删**，需要时手动清旧日志。
+
+**测试覆盖率产物**（`backend/.coverage*`、`frontend/coverage/`、`htmlcov/`）属测试产物，
+`.gitignore` 已覆盖；本地跑完 coverage 后 `--fix-local` 会一并清掉（可安全删除）。
+
+> Windows 提示：若 `--fix-local` 报 `🔒 无法访问`，说明该目录由**别的沙箱会话**创建
+> （ACL 只授予了创建者），本会话连 `rd /s` / `takeown` 都会被拒绝。脚本会打印
+> 一条 `rd /s /q "..."` 命令，到「完全权限」会话执行即可；CI 与干净克隆不会遇到。
 
 ## 9. 常见问题
 

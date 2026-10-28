@@ -308,6 +308,7 @@ interface ApiResponse<T> {
 | v1.1 | 2026-09-04 | 一期打磨收尾：①补全文件夹管理UI（创建/重命名/删除/层级导航）②补全对话删除功能 ③通知点击跳转（按类型路由到对应页面）④首页一屏自适应优化 ⑤useDocument新增文件夹CRUD方法 ⑥useConversation新增deleteConversation方法 ⑦TypeScript严格模式零错误验证 ⑧生产构建成功验证（5.08s） |
 | v1.3 | 2026-10-27 | 目录分层重构：`kernel/`（http/ui/offline/device/async）+ `shared/`（设计系统/主题/常量/指令）+ `features/<domain>/`（27 个领域，唯一所有权落点），旧按类型目录已删除；引入 ESLint 9 flat + Prettier 并纳入 CI，其中 ESLint 用 `no-restricted-imports` 强制 ADR-0007 分层边界 |
 | v1.2 | 2026-10-11 | 引入单元测试体系（vitest + jsdom）并修 3 处缺陷：①`vitest.config.ts` + `src/test/setup.ts`，4 个 spec / **75 条用例**，纳入 `check_all.py` 第 12 项（11 项 → 12 项）②**修 `useTheme` 的 `isDark` 不响应系统明暗**（computed 依赖里只有 `config`，系统切换时 `data-theme` 变了但 `isDark` 不重算）③**修 `THEME_PACKS` 漏 `epic`**（常量 3 套 vs 类型/useTheme/设置页 4 套）④**修 `useQueryAction` 处理器抛错变成未捕获 Promise rejection**（改为捕获 + 记日志 + 保留 action 参数以便重试） |
+| v1.4 | 2026-10-28 | 测试质量基建（D-13 后续）：接入 `@vitest/coverage-v8` + `npm run test:coverage`（v8 provider，先观测不设阈值），新增 kernel/http、kernel/offline、shared 与 features composable 的一批行为测试；CI 增加覆盖率步骤（`continue-on-error`，只观测） |
 
 ## 八、Lint 与格式化（D-13）
 
@@ -325,6 +326,37 @@ npm run typecheck     # vue-tsc --noEmit
 > **多语句**打印成换行分隔（无分号），Vue 编译器会报
 > `Error parsing JavaScript expression` 导致构建失败。
 > 约定：**Vue 模板内联事件处理器必须是单次调用/单表达式**；多语句一律抽成命名函数后 `@click="onXxx(...)"`。
+
+## 九、测试与覆盖率（Phase 5）
+
+```bash
+npm test              # vitest run（CI 门禁：必须全绿）
+npm run test:watch    # 监听模式（本地开发）
+npm run test:coverage # 覆盖率报告（v8；text + json-summary，输出到 frontend/coverage/）
+```
+
+### 分层
+
+| 层 | 是否要求单测 | 说明 |
+|---|---|---|
+| `kernel/**` | **要求** | 纯逻辑/传输语义：http 错误映射与重试、SSE 解析、离线队列重放、async 状态机 |
+| `shared/**` | **要求** | 设计系统纯逻辑、composables（自动保存/路由动作/主题） |
+| `features/*/**`（api/model/composables） | **要求** | 业务编排：成功/失败/空数据/写后 refetch |
+| `features/*/views/**` | 不强制 | 页面级只做路由懒加载冒烟；覆盖率统计中已排除，避免用 DOM 快照凑数 |
+| 生成物 / 样式 | 排除 | `*.d.ts`、`src/styles|shared/styles/**`、`__tests__` 自身不计入 |
+
+### 硬规则
+
+1. **禁止真实网络/后端**：http 层用 `vi.stubGlobal('fetch', ...)` 桩响应；领域 composable 用 `vi.mock('../api')` 只测状态编排；涉及离线队列时注入内存版 `QueueStorage`（不碰 IndexedDB）。
+2. 每条用例只验证**一个行为**，断言落在返回值/状态/副作用上；禁止"只断言存在"的空测试。
+3. 时间相关行为（防抖/重试间隔/定时保存）用 `vi.useFakeTimers()` + `advanceTimersByTimeAsync`，不要 `sleep`。
+4. 新测试放在被测模块同级的 `__tests__/<name>.spec.ts`（vitest include 为 `src/**/__tests__/**/*.spec.ts`）。
+5. **发现业务 bug 先记录、不在测试里顺手改源码**；测试要如实红，用 `it.fails`/跳过并登记，不要写迎合现状的假断言。
+
+### 覆盖率
+
+- provider `v8`，`reporter: ['text', 'json-summary']`；`include: src/**`、排除 views/生成物/样式（见 `vitest.config.ts`）。
+- **CI 只观测、不设阈值**（`continue-on-error`）：先收基线，等整体覆盖率稳定后再把 `thresholds` 升级为门禁。
 
 ---
 

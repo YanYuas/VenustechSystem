@@ -17,6 +17,8 @@
   运行期数据统一放仓库根 var/（见 ARCHITECTURE.md §7 / ADR-0004）：
     var\data 真实库 · var\demo 演示库 · var\legacy 历史副本。
   数据目录可由 -DataDir 覆盖；相对路径一律按**仓库根**解析。
+  子进程日志：var\logs\<时间>-<服务>.out.log / .err.log
+  自检：-Verify（真启动 → 健康检查 → 自动停止 → 退出码 0/1）。
 
   所有校验（venv 是否存在 / 依赖能否 import / node_modules / 端口占用 /
   前端 dist 是否需要构建 / 演示库是否需要 seed）都只在这里实现一次；
@@ -34,7 +36,17 @@
   只打印将要执行的命令 / 环境变量 / 前置检查结果，不启动任何进程。
   （幂等、可重复执行，供 CI 与人工核对。）
 
+.PARAMETER Verify
+  真启动、真等端口/健康检查、然后自动停止：全部通过退出码 0，否则 1。
+  非交互环境（CI/重定向）会自动跳过浏览器与"按回车停止"。
+  子进程日志写到 var\logs\<时间>-<服务>.out.log / .err.log。
+
 .EXAMPLE
+
+.PARAMETER Verify
+   真启动、真等端口/健康检查、然后自动停止：全部通过退出码 0，否则 1。
+   非交互环境（CI/重定向）会自动跳过浏览器与"按回车停止"。
+   子进程日志写到 var\logs\<时间>-<服务>.out.log / .err.log。
   powershell -ExecutionPolicy Bypass -File ops\start.ps1 -Mode dev
 .EXAMPLE
   powershell -ExecutionPolicy Bypass -File ops\start.ps1 -Mode demo -WhatIf
@@ -48,7 +60,11 @@ param(
 
     [string]$DataDir = '',
 
-    [switch]$WhatIf
+    [switch]$WhatIf,
+
+    # 启动 → 等端口/健康检查 → 自动停止 → 退出码 0/1。用于本地自检与 CI 冒烟，
+    # 避免"脚本看起来能跑、其实子进程没起来"的假绿。
+    [switch]$Verify
 )
 
 # ------------------------------------------------------------------
@@ -62,6 +78,8 @@ $script:BackendPort = 8765
 $script:FrontendPort = 5173
 $script:ServerPort = 3000
 $script:IsWhatIf = [bool]$WhatIf
+$script:IsVerify = [bool]$Verify
+$script:LogDir = Join-Path $Root 'var\logs'
 $script:Launched = New-Object System.Collections.ArrayList
 $script:StopHint = 'Press Enter to stop the services started by this launcher...'
 
@@ -82,8 +100,8 @@ function Write-Plan([string]$Text) { Write-Host "  [WHATIF] $Text" -ForegroundCo
 function Write-Step([string]$Text) { Write-Host "[$Text]" -ForegroundColor Yellow }
 
 function Test-ConsoleInteractive {
-    # -WhatIf 永不暂停；被重定向（CI / 管道）时不暂停
-    if ($script:IsWhatIf) { return $false }
+    # -WhatIf / -Verify 永不暂停；被重定向（CI / 管道）时不暂停
+    if ($script:IsWhatIf -or $script:IsVerify) { return $false }
     try { return (-not [Console]::IsInputRedirected) } catch { return $false }
 }
 
@@ -193,9 +211,23 @@ function Start-ServiceProcess([string]$Exe, [string[]]$ArgList, [string]$Working
         Show-PlannedCommand $Exe $ArgList $WorkingDirectory $Label
         return $null
     }
-    $proc = Start-Process -FilePath $Exe -ArgumentList $ArgList -WorkingDirectory $WorkingDirectory -PassThru
+    # 为什么必须显式重定向 stdout/stderr：
+    #   裸 Start-Process 会为控制台子进程新建窗口；当启动器自身的标准流被重定向
+    #   （CI / 管道 / 隐藏窗口 / 远程 shell）时，这个"新建控制台"会死锁 ——
+    #   实测 python.exe 卡在 Start-Process 里不再返回，后端永远起不来。
+    #   显式给子进程文件句柄后不再依赖新窗口，且日志可复查。
+    if (-not (Test-Path -LiteralPath $script:LogDir)) {
+        New-Item -ItemType Directory -Path $script:LogDir -Force | Out-Null
+    }
+    $safeLabel = ($Label -replace '[^A-Za-z0-9_-]', '-')
+    $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+    $outLog = Join-Path $script:LogDir ("{0}-{1}.out.log" -f $stamp, $safeLabel)
+    $errLog = Join-Path $script:LogDir ("{0}-{1}.err.log" -f $stamp, $safeLabel)
+    $proc = Start-Process -FilePath $Exe -ArgumentList $ArgList -WorkingDirectory $WorkingDirectory `
+        -PassThru -WindowStyle Hidden -RedirectStandardOutput $outLog -RedirectStandardError $errLog
     [void]$script:Launched.Add($proc)
     Write-Ok ("{0} started (PID {1})" -f $Label, $proc.Id)
+    Write-Info ("log: {0}" -f $outLog)
     return $proc
 }
 
@@ -210,21 +242,74 @@ function Stop-Launched {
         }
     }
     $script:Launched.Clear()
+    # 等端口真正释放（taskkill 返回后 Windows 仍可能短暂占用），
+    # 否则紧接着的 -Verify/重启会误判"端口被占用"。
+    foreach ($port in @($script:BackendPort, $script:FrontendPort, $script:ServerPort)) {
+        $deadline = (Get-Date).AddSeconds(15)
+        while ((Test-PortListening $port) -and ((Get-Date) -lt $deadline)) {
+            Start-Sleep -Milliseconds 300
+        }
+    }
     Write-Ok 'services stopped'
+}
+
+function Wait-UntilListening([int]$Port, [int]$TimeoutSeconds, [string]$Label) {
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    while ((Get-Date) -lt $deadline) {
+        if (Test-PortListening $Port) { return $true }
+        Start-Sleep -Milliseconds 500
+    }
+    return (Test-PortListening $Port)
+}
+
+function Test-HttpOk([string]$Url) {
+    try {
+        $resp = Invoke-WebRequest -Uri $Url -UseBasicParsing -TimeoutSec 5 -ErrorAction Stop
+        return ($resp.StatusCode -ge 200 -and $resp.StatusCode -lt 400)
+    } catch {
+        return $false
+    }
+}
+
+function Assert-ServiceHealthy([int]$Port, [string]$Label, [string]$HealthUrl = '', [int]$TimeoutSeconds = 90) {
+    if (-not (Wait-UntilListening $Port $TimeoutSeconds $Label)) {
+        Write-Host ("  [VERIFY-FAIL] {0}: port {1} not listening after {2}s" -f $Label, $Port, $TimeoutSeconds) -ForegroundColor Red
+        return $false
+    }
+    if ($HealthUrl -ne '') {
+        if (-not (Test-HttpOk $HealthUrl)) {
+            Write-Host ("  [VERIFY-FAIL] {0}: port {1} open but {2} not healthy" -f $Label, $Port, $HealthUrl) -ForegroundColor Red
+            return $false
+        }
+        Write-Ok ("[VERIFY] {0}: listening :{1} + healthy {2}" -f $Label, $Port, $HealthUrl)
+    } else {
+        Write-Ok ("[VERIFY] {0}: listening :{1}" -f $Label, $Port)
+    }
+    return $true
+}
+
+function Write-VerifySummary([string]$ModeName, [bool]$Ok) {
+    Write-Host ''
+    if ($Ok) {
+        Write-Host ("[VERIFY] PASS: {0} (services started, checked, stopped)" -f $ModeName) -ForegroundColor Green
+    } else {
+        Write-Host ("[VERIFY] FAIL: {0} (see var\logs for child process errors)" -f $ModeName) -ForegroundColor Red
+    }
 }
 
 function Wait-ForServices([int]$Seconds, [int]$Port, [string]$Label) {
     if ($script:IsWhatIf) {
-        Write-Plan ("would sleep {0}s, then check port {1} ({2})" -f $Seconds, $Port, $Label)
-        return
+        Write-Plan ("would wait up to {0}s for port {1} ({2})" -f $Seconds, $Port, $Label)
+        return $true
     }
-    Write-Info ("waiting {0}s for {1} ..." -f $Seconds, $Label)
-    Start-Sleep -Seconds $Seconds
-    if (-not (Test-PortListening $Port)) {
-        Write-Note ("port {0} is not listening yet - check the {1} window for errors" -f $Port, $Label)
+    Write-Info ("waiting up to {0}s for {1} ..." -f $Seconds, $Label)
+    $ok = Wait-UntilListening $Port $Seconds $Label
+    if (-not $ok) {
+        Write-Note ("port {0} is not listening yet - see var\logs for the {1} log" -f $Port, $Label)
     } else {
         Write-Ok ("{0} listening on port {1}" -f $Label, $Port)
     }
+    return $ok
 }
 
 function Open-Browser([string]$Url) {
@@ -232,7 +317,11 @@ function Open-Browser([string]$Url) {
         Write-Plan "would open browser: $Url"
         return
     }
-    Start-Process $Url
+    if ($script:IsVerify -or -not (Test-ConsoleInteractive)) {
+        Write-Info ("browser not opened (non-interactive/-Verify): {0}" -f $Url)
+        return
+    }
+    Start-Process $Url | Out-Null
 }
 
 function Wait-ForEnterThenStop {
@@ -284,7 +373,14 @@ function Start-DevMode {
     if ($null -ne $effectiveDataDir) { Remove-Item Env:\VENUSTECH_DATA_DIR -ErrorAction SilentlyContinue }
 
     Write-Step '3/3'
-    [void](Wait-ForServices 8 $BackendPort 'backend FastAPI')
+    if ($script:IsVerify) {
+        $backendOk = Assert-ServiceHealthy $BackendPort 'backend FastAPI' "http://127.0.0.1:$BackendPort/api/v1/health"
+        $frontendOk = Assert-ServiceHealthy $FrontendPort 'frontend Vite'
+        Write-VerifySummary 'dev' ($backendOk -and $frontendOk)
+        Stop-Launched
+        exit ([int](-not ($backendOk -and $frontendOk)))
+    }
+    [void](Wait-ForServices 60 $BackendPort 'backend FastAPI')
     Open-Browser "http://localhost:$FrontendPort"
     Write-Section 'DEV started'
     Write-Info "Backend : http://127.0.0.1:$BackendPort"
@@ -358,7 +454,14 @@ function Start-DemoMode {
     [void](Start-ServiceProcess 'npm.cmd' @('run', 'dev') $Frontend 'frontend Vite')
 
     Write-Step '3/3'
-    [void](Wait-ForServices 10 $BackendPort 'demo backend')
+    if ($script:IsVerify) {
+        $backendOk = Assert-ServiceHealthy $BackendPort 'demo backend FastAPI' "http://127.0.0.1:$BackendPort/api/v1/health"
+        $frontendOk = Assert-ServiceHealthy $FrontendPort 'frontend Vite'
+        Write-VerifySummary 'demo' ($backendOk -and $frontendOk)
+        Stop-Launched
+        exit ([int](-not ($backendOk -and $frontendOk)))
+    }
+    [void](Wait-ForServices 60 $BackendPort 'demo backend')
     Open-Browser "http://localhost:$FrontendPort"
 
     Write-Section 'DEMO started'
@@ -452,7 +555,19 @@ function Start-MobileMode {
     [void](Start-ServiceProcess $py.Path $backendArgs $Backend 'backend FastAPI (loopback)')
     if ($null -ne $effectiveDataDir) { Remove-Item Env:\VENUSTECH_DATA_DIR -ErrorAction SilentlyContinue }
 
-    [void](Wait-ForServices 5 $BackendPort 'backend FastAPI')
+    if ($script:IsVerify) {
+        $backendOk = Assert-ServiceHealthy $BackendPort 'backend FastAPI (loopback)' "http://127.0.0.1:$BackendPort/api/v1/health"
+        $serverJsForVerify = Join-Path $Root 'ops\server\server.js'
+        if ($null -ne $token.Token) { $env:QM_TOKEN = $token.Token }
+        [void](Start-ServiceProcess $node @($serverJsForVerify) $Root 'edge server :3000')
+        Remove-Item Env:\QM_TOKEN -ErrorAction SilentlyContinue
+        $edgeOk = Assert-ServiceHealthy $ServerPort 'edge server'
+        Write-VerifySummary 'mobile' ($backendOk -and $edgeOk)
+        Stop-Launched
+        exit ([int](-not ($backendOk -and $edgeOk)))
+    }
+
+    [void](Wait-ForServices 60 $BackendPort 'backend FastAPI')
 
     Write-Step '2/2'
     Write-Host ''

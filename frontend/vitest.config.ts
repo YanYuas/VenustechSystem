@@ -35,5 +35,25 @@ export default defineConfig({
     restoreMocks: true,
     // 不隐藏 console.warn（项目里有意为之的告警要看得见）
     silent: false,
+    // 覆盖率：先观测、不设阈值（CI 不 hard fail，见 .github/workflows/frontend.yml）
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json-summary'],
+      reportsDirectory: './coverage',
+      // 统计 src 下全部实现代码；测试自身与生成物不计入
+      include: ['src/**/*.{ts,vue}'],
+      exclude: [
+        'src/**/*.d.ts',
+        'src/main.ts',
+        'src/app/main.ts',
+        'src/**/views/**',
+        'src/**/__tests__/**',
+        'src/auto-imports.d.ts',
+        'src/components.d.ts',
+        'src/env.d.ts',
+        'src/shared/styles/**',
+        'src/**/README.md',
+      ],
+    },
   },
 })

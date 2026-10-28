@@ -91,6 +91,13 @@ jobs:
         timeout-minutes: 10
         run: npm test
 
+      # 覆盖率只观测、不设阈值（先收基线；稳定后再考虑升级为门禁）。
+      # continue-on-error: 覆盖率工具/合并抖动不应阻塞合并。
+      - name: Coverage report (vitest --coverage, observe-only)
+        timeout-minutes: 15
+        continue-on-error: true
+        run: npm run test:coverage
+
       - name: Build (vite build)
         timeout-minutes: 10
         run: npm run build

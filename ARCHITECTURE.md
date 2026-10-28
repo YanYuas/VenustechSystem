@@ -241,6 +241,10 @@ VenustechSystem/
 │   ├── design/                 UI 画廊与参考图
 │   └── assets/                 截图
 ├── var/                        运行期数据约定（gitignored，见 §7）
+│   ├── data/ demo/ legacy/     真实库 / 演示库 / 历史副本（**禁止删除**）
+│   ├── backups/                本地备份产物（**禁止删除**，另需复制到仓库外）
+│   ├── logs/ tmp/              日志与临时文件（tmp 可清）
+│   └── .gitkeep                唯一入库的占位文件（保持目录结构）
 ├── .github/workflows/          CI：backend / frontend / repo-guard / android-build
 ├── ARCHITECTURE.md             ★ 本文（架构唯一权威）
 ├── VERSION                     ★ 版本单一事实来源
@@ -248,6 +252,14 @@ VenustechSystem/
 ```
 
 **根目录契约**：根目录只允许上表列出的条目；新增根级文件前先想清楚它属于哪一层（源码→backend/frontend，运维→ops，脚本→scripts，文档→docs，数据→var）。由守护规则 R9 强制。
+
+**工作区卫生契约**（`scripts/audit_workspace_hygiene.py`，check_all 第 16 项 / repo-guard CI）：
+- **tracked 泄漏**：`git ls-files` 不得含数据库 / 密钥 / 令牌 / `node_modules` / `dist` / `var` 运行期文件（唯一例外 `var/.gitkeep`）。
+- **ignore 契约**：关键路径必须真的被 `.gitignore` 忽略（用 `git check-ignore` 做语义校验，不是 grep 文本）；`var/.gitkeep` 必须未被忽略。
+- **根目录**：除 `domains.json.root_contract`（含 `ignored_dirs`）外不得出现未登记条目（本地模式）。
+- **var/ 顶层白名单**：只允许 `data/ demo/ legacy/ backups/ logs/ tmp/`；`pytest-*`、`.ruff-*`、`rebuild`、`tools`、`junk` 等属垃圾（本地模式）。`var/logs/` 是启动器/服务日志目录，保留且 `--fix-local` **不删**（需要时手动清旧日志）。
+- **测试覆盖率产物**：`backend/.coverage*`（pytest-cov 并行数据）、`frontend/coverage/`、`coverage/`、`htmlcov/`、`coverage.xml` 必须被忽略；本地存在时提示，`--fix-local` 可清理（属测试产物，可安全删除）。
+- **清理**：`python scripts/audit_workspace_hygiene.py --fix-local` 只删"明确废弃"的本地垃圾，**绝不**碰 `var/data`、`var/demo`、`var/legacy`、`var/backups`、`var/logs`、`backend/.legacy-data-*`（只提示）。CI 干净克隆只跑 tracked + ignore 两项（`--ci`）。
 
 ---
 
@@ -294,7 +306,7 @@ VenustechSystem/
 7. **路由**：`api/<module>.py`，并在 `api/__init__.py` 注册（R5 失败会提示）。
 8. **前端**：`types/<module>.ts` → `api/<module>.ts` → `composables/use<Module>.ts` → `views/<Module>/` → 路由 + `domains.json.frontend_views`。
 9. **测试**：至少 `tests/test_<module>_api.py`（API 形状）+ `test_<module>_production.py`（真实行为/边界）。
-10. **验证**：`python scripts/check_all.py`（13 项全绿）。
+10. **验证**：`python scripts/check_all.py`（16 项全绿）。
 11. **记账**：CHANGELOG + 需要时 `docs/architecture/ADR/`。
 12. **收口**：`python scripts/audit_architecture.py` 必须 0 新增违规。
 
@@ -302,7 +314,7 @@ VenustechSystem/
 
 ## 9. 质量门禁与验证
 
-**唯一验证入口**：`python scripts/check_all.py`（15 项）；CI 必须 `--strict`（缺依赖=失败，不给假绿）。
+**唯一验证入口**：`python scripts/check_all.py`（16 项）；CI 必须 `--strict`（缺依赖=失败，不给假绿）。
 
 | 守护 | 命令 | 守什么 |
 |---|---|---|
@@ -315,6 +327,7 @@ VenustechSystem/
 | 测试质量 | `scripts/audit_test_quality.py` | 永真断言/无断言/吞异常（"缺陷在也全绿"的写法） |
 | 日志格式 | `scripts/audit_log_format.py` | loguru `{}` 占位符（`%s` 会静默丢参数） |
 | 交付物 | `scripts/audit_delivery.py` | 一键脚本真能启动、冒烟不含水分 |
+| 工作区结构 | `scripts/audit_workspace_hygiene.py` | tracked 泄漏 / `.gitignore` 契约 / 根目录与 `var/` 白名单（CI 只查前两项）；`--fix-local` 清本地垃圾，不碰数据兜底目录 |
 | 设计令牌 | `frontend/scripts/audit-tokens.py` | 用了不存在的 CSS 变量 |
 | 前端 lint | `npm run lint` | ESLint 9 flat：正确性 + **ADR-0007 分层边界**（kernel/shared/features 依赖方向） |
 | 前端格式 | `npm run format:check` | Prettier 一致性（`semi:false`；多语句内联 handler 必须抽函数） |
@@ -350,6 +363,11 @@ CI：`.github/workflows/{backend,frontend,repo-guard}.yml` + `android-build.yml`
 | D-14 | P2 | `server.js` 是唯一鉴权点却零测试 | `ops/server/server.js` | ✅ 已修（2026-10-26）：`ops/server/test` 16 用例 + CI edge-server job |
 | D-16 | P2 | `backend/scripts/**` 未纳入 ruff（实测 13 条，含 3 条 F821 疑似真 bug） | `backend/scripts/` | ✅ 已修（2026-10-27）：13 → 0（F541 4 / F401 3 / F821 3 / F841 3）。F821 逐条核实：`seed_demo.seed_tasks` 的 `utcnow()` 是**真 bug**（缺导入，补 `from app.models.base import utcnow`）；`smoke_backend` 两处 `pathlib.Path(...) if 'pathlib' in dir()` 是**死代码**（条件恒 False 且下一行覆盖），删除。门禁三处统一为 `ruff check app tests scripts`（backend.yml / check_all 第 15 项 / pyproject 口径注释） |
 | D-15 | **P0（隐性）** | 架构守护 R1/R2 长期**空转**：`layer_of_file()` 拿仓库相对路径比 `app/` 前缀（永不匹配），且 `TYPE_CHECKING` 豁免标记传入未使用 → `--strict` 恒绿 | `scripts/audit_architecture.py` | ✅ 已修（2026-10-27）：路径基准改为 `backend/`、TYPE_CHECKING 真正豁免；新增 4 条负向 + 2 条回归测试 |
+| D-17 | P1 | `PATCH /auth/me` 传 `pet_position` 必 500：`model_dump()` 后按对象取 `.x`（前端契约有字段但走不通） | `api/auth.py:78-80`；已用 strict xfail 钉住 | Phase 6 |
+| D-18 | P1 | `api/logs.py` 对 stdlib `logging.Logger` 调 `.opt()`（loguru API）→ 清日志失败分支必 AttributeError，掩盖真实失败原因 | `api/logs.py:100` | Phase 6 |
+| D-19 | P2 | `api/logs.py` 读日志错误分支返回裸 dict，绕过统一响应信封（前端契约不一致） | `api/logs.py:57-67` | Phase 6 |
+| D-20 | P1 | `avatar_service` 的 memory / inspiration 写操作无 `user_id` 归属校验（IDOR 隐患；单用户模式掩盖） | `avatar_service.py:85-98,152-180` | Phase 6 |
+| D-21 | P2 | SSE 请求未附加 `X-API-Token`（普通请求会带）→ 启用访问令牌后流式对话可能 401 | `frontend/src/kernel/http/sse.ts:26-31` | Phase 6 |
 
 > 原则：**先修 P0/P1 的"正确性"，再谈结构搬迁**。在事务边界、迁移基线、备份导入还有问题时做领域分包，只是把混乱打包进更漂亮的新目录。
 
@@ -364,6 +382,7 @@ CI：`.github/workflows/{backend,frontend,repo-guard}.yml` + `android-build.yml`
 | **Phase 2** | 收口领域边界 | D-06 仓储收口（156→0，R13）、D-07 sync 下沉（core 0 models 依赖）、D-09 SettingsView 拆分（1701→291）、前端 `kernel/shared/features` + pet 试点（R14）、D-15 守护空转修复 | ✅ 本轮完成（2026-10-27，1282 测试 + 86 前端测试全绿） |
 | **Phase 3** | 可持续交付 | P3 全量迁移（27 域 → features，旧路径 392→0）、P4（8 壳删除 + kernel 依赖归位 + `kernel/http` 拆分）、D-11 启动器单一实现、D-12 备份工具、D-13 前后端 lint 进 CI、ADR-0008 | ✅ 本轮完成（2026-10-27，1284 后端 + 86 前端测试，lint/format/构建全绿） |
 | **Phase 4** | 收尾与交付 | P0-2 泄漏处置（已重建仓库彻底消除）、CI 四 workflow 首跑全绿（修正 runner 上下文 / 文档审计跨平台 / Node 24）、`styles/`+`test/setup` 归位（sass 输出逐字节一致）、D-16 `backend/scripts` 纳入 ruff（13→0，含 1 个真潜伏 bug）、`var/` 数据物理迁移（SHA256+行数校验）、敏感文件守护 `--strict` | ✅ 本轮完成（2026-10-27，1284 后端 + 86 前端测试；**仅剩仓库重建需 delete_repo 权限**） |
+| **Phase 5** | 结构治理 + 测试质量 + 启动可靠性 | 工作区卫生守护（`audit_workspace_hygiene.py`，check_all 16 项，清理 193MB）；后端 pytest-cov 85.18%→88.48%（+166 测试，1450 全绿）；前端 coverage-v8 +49 测试（135 全绿，kernel/http 92.23%）；启动脚本真修：根治 `Start-Process` 新窗口死锁 + `-Verify` 自检 + `var/logs`；登记 D-17~D-21 | ✅ 本轮完成（2026-10-28） |
 
 **明确不做（以及为什么）**：
 

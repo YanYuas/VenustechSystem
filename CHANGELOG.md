@@ -7,6 +7,26 @@
 
 ## [Unreleased]
 
+### Changed — Phase 5：结构治理 + 测试质量 + 启动可靠性（2026-10-28）
+
+**项目文件夹结构治理（可执行契约）**
+- 新增 `scripts/audit_workspace_hygiene.py`（零第三方依赖）：A tracked 泄漏（DB/密钥/token/node_modules/dist/覆盖率产物）、B `.gitignore` 语义契约（26 条示例路径 + `var/.gitkeep` 锚点）、C 根目录契约、D `var/` 顶层白名单（`data/demo/legacy/backups/logs/tmp`）、E 覆盖率产物；支持 `--check` / `--fix-local` / `--ci`，接入 `check_all.py` **第 16 项**与 `repo-guard`。
+- 清理本机 **193MB** 垃圾：24 个 pytest basetemp（≈158MB）、`.ruff-install`（32MB）、`rebuild`/`tools`、backend `.ruff_cache`/`.pytest_cache`/`venustech_smoke`、var/ 顶层散落日志与一次性脚本、覆盖率产物；`var/data|demo|legacy|backups|logs` 与 `backend/.legacy-data-2026-10-27` 全部保留。
+- `.gitignore` 增加本地垃圾与覆盖率产物规则；`var/logs/` 纳入白名单且 `--fix-local` 明确不删。
+- 遗留：7 个空 ACL 目录 + `var/tmp/acl-blocked` 需完全权限会话 `rd /s /q`（均在 gitignored 的 var/ 内，不影响仓库）。
+
+**测试质量基建 + 新测试**
+- 后端：pin `pytest-cov==5.0.0` / `coverage==7.17.0`；覆盖率 **85.18% → 88.48%**（missed 1478→1149）；新增 **166 条**（api 错误路径 44 / core 28 / schemas 51 / service 43），全量 **1449 passed + 1 strict xfail**；3 条负向验证（改错断言必红）；`tests/README.md` 重写为 9 节规范（分层/AAA/断言/禁止真实库/覆盖率命令）；CI 加非阻断覆盖率报告。
+- 前端：`@vitest/coverage-v8` + `test:coverage`；新增 **49 条** → **135 passed / 12 files**（kernel/http 92.23%、shared/composables 89.74%、offline core 100%）；CI 加非阻断覆盖率；`docs/guides/frontend.md` 新增测试与覆盖率章节。
+- 覆盖率口径：前端分母为全量 `src/**/*.{ts,vue}`（views/ 按约定排除）；v8 对未执行文件不产 branch 计数，评估以 **lines** 为主。
+- 测试发现 5 个真问题（只记录未修，登记 D-17~D-21）：`PATCH /auth/me` pet_position 必 500、`api/logs.py` 对 stdlib logger 调 `.opt()`、read_log 错误分支绕过信封、avatar memory/inspiration 无归属校验（IDOR）、SSE 未带 `X-API-Token`。
+
+**启动脚本真修（D-11 后续）**
+- 根因：`Start-Process` 为控制台子进程新建窗口时，在 stdin/stdout 被重定向（CI / 管道 / 隐藏窗口 / 远程 shell）的环境会**死锁** → 后端永远起不来（表现为"卡在 [1/3] 无子进程"）。
+- 修法：子进程 stdout/stderr 显式重定向到 `var/logs/<时间>-<服务>.{out,err}.log`；端口轮询替代固定 sleep；停止后等待端口释放；新增 **`-Verify`**（真启动 → 端口 + `/api/v1/health` → 自动停止 → 退出码 0/1）；非交互不等待回车、不开浏览器。
+- 实测：dev / demo / mobile 三模式 `-Verify` 全部 PASS；`cmd /c start-dev.bat -Verify` **exit 0，15.2s**；停止后 8765/5173/3000 全部释放；`audit_delivery.py` 仍绿。
+- 新增 runbook `docs/runbooks/startup.md`（入口对照 / `-WhatIf` `-Verify` / 日志排障 / 与 CI 边界）。
+
 ### Changed — Phase 3：前端全量分层 + 交付底座（2026-10-27）
 
 本轮把"按类型平铺"的前端彻底迁入领域包，并把启动器/lint/备份治理补齐。**后端 1284 测试、前端 86 测试、lint/format/typecheck/build 全绿。**

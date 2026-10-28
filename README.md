@@ -66,6 +66,9 @@ start-demo.bat
 start-mobile.bat
 ```
 
+> 启动自检：`start-dev.bat -Verify` / `ops\start.ps1 -Mode demo -Verify` —— 真启动、健康检查、自动停止，退出码 0/1。
+> 详见 [docs/runbooks/startup.md](docs/runbooks/startup.md)；子进程日志在 `var/logs/`。
+
 同一个实现也可以直接调用；**`-WhatIf` 只打印将要执行的命令与环境变量，不启动任何进程**：
 
 ```powershell
@@ -102,7 +105,7 @@ node ops/server/server.js        # → http://<本机IP>:3000
 ## 验证（提交前必过）
 
 ```bash
-python scripts/check_all.py          # 13 项一键校验（架构/测试/冒烟/版本/文档链接/审计…）
+python scripts/check_all.py          # 16 项一键校验（架构/测试/冒烟/版本/目录卫生/文档链接/审计…）
 python scripts/check_all.py --strict # CI 用：缺依赖=失败，杜绝"跳过即通过"
 ```
 
@@ -110,6 +113,8 @@ python scripts/check_all.py --strict # CI 用：缺依赖=失败，杜绝"跳过
 
 ```bash
 python scripts/audit_architecture.py       # 架构守护（分层/领域归属/根目录契约）
+python scripts/audit_workspace_hygiene.py  # 目录卫生（tracked 泄漏/ignore 契约/var 白名单）
+python scripts/audit_workspace_hygiene.py --fix-local  # 清理本地垃圾（不碰真实库/备份）
 cd backend && python -m pytest tests -q    # 后端测试
 cd backend && python -m ruff check app tests  # 后端 lint（正确性规则 E4/E7/E9/F）
 cd frontend && npm run typecheck && npm test
