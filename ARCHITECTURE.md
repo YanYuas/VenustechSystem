@@ -363,7 +363,7 @@ CI：`.github/workflows/{backend,frontend,repo-guard}.yml` + `android-build.yml`
 | **Phase 1** | 修正确性 P0/P1 | D-01/03/04/05/08/10/14 ✅ 完成；D-02 ✅ 已评估（runbook + 守护，**远端处置待你执行**）；D-06/07/09 转入 Phase 2 | ✅ 本轮完成（2026-10-26，1229 测试全绿） |
 | **Phase 2** | 收口领域边界 | D-06 仓储收口（156→0，R13）、D-07 sync 下沉（core 0 models 依赖）、D-09 SettingsView 拆分（1701→291）、前端 `kernel/shared/features` + pet 试点（R14）、D-15 守护空转修复 | ✅ 本轮完成（2026-10-27，1282 测试 + 86 前端测试全绿） |
 | **Phase 3** | 可持续交付 | P3 全量迁移（27 域 → features，旧路径 392→0）、P4（8 壳删除 + kernel 依赖归位 + `kernel/http` 拆分）、D-11 启动器单一实现、D-12 备份工具、D-13 前后端 lint 进 CI、ADR-0008 | ✅ 本轮完成（2026-10-27，1284 后端 + 86 前端测试，lint/format/构建全绿） |
-| **Phase 4** | 收尾与交付 | P0-2 泄漏处置（refs/本地历史已清洗；**彻底消除需重建仓库**）、`styles/`+`test/setup` 归位（sass 输出逐字节一致）、D-16 `backend/scripts` 纳入 ruff（13→0，含 1 个真潜伏 bug）、`var/` 数据物理迁移（SHA256+行数校验）、敏感文件守护 `--strict` | ✅ 本轮完成（2026-10-27，1284 后端 + 86 前端测试；**仅剩仓库重建需 delete_repo 权限**） |
+| **Phase 4** | 收尾与交付 | P0-2 泄漏处置（已重建仓库彻底消除）、CI 四 workflow 首跑全绿（修正 runner 上下文 / 文档审计跨平台 / Node 24）、`styles/`+`test/setup` 归位（sass 输出逐字节一致）、D-16 `backend/scripts` 纳入 ruff（13→0，含 1 个真潜伏 bug）、`var/` 数据物理迁移（SHA256+行数校验）、敏感文件守护 `--strict` | ✅ 本轮完成（2026-10-27，1284 后端 + 86 前端测试；**仅剩仓库重建需 delete_repo 权限**） |
 
 **明确不做（以及为什么）**：
 

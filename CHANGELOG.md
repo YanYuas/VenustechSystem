@@ -38,6 +38,13 @@
 - 前端：ESLint 9 flat + Prettier + `eslint-config-prettier`；**核心是 ADR-0007 分层边界由 `no-restricted-imports` 强制**（kernel↛shared/features、shared↛features、feature 禁止深链跨域），负向验证会变红；CI `frontend.yml` 增加 `lint` 与 `format:check`。
 - 付了学费：Prettier `semi:false` 会把 Vue **多语句**内联事件处理器拆成换行（Vue 表达式解析失败 → build 红）。已把 25 处抽成 23 个命名函数，扫描器归零；约定写入 `docs/guides/frontend.md`：**模板内联 handler 必须是单次调用，多语句抽函数**。
 
+**CI 首次真实运行（2026-10-28，重建仓库后）**
+- 4 个 workflow 全部跑通：`backend-ci`（ruff + pytest 1284 + 架构守护 + 冒烟）、`frontend-ci`（lint + format + typecheck + vitest 86 + build + 2 个行为脚本）、`repo-guard`、`android-apk`。
+- 实跑暴露并修复 3 个"本地永远发现不了"的 CI-only 缺陷：
+  1. `backend.yml` 在 **job 级 env** 用 `${{ runner.temp }}` → runner 上下文不可用，GitHub 直接判 workflow 非法（0s 失败、无日志）→ 改为 `/tmp`；
+  2. `audit_docs_links.py` 跨平台缺陷：文档里的 `ops\start.ps1` 在 Linux 被当字面文件名、`var/...`（gitignored）被当必须存在 → 归一为 `/` + 运行期路径豁免；
+  3. `frontend.yml`/`android-build.yml` 固定 Node 20，而 **jsdom 30 engines 要求 ≥22.22/≥24.15**（vitest 报 `webidl.util.markAsUncloneable is not a function`）→ 统一升 Node 24，与开发机一致。
+
 **验证入口**
 - `check_all.py` 扩到 **15 项**（新增 ruff；前端 lint/format 在 CI）。CI 四工作流覆盖：后端 lint+测试+冒烟、前端 lint+format+typecheck+测试+构建、仓库守护、Android 打包。
 
