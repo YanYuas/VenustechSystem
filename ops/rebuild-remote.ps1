@@ -1,4 +1,4 @@
-# ============================================================
+﻿# ============================================================
 # 远端仓库重建（P0-2 彻底处置）
 #
 # 为什么需要"重建"而不是只 force-push：
@@ -42,10 +42,11 @@ if ($LASTEXITCODE -ne 0) { Fail "gh 未登录，请先 gh auth login" }
 $dirty = & git status --porcelain
 if ($dirty) { Fail "工作树不干净（$($dirty.Count) 个变更），先提交再重建" }
 
-$scopes = (& gh api -i /user 2>&1 | Select-String -Pattern "x-oauth-scopes" | Select-Object -First 1)
-if (-not $scopes -or $scopes -notmatch "delete_repo") {
+$scopeLine = ((& gh api -i /user 2>&1) | Select-String -Pattern "^x-oauth-scopes:" | Select-Object -First 1)
+$scopeList = if ($scopeLine) { ($scopeLine.Line -replace "^x-oauth-scopes:\s*", "").Trim() } else { "(unknown)" }
+if (-not $scopeLine -or $scopeList -notmatch "delete_repo") {
     Write-Host ""
-    Write-Host "缺少 delete_repo 权限（当前 scopes: $($scopes -replace '.*: ', '')）" -ForegroundColor Yellow
+    Write-Host "缺少 delete_repo 权限（当前 scopes: $scopeList）" -ForegroundColor Yellow
     Write-Host "请先在你自己的终端执行一次（会打开浏览器授权）：" -ForegroundColor Yellow
     Write-Host "    gh auth refresh -s delete_repo" -ForegroundColor White
     Write-Host "然后重新运行本脚本。" -ForegroundColor Yellow
