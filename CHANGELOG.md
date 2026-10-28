@@ -19,6 +19,7 @@
 - 后端：pin `pytest-cov==5.0.0` / `coverage==7.17.0`；覆盖率 **85.18% → 88.48%**（missed 1478→1149）；新增 **166 条**（api 错误路径 44 / core 28 / schemas 51 / service 43），全量 **1449 passed + 1 strict xfail**；3 条负向验证（改错断言必红）；`tests/README.md` 重写为 9 节规范（分层/AAA/断言/禁止真实库/覆盖率命令）；CI 加非阻断覆盖率报告。
 - 前端：`@vitest/coverage-v8` + `test:coverage`；新增 **49 条** → **135 passed / 12 files**（kernel/http 92.23%、shared/composables 89.74%、offline core 100%）；CI 加非阻断覆盖率；`docs/guides/frontend.md` 新增测试与覆盖率章节。
 - 覆盖率口径：前端分母为全量 `src/**/*.{ts,vue}`（views/ 按约定排除）；v8 对未执行文件不产 branch 计数，评估以 **lines** 为主。
+- **CI 首跑（Linux）抓到一个真 bug 并已修**：`api/logs.py` 的路径穿越检查依赖 `resolve().is_relative_to()`，而 POSIX 上反斜杠不是分隔符 → `..\..\evil.log` 被当普通文件名，返回 404 而不是 400「非法文件名」。已改为**显式拒绝分隔符/上跳/空名**（跨平台一致）+ 保留 resolve 纵深防御。
 - 测试发现 5 个真问题（只记录未修，登记 D-17~D-21）：`PATCH /auth/me` pet_position 必 500、`api/logs.py` 对 stdlib logger 调 `.opt()`、read_log 错误分支绕过信封、avatar memory/inspiration 无归属校验（IDOR）、SSE 未带 `X-API-Token`。
 
 **启动脚本真修（D-11 后续）**

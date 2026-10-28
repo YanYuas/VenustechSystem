@@ -51,9 +51,23 @@ def read_log(
 ):
     """读取日志文件内容"""
     log_dir = _get_log_dir()
+
+    # 安全检查（显式，平台无关）：拒绝分隔符 / 上跳 / 空名。
+    # 为什么不能只靠 resolve().is_relative_to()：POSIX 上反斜杠不是分隔符，
+    # `..\..\evil.log` 会被当成普通文件名 → 检查通过后落到 404，
+    # 与 Windows（400 非法文件名）契约不一致（CI 首跑 Linux 时发现）。
+    if (
+        not filename
+        or filename in {".", ".."}
+        or "/" in filename
+        or "\\" in filename
+        or ".." in filename
+    ):
+        return {"code": 400, "message": "非法文件名", "data": None}
+
     log_path = log_dir / filename
 
-    # 安全检查：防止路径遍历
+    # 纵深防御：解析后仍必须落在日志目录内
     if not log_path.resolve().is_relative_to(log_dir.resolve()):
         return {"code": 400, "message": "非法文件名", "data": None}
 
