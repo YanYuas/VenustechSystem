@@ -4,15 +4,18 @@
 # ============================================================
 from __future__ import annotations
 
-import logging
 from pathlib import Path
 
 from fastapi import APIRouter, Query
 
 from app.config import get_settings
-from app.core.response import success
+from app.core.logger import get_logger
+from app.core.response import error, success
 
-logger = logging.getLogger("app.logs")
+# 全仓日志后端是 loguru（见 tests/test_logging_contract.py 的日志契约守护）：
+# 这里必须用 get_logger（loguru），不能用 stdlib logging.getLogger —— D-18 的
+# 根因正是"stdlib logger + loguru 的 .opt() API"混用。
+logger = get_logger("api.logs")
 
 router = APIRouter(prefix="/logs", tags=["logs"])
 
@@ -63,22 +66,22 @@ def read_log(
         or "\\" in filename
         or ".." in filename
     ):
-        return {"code": 400, "message": "非法文件名", "data": None}
+        return error(400, "非法文件名")
 
     log_path = log_dir / filename
 
     # 纵深防御：解析后仍必须落在日志目录内
     if not log_path.resolve().is_relative_to(log_dir.resolve()):
-        return {"code": 400, "message": "非法文件名", "data": None}
+        return error(400, "非法文件名")
 
     if not log_path.exists():
-        return {"code": 404, "message": "日志文件不存在", "data": None}
+        return error(404, "日志文件不存在")
 
     try:
         with open(log_path, "r", encoding="utf-8", errors="replace") as f:
             lines = f.readlines()
     except Exception as e:
-        return {"code": 500, "message": f"读取失败: {e}", "data": None}
+        return error(500, f"读取失败: {e}")
 
     # 取最后N行
     lines = lines[-tail:]
@@ -110,6 +113,8 @@ def clear_logs():
             count += 1
         except Exception:
             # 文件被占用/权限不足时静默 skip 会让用户以为"已清空"，实为部分失败。
+            # D-18：统一用 loguru 的 opt(exception=True) 保留堆栈；原先 logger 是
+            # stdlib logging.Logger，没有 .opt()，失败分支会再抛 AttributeError。
             failed.append(f.name)
             logger.opt(exception=True).warning("日志文件清空失败: {}", f.name)
     return success({"cleared": count, "failed": failed})

@@ -9,7 +9,7 @@ import uuid
 from sqlalchemy.orm import Session
 
 from app.core.event_bus import event_bus
-from app.core.exceptions import ValidationException
+from app.core.exceptions import NotFoundException, ValidationException
 from app.repositories.avatar_repo import AvatarMemoryRepository, AvatarInspirationRepository, AvatarConfigRepository
 from app.repositories.identity_repo import IdentityRepository
 from app.schemas.avatar import CreateMemoryRequest, GenerateInspirationRequest, UpdateConfigRequest
@@ -59,6 +59,27 @@ class AvatarService:
         self.inspiration_repo = AvatarInspirationRepository(db)
         self.config_repo = AvatarConfigRepository(db)
 
+    # ==================== 归属校验（D-20 IDOR） ====================
+    # 写操作必须先取对象再校验 `user_id`。不匹配时抛 **NotFound** 而不是 403：
+    # 403 等于告诉攻击者「这个 id 真实存在，只是不属于你」，反而泄漏信息；
+    # 与本项目其他 service（task/document/asset…）保持同一错误语义。
+    # 注意：这些方法固定把 user_id 放在第一个参数，调用方（api 层）必须
+    # 传当前登录用户，不能只传资源 id。
+
+    def _owned_memory(self, user_id: str, memory_id: str):
+        """取当前用户可写的记忆；不存在或不属于本人一律 NotFound。"""
+        memory = self.memory_repo.get(memory_id)
+        if memory is None or memory.user_id != user_id:
+            raise NotFoundException("记忆不存在")
+        return memory
+
+    def _owned_inspiration(self, user_id: str, inspiration_id: str):
+        """取当前用户可写的灵感；不存在或不属于本人一律 NotFound。"""
+        insp = self.inspiration_repo.get(inspiration_id)
+        if insp is None or insp.user_id != user_id:
+            raise NotFoundException("灵感不存在")
+        return insp
+
     # ==================== 长期记忆 ====================
 
     def list_memories(self, user_id: str, memory_type: str | None = None,
@@ -82,18 +103,21 @@ class AvatarService:
         self.logger.info(f"记忆创建: {memory.id} ({memory.memory_type})")
         return self._memory_to_dict(memory)
 
-    def update_memory(self, memory_id: str, data: dict) -> dict:
-        memory = self.memory_repo.get_or_404(memory_id)
+    def update_memory(self, user_id: str, memory_id: str, data: dict) -> dict:
+        """更新记忆（D-20：仅限本人，越权按「不存在」处理）。"""
+        memory = self._owned_memory(user_id, memory_id)
         update_data = {k: v for k, v in data.items() if v is not None}
         updated = self.memory_repo.update(memory, **update_data)
         return self._memory_to_dict(updated)
 
-    def delete_memory(self, memory_id: str) -> None:
-        memory = self.memory_repo.get_or_404(memory_id)
+    def delete_memory(self, user_id: str, memory_id: str) -> None:
+        """删除记忆（D-20：仅限本人，越权按「不存在」处理）。"""
+        memory = self._owned_memory(user_id, memory_id)
         self.memory_repo.delete(memory)
 
-    def verify_memory(self, memory_id: str, verified: bool = True) -> dict:
-        memory = self.memory_repo.get_or_404(memory_id)
+    def verify_memory(self, user_id: str, memory_id: str, verified: bool = True) -> dict:
+        """确认/取消确认记忆（D-20：仅限本人，越权按「不存在」处理）。"""
+        memory = self._owned_memory(user_id, memory_id)
         updated = self.memory_repo.update(memory, is_verified=verified)
         return self._memory_to_dict(updated)
 
@@ -149,17 +173,17 @@ class AvatarService:
         items, total = self.inspiration_repo.paginate(page=page, page_size=page_size, **filters)
         return {"list": [self._inspiration_to_dict(i) for i in items], "total": total, "page": page, "page_size": page_size}
 
-    def select_inspiration(self, inspiration_id: str) -> dict:
-        """选择灵感方向，生成详细提示词"""
-        insp = self.inspiration_repo.get_or_404(inspiration_id)
+    def select_inspiration(self, user_id: str, inspiration_id: str) -> dict:
+        """选择灵感方向，生成详细提示词（D-20：仅限本人，越权按「不存在」处理）。"""
+        insp = self._owned_inspiration(user_id, inspiration_id)
         # 生成详细提示词（模板化）
         prompt = self._build_prompt(insp)
         updated = self.inspiration_repo.update(insp, status="selected", prompt=prompt)
         return self._inspiration_to_dict(updated)
 
-    def execute_inspiration(self, inspiration_id: str, result: str | None = None) -> dict:
-        """执行灵感（标记完成，保存结果）"""
-        insp = self.inspiration_repo.get_or_404(inspiration_id)
+    def execute_inspiration(self, user_id: str, inspiration_id: str, result: str | None = None) -> dict:
+        """执行灵感（标记完成，保存结果；D-20：仅限本人）。"""
+        insp = self._owned_inspiration(user_id, inspiration_id)
         updated = self.inspiration_repo.update(
             insp, status="completed", result=result or "已执行"
         )
@@ -168,14 +192,15 @@ class AvatarService:
         event_bus.publish(EVENT_INSPIRATION_EXECUTED, inspiration_id=inspiration_id)
         return self._inspiration_to_dict(updated)
 
-    def feedback_inspiration(self, inspiration_id: str, feedback: str) -> dict:
-        """灵感反馈：useful/useless/normal"""
-        insp = self.inspiration_repo.get_or_404(inspiration_id)
+    def feedback_inspiration(self, user_id: str, inspiration_id: str, feedback: str) -> dict:
+        """灵感反馈：useful/useless/normal（D-20：仅限本人）。"""
+        insp = self._owned_inspiration(user_id, inspiration_id)
         updated = self.inspiration_repo.update(insp, feedback=feedback)
         return self._inspiration_to_dict(updated)
 
-    def discard_inspiration(self, inspiration_id: str) -> dict:
-        insp = self.inspiration_repo.get_or_404(inspiration_id)
+    def discard_inspiration(self, user_id: str, inspiration_id: str) -> dict:
+        """丢弃灵感（D-20：仅限本人）。"""
+        insp = self._owned_inspiration(user_id, inspiration_id)
         updated = self.inspiration_repo.update(insp, status="discarded")
         return self._inspiration_to_dict(updated)
 

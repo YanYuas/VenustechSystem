@@ -356,7 +356,14 @@ npm run test:coverage # 覆盖率报告（v8；text + json-summary，输出到 f
 ### 覆盖率
 
 - provider `v8`，`reporter: ['text', 'json-summary']`；`include: src/**`、排除 views/生成物/样式（见 `vitest.config.ts`）。
-- **CI 只观测、不设阈值**（`continue-on-error`）：先收基线，等整体覆盖率稳定后再把 `thresholds` 升级为门禁。
+- **阈值棘轮（只许上调）**：`vitest.config.ts` 的 `coverage.thresholds` 当前为
+  `{ lines: 20, branches: 72, functions: 52, statements: 20 }`
+  （2026-10-28 Phase6 实测 20.95 / 73.25 / 53.65 / 20.95，各留约 1 个百分点余量防抖动；
+  历史上从 `{12,65,40,12}` 上调而来）。
+  `npm run test:coverage` 与 CI 的 `Coverage (threshold ratchet)` 步骤**都会因此失败**，即覆盖率回退会直接卡住合并。
+- **规则**：阈值只允许上调；若因重构/删测试需要下调，**必须在 `CHANGELOG.md` 说明理由**并经评审，不允许静默调低。
+- 口径提醒：`lines` 的分母是 `src/**/*.{ts,vue}` 全量实现文件（含大量未测 Vue 组件），且 views 按约定排除；
+  v8 provider 对"从未执行的文件"不生成 branch/function 计数，故 `branches/functions` 会显著高于 `lines` —— 评估覆盖率以 **lines** 为主。
 
 ---
 

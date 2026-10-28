@@ -7,6 +7,30 @@
 
 ## [Unreleased]
 
+### Changed — Phase 6：修测试发现的真 bug + 测试补缺（2026-10-28）
+
+**真 bug 修复（D-17~D-21，均带回归测试 + 负向验证）**
+- **D-17** `PATCH /auth/me` 传 `pet_position` 必 500：`model_dump()` 后按对象取 `.x` → 改 dict 取值，并处理嵌套部分坐标（只传 x 时保留 y）；strict xfail 转正 + 5 条边界测试。
+- **D-18** `api/logs.py` 清日志失败分支对 stdlib logger 调 loguru `.opt()` → AttributeError：根因是同一文件混用两套日志后端，统一 `get_logger`（loguru），保留 `opt(exception=True)`；加写失败回归测试（接口 200 + failed 列表 + 不抛 500）。
+- **D-19** `api/logs.py` 读日志错误分支返回裸 dict → 改用 `error()` 统一信封，补错误响应契约测试。
+- **D-20（P1，IDOR）** `avatar_service` memory/inspiration 写操作无归属校验：7 个写方法加 `user_id` 前置并校验（不匹配抛 NotFound，不泄漏存在性）；`api/avatar.py` 全部调用点传 `user.id`；新增 13 条 IDOR 用例（B 越权 7 个写操作全部 404 + **独立 Session** 复核数据未变、owner 操作成功、不可探测存在性）。
+- **D-21** SSE 请求未带 `X-API-Token`（启用访问令牌后流式对话 401）：`sse.ts` 与普通请求对齐；+2 条头断言测试。
+- （Phase 5 尾）CI 首跑 Linux 发现日志路径穿越返回 404 而非 400 → 已改为显式拒绝分隔符/上跳（跨平台一致）。
+
+**测试补缺**
+- 后端 **+118 条**（`test_assistant_service` 38 / `test_ai_services` 37 / `test_aihot_plugin` 22 / `test_plugin_manager_deep` 21），全部 mock LLM/HTTP 零联网；全量 **1588 passed**；覆盖率 **89.04% → 92.02%**（assistant 28.5→95.2%、ai/client 45.4→99.0%、plugin_manager 82→98.3%、aihot 28.1→93.8%）；CI 覆盖率阈值 **88% → 91%**（阻断）。
+- 前端 **+59 条**（useConversation 20 / offlineQueue store 14 / useSettingsDiagnostics 25），**196 passed**；lines **12.76% → 20.95%**、branches 68.57→73.25、functions 44.93→53.65；`vitest.config.ts` 阈值棘轮 **{12,65,40,12} → {20,72,52,20}** 并接入 CI 阻断步骤。
+- 规范：`backend/tests/README.md` 新增 Mock 约定；`docs/guides/frontend.md` 补覆盖率阈值棘轮规则（只升不降）。
+
+**测试又发现 7 个问题（登记 D-22~D-28，未修）**
+- D-22 `assistant_service._TIME_HINTS`：**"大后天" 先命中 "后天"** → 解析 +2 天（应 +3），测试按当前行为钉住；
+- D-23 `ai/client.chat()` 200 缺 `choices` 抛裸 KeyError，未映射 `AIRequestFailedException`；
+- D-24 `aihot` **双重响应信封** + `daily()` 对信封取 `ok` 恒 None → 404 回退成功分支运行期永远走不到（**P1，建议下轮先修**）；
+- D-25 `AssistantService._encryption()` 每次 new 而非复用全局单例；
+- D-26 多个模块 stdlib logger + loguru `{}` 风格混用（参数被丢弃）；
+- D-27 `useSettingsDiagnostics` ruleTimer 未在 dispose 清理；
+- D-28 `offlineQueue` store 重复 init 会重复注册网络监听。
+
 ### Changed — Phase 5：结构治理 + 测试质量 + 启动可靠性（2026-10-28）
 
 **项目文件夹结构治理（可执行契约）**

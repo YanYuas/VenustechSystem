@@ -168,7 +168,9 @@
     ],
     "ignored_dirs": [
       ".git",
-      ".arch-audit"
+      ".arch-audit",
+      ".ruff_cache",
+      ".pytest_cache"
     ]
   },
   "frontend_features": {

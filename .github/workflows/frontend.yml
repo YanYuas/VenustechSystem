@@ -91,11 +91,10 @@ jobs:
         timeout-minutes: 10
         run: npm test
 
-      # 覆盖率只观测、不设阈值（先收基线；稳定后再考虑升级为门禁）。
-      # continue-on-error: 覆盖率工具/合并抖动不应阻塞合并。
-      - name: Coverage report (vitest --coverage, observe-only)
+      # 覆盖率阈值棘轮（阻断）：低于 vitest.config.ts 的 thresholds 直接失败，防止回退。
+      # 阈值只许上调；下调必须在 CHANGELOG 说明理由（见 docs/guides/frontend.md §九）。
+      - name: Coverage (threshold ratchet)
         timeout-minutes: 15
-        continue-on-error: true
         run: npm run test:coverage
 
       - name: Build (vite build)

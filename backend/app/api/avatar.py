@@ -59,12 +59,12 @@ async def update_memory(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    return success(_svc(db).update_memory(memory_id, data))
+    return success(_svc(db).update_memory(user.id, memory_id, data))
 
 
 @router.delete("/memories/{memory_id}", summary="删除记忆")
 async def delete_memory(memory_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    _svc(db).delete_memory(memory_id)
+    _svc(db).delete_memory(user.id, memory_id)
     return success(None)
 
 
@@ -75,7 +75,7 @@ async def verify_memory(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    return success(_svc(db).verify_memory(memory_id, verified))
+    return success(_svc(db).verify_memory(user.id, memory_id, verified))
 
 
 # ==================== 灵感工作流 ====================
@@ -106,7 +106,7 @@ async def select_inspiration(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    return success(_svc(db).select_inspiration(inspiration_id))
+    return success(_svc(db).select_inspiration(user.id, inspiration_id))
 
 
 @router.post("/inspirations/{inspiration_id}/execute", summary="执行灵感")
@@ -116,7 +116,7 @@ async def execute_inspiration(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    return success(_svc(db).execute_inspiration(inspiration_id, result))
+    return success(_svc(db).execute_inspiration(user.id, inspiration_id, result))
 
 
 @router.post("/inspirations/{inspiration_id}/feedback", summary="灵感反馈")
@@ -126,7 +126,7 @@ async def feedback_inspiration(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    return success(_svc(db).feedback_inspiration(inspiration_id, feedback))
+    return success(_svc(db).feedback_inspiration(user.id, inspiration_id, feedback))
 
 
 @router.post("/inspirations/{inspiration_id}/discard", summary="丢弃灵感")
@@ -135,7 +135,7 @@ async def discard_inspiration(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    return success(_svc(db).discard_inspiration(inspiration_id))
+    return success(_svc(db).discard_inspiration(user.id, inspiration_id))
 
 
 # ==================== 配置管理 ====================

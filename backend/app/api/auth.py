@@ -76,8 +76,16 @@ def update_me(data: UpdateConfigRequest, user: User = Depends(get_current_user),
         if key in _FIELD_MAP and value is not None:
             setattr(user, _FIELD_MAP[key], value)
     if "pet_position" in payload and payload["pet_position"] is not None:
+        # D-17：payload 经过 model_dump(exclude_unset=True) 后是 **dict**（不是
+        # PetPosition 对象），此前按 `pet.x` 取属性 → AttributeError → 500。
+        # 另外 exclude_unset 会裁掉嵌套模型里"未显式给出"的坐标（{"x": 12}
+        # 只会留下 "x"），因此缺失的坐标沿用当前值，避免部分更新把 y 打回默认。
         pet = payload["pet_position"]
-        user.pet_position = {"x": pet.x, "y": pet.y}
+        current = user.pet_position or {}
+        user.pet_position = {
+            "x": pet.get("x", current.get("x", 1770)),
+            "y": pet.get("y", current.get("y", 880)),
+        }
     db.commit()
     db.refresh(user)
     return success(_user_out(user))

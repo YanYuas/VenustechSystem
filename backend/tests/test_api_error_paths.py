@@ -17,8 +17,6 @@ import uuid
 from pathlib import Path
 from types import SimpleNamespace
 
-import pytest
-
 from app.config import get_settings
 from app.core.event_bus import ALL_EVENTS
 
@@ -117,6 +115,85 @@ class TestLogsApi:
         finally:
             a.unlink(missing_ok=True)
             b.unlink(missing_ok=True)
+
+    def test_clear_logs_partial_failure_reports_file_and_does_not_500(
+        self, client, monkeypatch
+    ):
+        """D-18 回归：清日志失败分支不得因 logger API 不匹配抛 AttributeError。
+
+        全仓日志后端是 loguru（tests/test_logging_contract.py 强制禁止 stdlib 的
+        %-style / exc_info 写法）；修复方式是把本模块混用的 stdlib logger 换成
+        `get_logger("api.logs")`，保留 `opt(exception=True)`。
+        这里用 spy 钉住该契约：FastAPI 同步端点跑在 anyio 线程池，caplog 的
+        root handler 在这条链路下捕不到，spy 更直接也更稳。
+        """
+        bad = _write_log(f"phase6-bad-{uuid.uuid4().hex[:6]}.log", ["x"])
+        good = _write_log(f"phase6-good-{uuid.uuid4().hex[:6]}.log", ["y"])
+        original = Path.write_text
+
+        def flaky_write(self, *args, **kwargs):
+            if self.name == bad.name:
+                raise OSError("disk full")
+            return original(self, *args, **kwargs)
+
+        calls: list[dict] = []
+
+        class _SpyLoguru:
+            def opt(self, **kwargs):
+                calls.append({"opt": kwargs})
+                return self
+
+            def warning(self, msg, *args, **kwargs):
+                calls.append({"msg": msg, "args": args, "kwargs": kwargs})
+
+        monkeypatch.setattr("app.api.logs.logger", _SpyLoguru())
+        monkeypatch.setattr(Path, "write_text", flaky_write)
+        try:
+            resp = client.post("/api/v1/logs/clear")
+            assert resp.status_code == 200, resp.text
+            body = resp.json()
+            assert body["code"] == 0
+            assert body["data"]["failed"] == [bad.name]
+            assert body["data"]["cleared"] >= 1
+            assert good.read_text(encoding="utf-8") == ""
+        finally:
+            monkeypatch.undo()
+            bad.unlink(missing_ok=True)
+            good.unlink(missing_ok=True)
+
+        assert len(calls) == 2, calls
+        assert calls[0]["opt"] == {"exception": True}, "必须用 loguru opt(exception=True) 保留堆栈"
+        warn = calls[1]
+        assert "日志文件清空失败" in warn["msg"]
+        assert "{}" in warn["msg"], "loguru 用 {} 占位"
+        assert warn["args"] == (bad.name,)
+        assert warn["kwargs"] == {}
+
+    def test_read_log_error_responses_use_unified_envelope(self, client, monkeypatch):
+        """D-19 契约：400/404/500 错误响应与 success() 字段集合一致（含 timestamp）。"""
+        expected_keys = {"code", "message", "data", "timestamp"}
+        traversal = client.get("/api/v1/logs/..%5C..%5Cevil.log").json()
+        missing = client.get("/api/v1/logs/no-such-envelope.log").json()
+
+        broken = _write_log(f"phase6-broken-{uuid.uuid4().hex[:6]}.log", ["boom"])
+        monkeypatch.setattr(
+            "app.api.logs.open",
+            lambda *args, **kwargs: (_ for _ in ()).throw(OSError("read failed")),
+            raising=False,
+        )
+        try:
+            failed = client.get(f"/api/v1/logs/{broken.name}").json()
+        finally:
+            broken.unlink(missing_ok=True)
+
+        for body, code in ((traversal, 400), (missing, 404), (failed, 500)):
+            assert set(body) == expected_keys, body
+            assert body["code"] == code
+            assert body["data"] is None
+            assert isinstance(body["timestamp"], int)
+        assert traversal["message"] == "非法文件名"
+        assert "不存在" in missing["message"]
+        assert failed["message"].startswith("读取失败: ")
 
     def test_clear_logs_when_dir_missing_returns_zero(self, client, monkeypatch):
         missing = _data_dir() / f"no-logs-{uuid.uuid4().hex[:6]}"
@@ -326,13 +403,46 @@ class TestAuthApi:
         assert resp.status_code == 400
         assert body["code"] == 1001
 
-    @pytest.mark.xfail(
-        reason="BUG(Phase5 记录): auth.py:78-80 对 model_dump() 后的 dict 取 pet.x → AttributeError(500)",
-        strict=True,
-    )
     def test_patch_me_pet_position_roundtrip(self, client):
+        """D-17 回归：payload 是 dict，不能按 PetPosition 对象取 .x/.y（曾必 500）。"""
         data = _ok(client.patch("/api/v1/auth/me", json={"pet_position": {"x": 12, "y": 34}}))
         assert data["pet_position"] == {"x": 12, "y": 34}
+        # 已落库：GET 读回一致
+        assert _ok(client.get("/api/v1/auth/me"))["pet_position"] == {"x": 12, "y": 34}
+        # 还原默认位置，避免影响其他测试
+        _ok(client.patch("/api/v1/auth/me", json={"pet_position": {"x": 1770, "y": 880}}))
+
+    def test_patch_me_pet_position_partial_keeps_other_coordinate(self, client):
+        """exclude_unset 会裁掉嵌套模型未给出的坐标；部分更新不得把另一轴打回默认值。"""
+        _ok(client.patch("/api/v1/auth/me", json={"pet_position": {"x": 12, "y": 34}}))
+        data = _ok(client.patch("/api/v1/auth/me", json={"pet_position": {"x": 50}}))
+        assert data["pet_position"] == {"x": 50, "y": 34}
+        _ok(client.patch("/api/v1/auth/me", json={"pet_position": {"x": 1770, "y": 880}}))
+
+    def test_patch_me_pet_position_empty_dict_keeps_current(self, client):
+        _ok(client.patch("/api/v1/auth/me", json={"pet_position": {"x": 21, "y": 22}}))
+        data = _ok(client.patch("/api/v1/auth/me", json={"pet_position": {}}))
+        assert data["pet_position"] == {"x": 21, "y": 22}
+        _ok(client.patch("/api/v1/auth/me", json={"pet_position": {"x": 1770, "y": 880}}))
+
+    def test_patch_me_pet_position_explicit_null_keeps_current(self, client):
+        """auth 层 null 语义 = 不改（与 ADR-0008 服务层「null=清空」不同）。"""
+        _ok(client.patch("/api/v1/auth/me", json={"pet_position": {"x": 31, "y": 32}}))
+        data = _ok(client.patch("/api/v1/auth/me", json={"pet_position": None}))
+        assert data["pet_position"] == {"x": 31, "y": 32}
+        _ok(client.patch("/api/v1/auth/me", json={"pet_position": {"x": 1770, "y": 880}}))
+
+    def test_patch_me_pet_position_invalid_type_returns_400(self, client):
+        resp = client.patch("/api/v1/auth/me", json={"pet_position": {"x": "left", "y": 1}})
+        body = _api_error(resp)
+        assert resp.status_code == 400
+        assert body["code"] == 1001
+
+    def test_patch_me_pet_position_negative_values_accepted_by_schema(self, client):
+        """PetPosition 未声明 ge/le：负坐标是合法输入（多显示器左上扩展场景）。"""
+        data = _ok(client.patch("/api/v1/auth/me", json={"pet_position": {"x": -100, "y": -50}}))
+        assert data["pet_position"] == {"x": -100, "y": -50}
+        _ok(client.patch("/api/v1/auth/me", json={"pet_position": {"x": 1770, "y": 880}}))
 
     def test_init_empty_nickname_returns_400(self, client):
         resp = client.post("/api/v1/auth/init", json={"nickname": ""})

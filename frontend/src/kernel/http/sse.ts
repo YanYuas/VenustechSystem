@@ -4,7 +4,7 @@
 // 从原 kernel/http/index.ts 拆出（P4，ADR-0007）。行为零变化：
 // 首包超时 60s、data: 前缀解析、错误文案逐字保留。
 // ============================================================
-import { SSE_TIMEOUT, getApiBase } from './client'
+import { SSE_TIMEOUT, getApiBase, getApiToken } from './client'
 import { ApiError } from './errors'
 import { ApiErrorCode, type SseEvent } from './types'
 
@@ -23,9 +23,15 @@ export async function sseRequest(
   }
 
   try {
+    // 与 request.ts 对齐：启用访问令牌（移动端/局域网）时流式请求也必须带鉴权头，
+    // 否则 SSE 会被后端 401 拒绝（D-21）。无 token 时不加该头，保持既有请求形状。
+    const token = getApiToken()
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (token) headers['X-API-Token'] = token
+
     const res = await fetch(`${getApiBase()}${path}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(body),
       signal: controller.signal,
     })

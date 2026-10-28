@@ -109,7 +109,22 @@ cd backend
 .\.venv\Scripts\python.exe -m pytest tests -q --tb=short       # 简短报错
 ```
 
-## 九、新增模块测试 Checklist
+## 九、Mock 约定（外部依赖零联网）
+
+涉及 LLM / HTTP / 子进程的测试**一律用替身**，禁止真联网、真等待：
+
+- **HTTP 层**：monkeypatch 模块级 `httpx.AsyncClient`（替身实现 `__aenter__/__aexit__/post/get/stream`），
+  并用类级 `script` 列表预排"响应 / 异常"序列，同时记录 `calls` 断言 URL、headers、params；
+- **LLM 编排层**：构造 `AIService` 后直接替换 `svc.client` 为 Fake（`chat()` 返回 `AIResponse(content=...)`），
+  断言 prompt 里带上下文、temperature 等调用参数，以及非法 JSON / 空响应的降级分支；
+- **重试/超时**：monkeypatch `asyncio.sleep` 为空实现，让指数退避测试毫秒级完成；
+- **错误映射**：非 2xx → `AIRequestFailedException`、网络错误重试耗尽 → 同上、
+  上游不可达 → 降级缓存或 `ok=False`，逐条断言而不是只断言"不抛异常"；
+- **全局单例**（`event_bus` / `plugin_manager` / `aihot._cache` / vault 解锁态）：
+  用 fixture 保存→清空→恢复，避免用例间串味；插件测试在 `VENUSTECH_TEST_DATA_DIR` 内造插件目录；
+- 断言重点 = **调用参数 + 错误映射 + 降级分支**，不要只测 happy path。
+
+## 十、新增模块测试 Checklist
 
 1. [ ] Service 层：CRUD 正常路径
 2. [ ] Service 层：状态机 / 业务规则全部边界

@@ -6,7 +6,7 @@
 // ============================================================
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { ApiError, sseRequest } from '..'
+import { ApiError, sseRequest, setApiToken } from '..'
 import { ApiErrorCode } from '../types'
 import type { SseEvent } from '../types'
 
@@ -49,6 +49,8 @@ function collect() {
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  // 鉴权头用例会写 localStorage；每个用例后清理，避免污染其它 spec。
+  localStorage.removeItem('qm-star-token')
 })
 
 describe('sseRequest：正常流解析', () => {
@@ -153,5 +155,34 @@ describe('sseRequest：错误分支', () => {
     expect(sawAbortedSignal).toBe(true)
     expect(err).toBeInstanceOf(ApiError)
     expect(err.message).toBe('请求超时或已取消')
+  })
+})
+
+describe('sseRequest：鉴权头（D-21）', () => {
+  it('已配置访问令牌时，SSE 请求携带 X-API-Token（与普通请求一致）', async () => {
+    setApiToken('abc-123')
+    const fetchMock = stubFetch(async () => sseResponse(['data: {"type":"done"}\n']))
+    const { events, onMessage } = collect()
+
+    await sseRequest('/conversations/1/messages/stream', { content: 'hi' }, onMessage)
+
+    expect(events).toEqual([{ type: 'done' }])
+    const [, init] = fetchMock.mock.calls[0] as unknown as FetchArgs
+    const headers = (init?.headers ?? {}) as Record<string, string>
+    expect(headers['X-API-Token']).toBe('abc-123')
+    expect(headers['Content-Type']).toBe('application/json')
+  })
+
+  it('未配置访问令牌时不出现 X-API-Token 头（不改变既有请求形状）', async () => {
+    const fetchMock = stubFetch(async () => sseResponse(['data: {"type":"done"}\n']))
+
+    await sseRequest('/stream', {}, () => undefined)
+
+    const [, init] = fetchMock.mock.calls[0] as unknown as FetchArgs
+    const headerNames = Object.keys((init?.headers ?? {}) as Record<string, string>).map((k) =>
+      k.toLowerCase(),
+    )
+    expect(headerNames).not.toContain('x-api-token')
+    expect(headerNames).toContain('content-type')
   })
 })

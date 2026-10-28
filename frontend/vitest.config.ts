@@ -35,11 +35,15 @@ export default defineConfig({
     restoreMocks: true,
     // 不隐藏 console.warn（项目里有意为之的告警要看得见）
     silent: false,
-    // 覆盖率：先观测、不设阈值（CI 不 hard fail，见 .github/workflows/frontend.yml）
+    // 覆盖率：阈值棘轮（只许上调；下调须在 CHANGELOG 说明理由）。
+    // 阈值依据（2026-10-28，Phase6 task-30 实测）：lines 20.95 / branches 73.25 /
+    // functions 53.65 / statements 20.95。此处各留约 1 个点余量（20/72/52/20）
+    // 吸收 CI 环境抖动；上调后覆盖率回退会直接让 CI 的 threshold ratchet 变红。
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json-summary'],
       reportsDirectory: './coverage',
+      thresholds: { lines: 20, branches: 72, functions: 52, statements: 20 },
       // 统计 src 下全部实现代码；测试自身与生成物不计入
       include: ['src/**/*.{ts,vue}'],
       exclude: [

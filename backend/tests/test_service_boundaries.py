@@ -349,17 +349,21 @@ class TestAIServiceBoundaries:
 
 
 class TestAvatarServiceBoundaries:
+    # D-20 后写方法签名统一为 (user_id, resource_id, ...)：第一个参数是
+    # 当前登录用户，缺了它就无法做归属校验（这正是 IDOR 的成因）。
     def test_update_missing_memory_raises_not_found(self, db_session, test_user):
         with pytest.raises(NotFoundException):
-            AvatarService(db_session).update_memory(str(uuid.uuid4()), {"title": "x"})
+            AvatarService(db_session).update_memory(
+                test_user.id, str(uuid.uuid4()), {"title": "x"}
+            )
 
     def test_delete_missing_memory_raises_not_found(self, db_session, test_user):
         with pytest.raises(NotFoundException):
-            AvatarService(db_session).delete_memory(str(uuid.uuid4()))
+            AvatarService(db_session).delete_memory(test_user.id, str(uuid.uuid4()))
 
     def test_verify_missing_memory_raises_not_found(self, db_session, test_user):
         with pytest.raises(NotFoundException):
-            AvatarService(db_session).verify_memory(str(uuid.uuid4()), True)
+            AvatarService(db_session).verify_memory(test_user.id, str(uuid.uuid4()), True)
 
 
 class TestPluginManagerBoundaries:

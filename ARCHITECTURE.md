@@ -363,11 +363,18 @@ CI：`.github/workflows/{backend,frontend,repo-guard}.yml` + `android-build.yml`
 | D-14 | P2 | `server.js` 是唯一鉴权点却零测试 | `ops/server/server.js` | ✅ 已修（2026-10-26）：`ops/server/test` 16 用例 + CI edge-server job |
 | D-16 | P2 | `backend/scripts/**` 未纳入 ruff（实测 13 条，含 3 条 F821 疑似真 bug） | `backend/scripts/` | ✅ 已修（2026-10-27）：13 → 0（F541 4 / F401 3 / F821 3 / F841 3）。F821 逐条核实：`seed_demo.seed_tasks` 的 `utcnow()` 是**真 bug**（缺导入，补 `from app.models.base import utcnow`）；`smoke_backend` 两处 `pathlib.Path(...) if 'pathlib' in dir()` 是**死代码**（条件恒 False 且下一行覆盖），删除。门禁三处统一为 `ruff check app tests scripts`（backend.yml / check_all 第 15 项 / pyproject 口径注释） |
 | D-15 | **P0（隐性）** | 架构守护 R1/R2 长期**空转**：`layer_of_file()` 拿仓库相对路径比 `app/` 前缀（永不匹配），且 `TYPE_CHECKING` 豁免标记传入未使用 → `--strict` 恒绿 | `scripts/audit_architecture.py` | ✅ 已修（2026-10-27）：路径基准改为 `backend/`、TYPE_CHECKING 真正豁免；新增 4 条负向 + 2 条回归测试 |
-| D-17 | P1 | `PATCH /auth/me` 传 `pet_position` 必 500：`model_dump()` 后按对象取 `.x`（前端契约有字段但走不通） | `api/auth.py:78-80`；已用 strict xfail 钉住 | Phase 6 |
-| D-18 | P1 | `api/logs.py` 对 stdlib `logging.Logger` 调 `.opt()`（loguru API）→ 清日志失败分支必 AttributeError，掩盖真实失败原因 | `api/logs.py:100` | Phase 6 |
-| D-19 | P2 | `api/logs.py` 读日志错误分支返回裸 dict，绕过统一响应信封（前端契约不一致） | `api/logs.py:57-67` | Phase 6 |
-| D-20 | P1 | `avatar_service` 的 memory / inspiration 写操作无 `user_id` 归属校验（IDOR 隐患；单用户模式掩盖） | `avatar_service.py:85-98,152-180` | Phase 6 |
-| D-21 | P2 | SSE 请求未附加 `X-API-Token`（普通请求会带）→ 启用访问令牌后流式对话可能 401 | `frontend/src/kernel/http/sse.ts:26-31` | Phase 6 |
+| D-17 | P1 | `PATCH /auth/me` 传 `pet_position` 必 500：`model_dump()` 后按对象取 `.x` | `api/auth.py` | ✅ 已修（2026-10-28）：改 dict 取值 + 嵌套部分坐标保留；strict xfail 转正 + 5 条边界测试 |
+| D-18 | P1 | `api/logs.py` 对 stdlib logger 调 loguru `.opt()` → 清日志失败分支 AttributeError | `api/logs.py` | ✅ 已修（2026-10-28）：根因是混用后端，统一 `get_logger`（loguru），保留 `opt(exception=True)`；回归测试 + 负向验证 |
+| D-19 | P2 | `api/logs.py` 错误分支返回裸 dict，绕过统一响应信封 | `api/logs.py` | ✅ 已修（2026-10-28）：400/404/500 改 `error()`，补信封契约测试 |
+| D-20 | P1 | `avatar_service` memory/inspiration 写操作无 `user_id` 归属校验（IDOR） | `avatar_service.py` | ✅ 已修（2026-10-28）：7 个写方法加 `user_id` + 归属校验（NotFound，不泄漏存在性）；13 条 IDOR 用例 + 独立 Session 复核 |
+| D-21 | P2 | SSE 请求未带 `X-API-Token` → 启用令牌后流式对话 401 | `frontend/src/kernel/http/sse.ts` | ✅ 已修（2026-10-28）：与普通请求对齐；+2 条头断言测试 |
+| D-22 | P2 | `assistant_service._TIME_HINTS` 顺序使 **"大后天" 先命中 "后天"** → 解析成 +2 天（应 +3） | `assistant_service.py:41-48`；测试按当前行为钉住 | Phase 7 |
+| D-23 | P2 | `ai/client.chat()` 对 200 响应直接取 `choices[0]`，缺字段/非法 JSON 抛裸 KeyError/JSONDecodeError，未映射 `AIRequestFailedException`（调用方可能 500） | `ai/client.py:85-88`；characterization 测试注释登记 | Phase 7 |
+| D-24 | P1 | `plugins_builtin/aihot/main.py` **双重响应信封**（`_fetch` 已返回信封，调用方又 `success(...)` 包一层）；`daily()` 对信封取 `ok` 恒 None → 404 回退成功的 `live/fallback-*` 分支运行期永远走不到 | `aihot/main.py:84/89/111/116/121/135/137` | Phase 7 |
+| D-25 | P3 | `AssistantService._encryption()` 每次新建 `EncryptionManager` 而非复用全局 `init_encryption` 单例 | `assistant_service.py` | Phase 7 |
+| D-26 | P2 | 多个 app 模块用 stdlib `logging.getLogger` 却按 loguru 风格 `{}` 传参（stdlib 下参数被丢弃，消息留 `{}`）；现有契约测试只查 %-style 漏掉此形态 | health/event_bus/plugin_manager/ai/asset/avatar/dashboard 等 | Phase 7 |
+| D-27 | P3 | `useSettingsDiagnostics` 的 400ms `ruleTimer` 未在 scope dispose 清理，卸载后仍可能发一次预览请求（低危） | `features/settings/composables/useSettingsDiagnostics.ts` | Phase 7 |
+| D-28 | P3 | `kernel/offline/offlineQueue` store 的 `manager` 模块级缓存 + `init()` 每次 `addEventListener`：重复 init 会重复注册网络监听（生产路径当前只调一次） | `kernel/offline/offlineQueue.ts` | Phase 7 |
 
 > 原则：**先修 P0/P1 的"正确性"，再谈结构搬迁**。在事务边界、迁移基线、备份导入还有问题时做领域分包，只是把混乱打包进更漂亮的新目录。
 
@@ -383,6 +390,7 @@ CI：`.github/workflows/{backend,frontend,repo-guard}.yml` + `android-build.yml`
 | **Phase 3** | 可持续交付 | P3 全量迁移（27 域 → features，旧路径 392→0）、P4（8 壳删除 + kernel 依赖归位 + `kernel/http` 拆分）、D-11 启动器单一实现、D-12 备份工具、D-13 前后端 lint 进 CI、ADR-0008 | ✅ 本轮完成（2026-10-27，1284 后端 + 86 前端测试，lint/format/构建全绿） |
 | **Phase 4** | 收尾与交付 | P0-2 泄漏处置（已重建仓库彻底消除）、CI 四 workflow 首跑全绿（修正 runner 上下文 / 文档审计跨平台 / Node 24）、`styles/`+`test/setup` 归位（sass 输出逐字节一致）、D-16 `backend/scripts` 纳入 ruff（13→0，含 1 个真潜伏 bug）、`var/` 数据物理迁移（SHA256+行数校验）、敏感文件守护 `--strict` | ✅ 本轮完成（2026-10-27，1284 后端 + 86 前端测试；**仅剩仓库重建需 delete_repo 权限**） |
 | **Phase 5** | 结构治理 + 测试质量 + 启动可靠性 | 工作区卫生守护（`audit_workspace_hygiene.py`，check_all 16 项，清理 193MB）；后端 pytest-cov 85.18%→88.48%（+166 测试，1450 全绿）；前端 coverage-v8 +49 测试（135 全绿，kernel/http 92.23%）；启动脚本真修：根治 `Start-Process` 新窗口死锁 + `-Verify` 自检 + `var/logs`；登记 D-17~D-21 | ✅ 本轮完成（2026-10-28） |
+| **Phase 6** | 修测试发现的真 bug + 补测试缺口 | D-17/18/19（auth 500、logs loguru/envelope）、D-20（avatar IDOR）、D-21（SSE token）全部修复 + 回归测试；后端 +118 测试（1598 收集 / 1588 passed），覆盖率 89.04%→92.02%；前端 +59 测试（196 passed），lines 12.76%→20.95%、阈值棘轮 20/72/52/20 进 CI；新登记 D-22~D-28 | ✅ 本轮完成（2026-10-28） |
 
 **明确不做（以及为什么）**：
 
