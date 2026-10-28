@@ -335,7 +335,7 @@ CI：`.github/workflows/{backend,frontend,repo-guard}.yml` + `android-build.yml`
 | ID | 等级 | 债务 | 证据 | 处置阶段 |
 |---|---|---|---|---|
 | D-01 | **P0** | 令牌回环绕过：cloudflared 场景等于无鉴权 | `ops/server/server.js` `isAuthorized()` | ✅ 已修（2026-10-26）：代理头检测 + 常量时间比较 + 16 条单测 + CI |
-| D-02 | **P0** | `origin/feature/phase2-development` 包含真实用户库 `app.db`（当时位于 `backend` 的 `data/` 下，606KB，公开可拉） | 泄漏提交 `6b5c2dd`，仅该分支可达；**无 `.encryption_key`**（密文字段安全） | 🟡 部分完成（2026-10-27）：本地+远端 refs 已清洗（filter-repo 后 44 commits、tree 不变；远端仅 main+tags，10 个陈旧分支删除；`audit_repo_secrets --strict` 已开）。**但实测 GitHub 仍按旧 SHA 返回对象（HTTP 200）→ 待重建仓库彻底消除**：`ops/rebuild-remote.ps1`（需先 `gh auth refresh -s delete_repo`）+ runbook §5 |
+| D-02 | **P0** | `origin/feature/phase2-development` 曾包含真实用户库 `app.db`（当时在 `backend` 的 `data/` 下，606KB，公开可拉） | 泄漏提交 `6b5c2dd`，仅该分支可达；**无 `.encryption_key`**（密文字段安全） | ✅ **已彻底处置（2026-10-28）**：历史清洗（filter-repo，44 commits、tree 逐字节不变）+ 远端 refs 清理 + **仓库删除重建**（`ops/rebuild-remote.ps1`）；新仓库只剩 `main`+3 tags，旧 commit → HTTP 422 / 旧 blob → HTTP 404 / git 协议层 `not our ref`，全新克隆历史扫描 DB 命中 0；`audit_repo_secrets --strict` 常开 |
 | D-03 | **P0** | 备份导入 100% 失败：`FormData` 被 `JSON.stringify` 后发 JSON，后端要 multipart → 422 | `frontend/src/features/dashboard/api.ts` + `kernel/http/index.ts` ↔ `backend/app/api/backup.py` | ✅ 已修（2026-10-26）：`http.postForm` + 真实 multipart 运行时断言 11/11 |
 | D-04 | P1 | **事务边界下沉**：`BaseRepository` 每个方法内部 commit，service 再 commit → 多步操作无原子性 | `repositories/base.py` | ✅ 已修（2026-10-26）：repo 只 flush、service 控 commit、get_db 兜底；8 条原子性测试 + 守护 R11 |
 | D-05 | P1 | 迁移基线失效：`0001` 用 `create_all()`，11 张基线表无 DDL；升级库缺 11 个索引 | `migrations/versions/0001_initial.py` | ✅ 已修（2026-10-26）：0001 冻结显式 DDL（49 表/79 索引）+ 0021 对账 + 6 条完整性测试 + 守护 R12 |

@@ -137,17 +137,24 @@ git push origin --delete mod-asset mod-companion mod-dashboard mod-execution `
 | 远端 refs 清洗 | `git push --mirror --force`：远端现在**只有 `main`(ef075f4) + 3 个 tag**，10 个陈旧分支已删除 |
 | 守护收紧 | `audit_repo_secrets.py` 在 CI 与 `check_all.py` 改为 `--strict`（历史再出现 DB 直接失败） |
 
-### 仍未消除：GitHub 按旧 SHA 仍可取到对象
+### 已彻底消除：2026-10-28 删除并重建仓库
 
-实测（清洗后、未认证）：
+清洗 refs 后曾实测（未认证）：旧 commit/blob 仍返回 **HTTP 200**（GitHub 悬空对象），
+证明"只 force-push 不够"。**因此执行了仓库重建**（`gh auth refresh -s delete_repo` → `ops/rebuild-remote.ps1 -Confirm`）。
 
-```
-GET /repos/.../commits/6b5c2dd…  -> HTTP 200
-GET /repos/.../git/blobs/dd0fcb09… -> HTTP 200
-GET /repos/.../branches/feature/phase2-development -> HTTP 404
-```
+重建后实测（2026-10-28）：
 
-即 refs 已干净，但 GitHub 的未知/悬空对象仍在。**只有重建仓库能彻底消除。**
+| 探测 | 结果 |
+|---|---|
+| 旧 commit `6b5c2dd…` API | **HTTP 422**（No commit found） |
+| 旧 blob `dd0fcb09…` API | **HTTP 404** |
+| `feature/phase2-development` 分支 | **HTTP 404** |
+| `git fetch origin 6b5c2dd…` | **not our ref**（exit 128） |
+| 全新克隆 `git log --all --diff-filter=A` 扫 `*.db*`/`.encryption_key` | **0 命中** |
+| 新仓库 refs | `main`(86fa061) + 3 个 tag，分支数 1 |
+| 兜底 | 重建前 bundle 在 `var/backups/`（gitignored），可离线恢复 |
+
+代价（预期）：star/fork/watch/issue/PR/Actions secrets 归零；仓库描述已保留（"推演光明"），主页/分支保护需按需重配。
 
 ### 彻底处置（二选一）
 

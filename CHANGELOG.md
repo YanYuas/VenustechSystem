@@ -62,7 +62,7 @@
 - `git-filter-repo` 清洗本地历史（移除 `backend/data*/**`、`*.db*`、`.encryption_key`；44 commits、main tree 逐字节不变）；本地 10 个陈旧分支删除 + reflog/gc → 旧 SHA 本地 `cat-file` 已失败。
 - 远端 `git push --mirror --force`：只剩 `main` + 3 个干净 tag，`feature/phase2-development` 等 10 个分支删除。
 - `audit_repo_secrets.py --strict` 已在 CI 与 `check_all.py` 生效（历史再出现 DB 直接红）。
-- ⚠ 实测 GitHub 仍按旧 commit/blob SHA 返回 200（悬空对象）；**彻底消除需删除+重建仓库**：`ops/rebuild-remote.ps1` 就绪，前置 `gh auth refresh -s delete_repo`（runbook §5）。
+- ✅ **2026-10-28 已彻底处置**：`gh repo delete` + 重建 + 推送干净历史（`main` 86fa061 + 3 tags，分支数 1）。验证：旧 commit → HTTP 422、旧 blob → HTTP 404、`git fetch` → `not our ref`、全新克隆历史扫 `*.db*`/`.encryption_key` 命中 0；star/fork 归零属预期，仓库描述保留。
 
 ### Changed — Phase 2：收口领域边界（Repository / sync / 前端分层，2026-10-27）
 
