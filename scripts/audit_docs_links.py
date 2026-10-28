@@ -53,7 +53,14 @@ SKIP_PREFIXES = ("http://", "https://", "mailto:", "tel:", "data:", "#", "//")
 
 # 运行期数据在 var/（整目录 gitignore）。文档当然要写它（用户要知道库在哪），
 # 但 CI 的干净克隆里必然不存在 —— 不能当成"失效路径"。
-RUNTIME_PREFIXES = ("var/",)
+RUNTIME_PREFIXES = (
+    "var/",                  # 运行期数据（gitignored）
+    "frontend/dist/",        # 前端构建产物（gitignored）
+    "frontend/node_modules/",  # 依赖（gitignored）
+    "frontend/coverage/",    # 覆盖率报告（gitignored）
+    "backend/.venv/",        # Python 虚拟环境（gitignored）
+    "backend/.coverage",     # pytest-cov 产物（gitignored）
+)
 
 
 def normalize_path(p: str) -> str:
