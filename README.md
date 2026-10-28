@@ -46,7 +46,7 @@ backend/app/models/*.py     SQLAlchemy → SQLite
 
 ## 快速开始
 
-环境：Python 3.11+、Node 18+（可选 [uv](https://docs.astral.sh/uv/)）。
+环境：Python 3.11+、**Node 24 LTS**（jsdom 30 要求 ≥22.22 / ≥24.15；Node 20 跑不了前端测试）、可选 [uv](https://docs.astral.sh/uv/)。
 
 根目录 4 个 `.bat` 都是**薄转发壳**：全部逻辑在 [ops/start.ps1](ops/start.ps1) 一处实现
 （D-11 启动器单一实现），`.bat` 只负责把参数转给 PowerShell。安装逻辑同理在

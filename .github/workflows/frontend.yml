@@ -52,10 +52,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Node 20
+      # Node 24：jsdom 30 的 engines 要求 ^22.22.2 || ^24.15.0 || >=26（Node 20 上
+      # vitest 会因 undici/webidl 不兼容直接崩：webidl.util.markAsUncloneable is not a function）。
+      # 与开发机保持一致（本机 Node 24.20）。
+      - name: Set up Node 24
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
           # 复用 npm 缓存；键里包含 lockfile，lock 变了缓存自然失效
           cache: npm
           cache-dependency-path: frontend/package-lock.json
