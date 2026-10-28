@@ -41,7 +41,7 @@ npm run dev                               → 前端 5173（Vite HMR 热更新�
 
 ### 坑 1（严重 · 有丢数据风险）· `app.db` 被 git 跟踪
 
-**现状**：`backend/data/app.db`（约 592 KB）**在版本控制里**（`.gitignore` 未忽略它）。
+**现状**：运行期数据已收敛到 `var/`（gitignored）；`var/data/app.db` **不在版本控制里**。
 
 **会造成什么**：
 
@@ -57,7 +57,8 @@ npm run dev                               → 前端 5173（Vite HMR 热更新�
 
 ```bash
 # 1) 让 git 不再跟踪数据库文件（--cached 只动索引，不动你本地文件，数据安全）
-git rm --cached backend/data/app.db
+# 历史命令（当时库还在 backend/data 下）；现在无需执行，库已不在索引里
+git rm --cached <当时的数据库路径>
 
 # 2) .gitignore 已追加：backend/data/ · backend/data_test/ · data-*/ · .workbuddy/
 #    （本次已改好，无需手动操作）
@@ -156,7 +157,7 @@ npm run dev
 > ✅ 数据目录隔离由 `ops\start.ps1` 的 `-DataDir` 参数提供（`scripts\dev.ps1` 是兼容转发壳，
 > 参数原样透传）。相对路径按 `backend\` 解析，实际注入后端的 `VENUSTECH_DATA_DIR` 一定是
 > **绝对 Windows 路径**（Git-Bash 风格 `/d/...` 会丢盘符，导致后端打开另一个空库）。
-> 不传该参数则沿用主库 `backend/data/app.db`。
+> 不传该参数则沿用主库 `var/data/app.db`。
 > 该参数是分支开发的安全阀 —— 分支上随便跑新增迁移，主库不受影响。
 
 ---
@@ -179,7 +180,7 @@ npm run dev
 
 **分支开发在这个项目上是完全可行且推荐的**，因为它是本地优先应用——切分支就是切代码，开发服务器照常热更新，实时效果与主分支毫无差别。
 
-唯一的门槛曾经是 `backend/data/app.db` 被纳入版本控制，会让"切分支"变成"切数据"。
+唯一的门槛曾经是真实库被纳入版本控制（当时在 `backend` 的 `data/` 下），会让"切分支"变成"切数据"。
 该文件已于 2026-09-15 执行 `git rm --cached` 移出版本控制（见 `CONTRIBUTING.md` 数据与产物章节），
 现在只需用 `VENUSTECH_DATA_DIR`（或 `ops\start.ps1 -DataDir`）给分支独立数据库。
 

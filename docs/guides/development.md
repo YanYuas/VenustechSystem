@@ -75,7 +75,7 @@ backend/app/
 - 使用 SQLAlchemy 2.0 async 语法
 - 迁移用 Alembic（`backend/migrations/`，23 个版本）
 - 模型继承 `Base`（`models/base.py`）
-- 运行期数据存 `backend/data_*/`，已被 `.gitignore` 排除
+- 运行期数据统一存仓库根 `var/`（真实库 `var/data`、演示库 `var/demo`、历史副本 `var/legacy`），已被 `.gitignore` 排除
 
 ### 3.4 测试
 
@@ -157,9 +157,9 @@ frontend/src/
 | 场景 | 命令（任选其一） | 端口 | 数据目录 |
 |---|---|---|---|
 | 环境初始化（仅首次） | `setup.bat` ＝ `ops\setup.ps1` | — | — |
-| 开发 | `start-dev.bat` ＝ `ops\start.ps1 -Mode dev` | 8765(--reload) + 5173 | `backend\data` |
-| 演示（丰富示例数据） | `start-demo.bat` ＝ `-Mode demo` | 8765 + 5173 | `backend\data_demo`（缺库自动 seed） |
-| 手机 / 局域网 | `start-mobile.bat` ＝ `-Mode mobile` | 8765(回环) + **3000**(对外) | `backend\data` |
+| 开发 | `start-dev.bat` ＝ `ops\start.ps1 -Mode dev` | 8765(--reload) + 5173 | `var\data` |
+| 演示（丰富示例数据） | `start-demo.bat` ＝ `-Mode demo` | 8765 + 5173 | `var\demo`（缺库自动 seed） |
+| 手机 / 局域网 | `start-mobile.bat` ＝ `-Mode mobile` | 8765(回环) + **3000**(对外) | `var\data` |
 
 ```powershell
 # 三种模式都可以先"预演"：只打印将要执行的命令 / 环境变量，不启动进程
@@ -167,11 +167,11 @@ powershell -ExecutionPolicy Bypass -File ops\start.ps1 -Mode dev    -WhatIf
 powershell -ExecutionPolicy Bypass -File ops\start.ps1 -Mode demo   -WhatIf
 powershell -ExecutionPolicy Bypass -File ops\start.ps1 -Mode mobile -WhatIf
 
-# 分支开发：数据目录隔离（相对 backend\，会被转成绝对 Windows 路径）
-powershell -ExecutionPolicy Bypass -File ops\start.ps1 -Mode dev -DataDir .\data-fusion
+# 分支开发：数据目录隔离（相对仓库根，会被转成绝对 Windows 路径）
+powershell -ExecutionPolicy Bypass -File ops\start.ps1 -Mode dev -DataDir .\var\data-branch
 
 # 兼容旧入口（等价于 -Mode dev [-DataDir]，仅供既有文档/肌肉记忆使用）
-powershell -ExecutionPolicy Bypass -File scripts\dev.ps1 -DataDir .\data-fusion
+powershell -ExecutionPolicy Bypass -File scripts\dev.ps1 -DataDir .\var\data-branch
 ```
 
 > 启动器会做这些校验（都只在这一处实现）：项目 venv 是否存在、能否 `import uvicorn/fastapi`、
@@ -238,4 +238,4 @@ A: 弱网时请求写入本地 IndexedDB，网络恢复后自动重放。见 `fr
 A: 在 `frontend/src/styles/` 中新增主题变量文件，在 `data-theme` 中注册，无需修改组件代码。
 
 ### Q: 数据存在哪里？
-A: 运行期数据存 `backend/data_*/`（SQLite），已被 `.gitignore` 排除。切换分支不会覆盖本地数据库。
+A: 运行期数据统一存仓库根 `var/`（SQLite）：真实库 `var/data/app.db`、演示库 `var/demo/`、历史副本 `var/legacy/`，全部已被 `.gitignore` 排除；切换分支不会覆盖本地数据库。旧的 `backend/data*` 已迁走并改名保留在 `backend/.legacy-data-2026-10-27/`。

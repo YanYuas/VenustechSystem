@@ -9,8 +9,9 @@
   它等价于 ops\start.ps1 -Mode dev，并继续支持 -DataDir。
 
 .PARAMETER DataDir
-  后端数据目录（相对 backend\）。分支开发用它隔离数据库，避免分支上
-  新增的 Alembic 迁移污染主库、切回 main 时报 "Can't locate revision"。
+  后端数据目录（**相对仓库根**；2026-10-27 var/ 迁移后统一基准）。
+  分支开发用它隔离数据库，避免分支上新增的 Alembic 迁移污染主库、
+  切回 main 时报 "Can't locate revision"。
   详见 docs/guides/branch-development.md。
 
 .PARAMETER WhatIf
@@ -19,7 +20,7 @@
 .EXAMPLE
   powershell -ExecutionPolicy Bypass -File scripts\dev.ps1
 .EXAMPLE
-  powershell -ExecutionPolicy Bypass -File scripts\dev.ps1 -DataDir .\data-fusion
+  powershell -ExecutionPolicy Bypass -File scripts\dev.ps1 -DataDir .\var\data-branch
 .EXAMPLE
   scripts\dev.ps1 -WhatIf
 #>

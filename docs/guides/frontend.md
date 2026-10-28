@@ -9,10 +9,19 @@
 > ⚠️ **2026-10-27 起目录分层已变更，以 [ADR-0007](../architecture/ADR/0007-frontend-feature-architecture.md) 与
 > [`frontend/src/features/README.md`](../../frontend/src/features/README.md) 为准。**
 >
-> 新分层：`kernel/`（无业务底座：http/toast/modal/offline）→ `shared/`（设计系统与壳：
-> constants/directives，styles/components 待 P3）→ `features/<domain>/`（领域唯一所有权落点）。
-> 试点 `features/pet/` 已完成；其余领域仍按旧目录平铺，**正在 P3 分批迁移**。
-> 旧公共模块（`api/http.ts`、`composables/useToast.ts` 等 8 处）保留**薄转发壳**，P4 删除。
+> 现行分层：`app/`（入口 / 路由 / 应用壳）→ `kernel/`（无业务底座：http / toast / modal / offline /
+> async / device）→ `shared/`（设计系统与壳：components / styles / constants / directives / theme /
+> types / composables / test）→ `features/<domain>/`（27 个领域唯一所有权落点：22 个页面域 +
+> 5 个 API-only 域）。
+>
+> **P3 全量迁移 + P4 壳清理已完成**：`api/ composables/ stores/ constants/ directives/ types/ utils/
+> views/ components/ styles/ test/` 已全部从 `src/` 根消失。其中样式与测试前置归位为：
+> `src/styles/*.scss` → `src/shared/styles/*.scss`（`app/main.ts` 按
+> variables → element-plus → global → animations 顺序注入），
+> `src/test/setup.ts` → `src/shared/test/setup.ts`（`vitest.config.ts` 的 `setupFiles` 已同步）。
+> `auto-imports.d.ts` / `components.d.ts`（unplugin 生成产物）与 `env.d.ts`（全局环境声明）
+> **保留在 `src/` 根**：它们是构建工具/TS 的声明入口，不是分层资产（详见
+> [`frontend/src/shared/README.md`](../../frontend/src/shared/README.md)）。
 >
 > 下面这棵树是**迁移中的历史快照**，数量与部分文件（如已删除的 BaseConfirm/BaseTooltip）
 > 已不代表现状 —— 用于理解历史结构，不要据此新增文件。

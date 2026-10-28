@@ -77,9 +77,9 @@ models/<module>.py ── SQLAlchemy 模型 → SQLite（WAL）
 
 | 模式 | 启动器 | 进程 | 端口 | 数据目录 | 适用 |
 |---|---|---|---|---|---|
-| 开发 | `start-dev.bat` / `scripts/dev.ps1` | Vite + uvicorn(`--reload`) | 5173 / 8765 | `backend/data` | 写代码 |
-| 演示 | `start-demo.bat` | 同上，`VENUSTECH_DATA_DIR=backend/data_demo` | 5173 / 8765 | `backend/data_demo` | 给别人看，不污染真实库 |
-| 统一/移动 | `start-mobile.bat` | server.js + uvicorn | **3000**（对外）/ 8765（回环） | `backend/data` | 局域网/手机/Tailscale |
+| 开发 | `start-dev.bat` / `scripts/dev.ps1` | Vite + uvicorn(`--reload`) | 5173 / 8765 | `var/data` | 写代码 |
+| 演示 | `start-demo.bat` | 同上，`VENUSTECH_DATA_DIR=<repo>/var/demo` | 5173 / 8765 | `var/demo` | 给别人看，不污染真实库 |
+| 统一/移动 | `start-mobile.bat` | server.js + uvicorn | **3000**（对外）/ 8765（回环） | `var/data` | 局域网/手机/Tailscale |
 
 **关键边界**：后端永远只绑 `127.0.0.1`；对外只暴露 `server.js` 的 3000。`server.js` 做三件事：托管 `frontend/dist`、把 `/api/*` 代理到 8765、校验 `X-API-Token`（回环来源豁免，PC 前端零配置）。
 
@@ -217,17 +217,20 @@ VenustechSystem/
 │   │   ├── kernel/             ★ 无业务语义底座：http(client·errors·request·sse·types) / ui / offline / device / async / electron
 │   │   ├── shared/             ★ 设计系统与壳：components(common+layout) / theme / constants / directives / composables / types
 │   │   ├── features/           ★ 27 个领域包（api·model·composables·components·views·index.ts）
-│   │   ├── styles/             4 套主题 × 明暗（P4 剩余：迁入 shared/styles）
-│   │   └── test/               vitest setup
+│   │   └── shared/styles/      ★ 4 套主题 × 明暗（2026-10-27 由 src/styles 迁入）
+│   │       shared/test/        vitest setup（2026-10-27 由 src/test 迁入）
 │   ├── eslint.config.js        ESLint 9 flat（含 ADR-0007 分层边界规则）
 │   ├── .prettierrc.json        Prettier（semi:false；多语句内联 handler 必须抽函数）
 │   ├── public/                 manifest + sw.js（PWA）
 │   ├── android/                Capacitor 原生工程（构建产物，勿手改）
 │   └── scripts/                前端专用测试脚本（esbuild）
 ├── ops/                        ★ 运行时与运维（不是业务代码）
-│   ├── server/                 统一 Web 服务：server.js + package.json + node_modules
+│   ├── start.ps1               ★ 唯一启动实现（dev/demo/mobile，-WhatIf 可预演）
+│   ├── setup.ps1               唯一安装实现（venv + 依赖 + node_modules）
+│   ├── backup-git.ps1          Git 全历史 bundle 备份（轮转 + 校验）
+│   ├── rebuild-remote.ps1      远端泄漏仓库重建（删→建→推干净历史→验证旧 SHA 404）
 │   ├── push-branches.bat       推送辅助
-│   └── （规划）scripts/ 唯一启动实现、ci/ 门禁脚本、runbooks/
+│   └── server/                 统一 Web 服务：server.js + package.json + node_modules
 ├── scripts/                    质量门禁与工程脚本（check_all / audit_* / check_versions）
 ├── docs/                       文档（IA 见 docs/README.md）
 │   ├── architecture/           ★ 本文、domains.json、ADR/、legacy/
@@ -253,11 +256,21 @@ VenustechSystem/
 **唯一配置入口**：`backend/app/config.py` 的 `Settings`，前缀 `VENUSTECH_`，模板见 `backend/.env.example`。
 
 **数据目录（最重要的一个变量）**：
-- 开发默认 `backend/data`（**相对 `backend/` 解析，与启动方式无关** —— 曾经用 `./data` 导致从仓库根启动时生成第二份数据库）。
-- 由 `VENUSTECH_DATA_DIR` 覆盖（演示库、分支隔离、测试都用它）。
+- 开发/源码运行默认 `<仓库根>/var/data`（**相对仓库根解析，与启动方式无关** —— 曾经用 `./data` 导致从仓库根启动时生成第二份数据库）。
+- 由 `VENUSTECH_DATA_DIR` 覆盖（演示库 `var/demo`、分支隔离、测试都用它）；启动器的 `-DataDir` 相对路径也按**仓库根**解析。
 - 目录内包含：`app.db`（SQLite，WAL）、`logs/`、`backups/`、`documents/`、`plugins/`、`.encryption_key`。
+- 一次性兼容分支：若 `var/data` 不存在但旧的 `backend/data` 存在，`config._default_data_dir()` 会回退旧目录并告警（迁移完成后可删除，见源码注释）。
 
 **约定**：仓库内的一切运行期数据都属于 `var/`（已整体 gitignore）。**不要把数据库、密钥、日志放进任何会被提交的位置。**
+
+| 目录 | 用途 |
+|---|---|
+| `var/data` | 真实库（含 `app.db` / `.encryption_key` / `logs` / `plugins` 等） |
+| `var/demo` | 演示库（`seed_demo.py` 生成，可重建） |
+| `var/legacy/` | 历史数据副本（`data_hc` / `data_pet` / `data_smoke*` / `data_tpl*` / `data_tt`） |
+| `var/backups/` | 备份产物（git bundle、迁移前快照），**必须再复制到仓库外** |
+
+> 2026-10-27 已把旧的 `backend/data*` 物理迁移到 `var/`；旧目录改名保留在 `backend/.legacy-data-2026-10-27/`（gitignored，确认无误后可删）。
 
 | 文件 | 位置 | 说明 |
 |---|---|---|
@@ -322,7 +335,7 @@ CI：`.github/workflows/{backend,frontend,repo-guard}.yml` + `android-build.yml`
 | ID | 等级 | 债务 | 证据 | 处置阶段 |
 |---|---|---|---|---|
 | D-01 | **P0** | 令牌回环绕过：cloudflared 场景等于无鉴权 | `ops/server/server.js` `isAuthorized()` | ✅ 已修（2026-10-26）：代理头检测 + 常量时间比较 + 16 条单测 + CI |
-| D-02 | **P0** | `origin/feature/phase2-development` 包含真实用户库 `backend/data/app.db`（606KB，公开可拉） | 泄漏提交 `6b5c2dd`，仅该分支可达；**无 `.encryption_key`**（密文字段安全） | ⚠️ 已评估 + 检测守护 + runbook；**待你执行删分支/重建远端**（不可逆） |
+| D-02 | **P0** | `origin/feature/phase2-development` 包含真实用户库 `app.db`（当时位于 `backend` 的 `data/` 下，606KB，公开可拉） | 泄漏提交 `6b5c2dd`，仅该分支可达；**无 `.encryption_key`**（密文字段安全） | 🟡 部分完成（2026-10-27）：本地+远端 refs 已清洗（filter-repo 后 44 commits、tree 不变；远端仅 main+tags，10 个陈旧分支删除；`audit_repo_secrets --strict` 已开）。**但实测 GitHub 仍按旧 SHA 返回对象（HTTP 200）→ 待重建仓库彻底消除**：`ops/rebuild-remote.ps1`（需先 `gh auth refresh -s delete_repo`）+ runbook §5 |
 | D-03 | **P0** | 备份导入 100% 失败：`FormData` 被 `JSON.stringify` 后发 JSON，后端要 multipart → 422 | `frontend/src/features/dashboard/api.ts` + `kernel/http/index.ts` ↔ `backend/app/api/backup.py` | ✅ 已修（2026-10-26）：`http.postForm` + 真实 multipart 运行时断言 11/11 |
 | D-04 | P1 | **事务边界下沉**：`BaseRepository` 每个方法内部 commit，service 再 commit → 多步操作无原子性 | `repositories/base.py` | ✅ 已修（2026-10-26）：repo 只 flush、service 控 commit、get_db 兜底；8 条原子性测试 + 守护 R11 |
 | D-05 | P1 | 迁移基线失效：`0001` 用 `create_all()`，11 张基线表无 DDL；升级库缺 11 个索引 | `migrations/versions/0001_initial.py` | ✅ 已修（2026-10-26）：0001 冻结显式 DDL（49 表/79 索引）+ 0021 对账 + 6 条完整性测试 + 守护 R12 |
@@ -335,7 +348,7 @@ CI：`.github/workflows/{backend,frontend,repo-guard}.yml` + `android-build.yml`
 | D-12 | P2 | `.git` 是 Junction 指向 `C:\Users\21722\qimingxing-git-repo`：备份项目目录 ≠ 备份历史 | 文件系统 | ✅ 已提供工具（2026-10-27）：`ops/backup-git.ps1`（bundle 创建/校验/轮转，实测 4.5MB 通过）+ runbook；结构性迁移待停机窗口 |
 | D-13 | P2 | 无 lint：ESLint/Prettier/ruff 全缺 | — | ✅ 已修（2026-10-27）：backend ruff E4/E7/E9/F（245→0，进 CI）；frontend ESLint 9 flat（含 ADR-0007 边界）+ Prettier（进 CI） |
 | D-14 | P2 | `server.js` 是唯一鉴权点却零测试 | `ops/server/server.js` | ✅ 已修（2026-10-26）：`ops/server/test` 16 用例 + CI edge-server job |
-| D-16 | P2 | `backend/scripts/**` 未纳入 ruff（实测 13 条，含 3 条 F821 疑似真 bug） | `backend/scripts/` | Phase 4 |
+| D-16 | P2 | `backend/scripts/**` 未纳入 ruff（实测 13 条，含 3 条 F821 疑似真 bug） | `backend/scripts/` | ✅ 已修（2026-10-27）：13 → 0（F541 4 / F401 3 / F821 3 / F841 3）。F821 逐条核实：`seed_demo.seed_tasks` 的 `utcnow()` 是**真 bug**（缺导入，补 `from app.models.base import utcnow`）；`smoke_backend` 两处 `pathlib.Path(...) if 'pathlib' in dir()` 是**死代码**（条件恒 False 且下一行覆盖），删除。门禁三处统一为 `ruff check app tests scripts`（backend.yml / check_all 第 15 项 / pyproject 口径注释） |
 | D-15 | **P0（隐性）** | 架构守护 R1/R2 长期**空转**：`layer_of_file()` 拿仓库相对路径比 `app/` 前缀（永不匹配），且 `TYPE_CHECKING` 豁免标记传入未使用 → `--strict` 恒绿 | `scripts/audit_architecture.py` | ✅ 已修（2026-10-27）：路径基准改为 `backend/`、TYPE_CHECKING 真正豁免；新增 4 条负向 + 2 条回归测试 |
 
 > 原则：**先修 P0/P1 的"正确性"，再谈结构搬迁**。在事务边界、迁移基线、备份导入还有问题时做领域分包，只是把混乱打包进更漂亮的新目录。
@@ -350,7 +363,7 @@ CI：`.github/workflows/{backend,frontend,repo-guard}.yml` + `android-build.yml`
 | **Phase 1** | 修正确性 P0/P1 | D-01/03/04/05/08/10/14 ✅ 完成；D-02 ✅ 已评估（runbook + 守护，**远端处置待你执行**）；D-06/07/09 转入 Phase 2 | ✅ 本轮完成（2026-10-26，1229 测试全绿） |
 | **Phase 2** | 收口领域边界 | D-06 仓储收口（156→0，R13）、D-07 sync 下沉（core 0 models 依赖）、D-09 SettingsView 拆分（1701→291）、前端 `kernel/shared/features` + pet 试点（R14）、D-15 守护空转修复 | ✅ 本轮完成（2026-10-27，1282 测试 + 86 前端测试全绿） |
 | **Phase 3** | 可持续交付 | P3 全量迁移（27 域 → features，旧路径 392→0）、P4（8 壳删除 + kernel 依赖归位 + `kernel/http` 拆分）、D-11 启动器单一实现、D-12 备份工具、D-13 前后端 lint 进 CI、ADR-0008 | ✅ 本轮完成（2026-10-27，1284 后端 + 86 前端测试，lint/format/构建全绿） |
-| **Phase 4** | 收尾与交付 | P0-2 远端泄漏处置（**需你执行**）、`styles/` 与工程文件归位、`backend/scripts` 纳入 lint、`var/` 数据物理迁移、CI 首次真实运行 | 待批 |
+| **Phase 4** | 收尾与交付 | P0-2 泄漏处置（refs/本地历史已清洗；**彻底消除需重建仓库**）、`styles/`+`test/setup` 归位（sass 输出逐字节一致）、D-16 `backend/scripts` 纳入 ruff（13→0，含 1 个真潜伏 bug）、`var/` 数据物理迁移（SHA256+行数校验）、敏感文件守护 `--strict` | ✅ 本轮完成（2026-10-27，1284 后端 + 86 前端测试；**仅剩仓库重建需 delete_repo 权限**） |
 
 **明确不做（以及为什么）**：
 

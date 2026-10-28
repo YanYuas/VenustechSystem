@@ -10,9 +10,13 @@
 
   三种模式：
     dev    后端 FastAPI 127.0.0.1:8765（--reload）+ 前端 Vite 5173 + 开浏览器
-    demo   同 dev，但数据目录指向 backend\data_demo（缺库先 seed_demo.py）
+    demo   同 dev，但数据目录指向 var\demo（缺库先 seed_demo.py）
     mobile 后端仅回环 8765 + 统一边缘服务 ops/server/server.js 0.0.0.0:3000
            （静态 + /api 代理 + 访问令牌）
+
+  运行期数据统一放仓库根 var/（见 ARCHITECTURE.md §7 / ADR-0004）：
+    var\data 真实库 · var\demo 演示库 · var\legacy 历史副本。
+  数据目录可由 -DataDir 覆盖；相对路径一律按**仓库根**解析。
 
   所有校验（venv 是否存在 / 依赖能否 import / node_modules / 端口占用 /
   前端 dist 是否需要构建 / 演示库是否需要 seed）都只在这里实现一次；
@@ -22,7 +26,8 @@
   dev | demo | mobile
 
 .PARAMETER DataDir
-  覆盖后端数据目录。相对路径按 backend\ 解析（与原 scripts/dev.ps1 一致），
+  覆盖后端数据目录。默认 dev/mobile 用 var\data、demo 用 var\demo（相对仓库根）；
+  传入的相对路径同样按**仓库根**解析（2026-10-27 var/ 迁移后统一基准），
   实际传给后端时一律转成绝对 Windows 路径（Git-Bash 风格 /d/... 会丢盘符）。
 
 .PARAMETER WhatIf
@@ -34,7 +39,7 @@
 .EXAMPLE
   powershell -ExecutionPolicy Bypass -File ops\start.ps1 -Mode demo -WhatIf
 .EXAMPLE
-  powershell -ExecutionPolicy Bypass -File scripts\dev.ps1 -DataDir .\data-fusion
+  powershell -ExecutionPolicy Bypass -File scripts\dev.ps1 -DataDir .\var\data-branch
 #>
 
 param(
@@ -168,8 +173,8 @@ function Get-EffectiveDataDir([string]$DefaultDir) {
     if ([System.IO.Path]::IsPathRooted($chosen)) {
         return [System.IO.Path]::GetFullPath($chosen)
     }
-    # 相对路径以 backend\ 为基准（与原 scripts/dev.ps1 的 -DataDir 约定一致）
-    return [System.IO.Path]::GetFullPath((Join-Path $Backend $chosen))
+    # 相对路径以仓库根为基准（2026-10-27 var/ 迁移后的统一约定，旧约定是 backend\）
+    return [System.IO.Path]::GetFullPath((Join-Path $Root $chosen))
 }
 
 # ------------------------------------------------------------------
@@ -257,17 +262,17 @@ function Start-DevMode {
     if (Test-PortListening $BackendPort) { Write-Note "port $BackendPort in use (backend may already be running)" }
     if (Test-PortListening $FrontendPort) { Write-Note "port $FrontendPort in use (frontend may already be running)" }
 
-    $effectiveDataDir = $null
+    # 数据目录：默认 var\data；-DataDir 覆盖（相对路径按仓库根解析）
+    $effectiveDataDir = Get-EffectiveDataDir (Join-Path $Root 'var\data')
     if (-not [string]::IsNullOrEmpty($DataDir)) {
-        $effectiveDataDir = Get-EffectiveDataDir (Join-Path $Root 'backend\data')
-        Write-Info "Data dir: $effectiveDataDir (branch isolation; VENUSTECH_DATA_DIR)"
+        Write-Info "Data dir: $effectiveDataDir (override; VENUSTECH_DATA_DIR)"
     } else {
-        Write-Info 'Data dir: backend\data (default)'
+        Write-Info "Data dir: $effectiveDataDir (default; VENUSTECH_DATA_DIR)"
     }
-    if ($script:IsWhatIf -and $null -ne $effectiveDataDir) {
+    if ($script:IsWhatIf) {
         Write-Plan "would set env VENUSTECH_DATA_DIR=$effectiveDataDir for the backend window"
     }
-    if ($null -ne $effectiveDataDir) { $env:VENUSTECH_DATA_DIR = $effectiveDataDir }
+    $env:VENUSTECH_DATA_DIR = $effectiveDataDir
 
     Write-Step '1/3'
     $backendArgs = @('-m', 'uvicorn', 'app.main:app', '--host', '127.0.0.1', '--port', "$BackendPort", '--reload')
@@ -281,7 +286,6 @@ function Start-DevMode {
     Write-Step '3/3'
     [void](Wait-ForServices 8 $BackendPort 'backend FastAPI')
     Open-Browser "http://localhost:$FrontendPort"
-
     Write-Section 'DEV started'
     Write-Info "Backend : http://127.0.0.1:$BackendPort"
     Write-Info "Frontend: http://localhost:$FrontendPort"
@@ -300,9 +304,9 @@ function Start-DemoMode {
 
     [void](Assert-Node)
 
-    $demoDir = Get-EffectiveDataDir (Join-Path $Root 'backend\data_demo')
+    $demoDir = Get-EffectiveDataDir (Join-Path $Root 'var\demo')
     Write-Info "Data dir: $demoDir"
-    Write-Info '  (your real database - backend\data - is NOT touched)'
+    Write-Info '  (your real database - var\data - is NOT touched)'
 
     $dbFile = Join-Path $demoDir 'app.db'
     if (-not (Test-Path -LiteralPath $dbFile)) {
@@ -438,7 +442,7 @@ function Start-MobileMode {
 
     $effectiveDataDir = $null
     if (-not [string]::IsNullOrEmpty($DataDir)) {
-        $effectiveDataDir = Get-EffectiveDataDir (Join-Path $Root 'backend\data')
+        $effectiveDataDir = Get-EffectiveDataDir (Join-Path $Root 'var\data')
         if ($script:IsWhatIf) { Write-Plan "would set env VENUSTECH_DATA_DIR=$effectiveDataDir for the backend window" }
         $env:VENUSTECH_DATA_DIR = $effectiveDataDir
     }

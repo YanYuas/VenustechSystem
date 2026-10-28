@@ -121,11 +121,11 @@ jobs:
 
       # 上面那步只看「当前索引」；本步额外扫描**全部 refs 的历史新增文件**。
       # 背景：backend/data/app.db 曾被提交（提交 6b5c2dd），删出索引并不能消除历史。
-      # 现状：历史泄漏仍存在（待按 docs/runbooks/security-incident-db-leak.md 处置），
-      #       因此默认只告警、不判红；**处置完成后请把本步骤改为 --strict**，让复发直接失败。
-      - name: 仓库敏感文件守护（索引 + 历史 + .gitignore）
+      # 2026-10-27：历史已用 git-filter-repo 清洗（远端 refs 已无泄漏；SHA 级残留待仓库重建），
+      # 因此这里改为 --strict：历史里再出现数据库/密钥 = 直接失败（防止复发）。
+      - name: 仓库敏感文件守护（索引 + 历史 + .gitignore，--strict）
         if: always()
-        run: python scripts/audit_repo_secrets.py
+        run: python scripts/audit_repo_secrets.py --strict
 
   # 统一 Web 服务（ops/server）是唯一鉴权入口，必须有自己的测试。
   # 2026-10 审计 P0：回环绕过（cloudflared 场景无鉴权）—— 修复后在这里守住。

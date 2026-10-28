@@ -7,7 +7,7 @@
 
 | 对象 | 位置 | 丢失后果 |
 |---|---|---|
-| 数据库 | `$VENUSTECH_DATA_DIR/app.db`（默认 `backend/data/app.db`） | 全部业务数据丢失 |
+| 数据库 | `$VENUSTECH_DATA_DIR/app.db`（dev 默认 `<仓库根>/var/data/app.db`） | 全部业务数据丢失 |
 | 加密主密钥 | `$VENUSTECH_DATA_DIR/.encryption_key` | 已加密字段（AI Key、保险箱凭据）**永久不可解**，换钥也无法恢复 |
 | 前端产物 + 服务代码 | `frontend/dist`、`ops/server/` | 可重新构建/检出，非关键 |
 
@@ -20,7 +20,8 @@
 2. 复制整个数据目录到一个带日期的文件夹：
 
 ```powershell
-$data = "D:\YanYuas\PersonalDevelopmentPortfolio\VenustechSystem\backend\data"
+# 2026-10-27 起新增装/开发数据目录在仓库根 var/（旧 backend/data 已迁移并改名保留）
+$data = "D:\YanYuas\PersonalDevelopmentPortfolio\VenustechSystem\var\data"
 $dest = "D:\Backups\qimingxing-$(Get-Date -Format yyyyMMdd-HHmm)"
 New-Item -ItemType Directory -Path $dest -Force | Out-Null
 Copy-Item "$data\app.db*" $dest
@@ -28,6 +29,11 @@ Copy-Item "$data\.encryption_key" $dest
 ```
 
 3. 校验：`$dest` 里应有 `app.db`、`.encryption_key`；启动后端确认数据完整。
+
+> 仓库内备份产物统一放 `var/backups/`（gitignored，**必须再复制到仓库外**）。
+> `var/backups/data-pre-var-migration-2026-10-27/` 是本次 `backend/data → var/data`
+> 迁移前的逐文件快照（含 `.encryption_key`，SHA256 与源一致；确认无误后可删）。
+> 旧目录本身也未删除，改名为 `backend/.legacy-data-2026-10-27/`。
 
 ## 3. 应用内备份 / 恢复
 
@@ -40,13 +46,13 @@ Copy-Item "$data\.encryption_key" $dest
 ## 4. 恢复步骤
 
 1. 停止后端。
-2. 把备份的 `app.db` 与 `.encryption_key` 放回 `$VENUSTECH_DATA_DIR`。
+2. 把备份的 `app.db` 与 `.encryption_key` 放回 `$VENUSTECH_DATA_DIR`（dev 默认 `<仓库根>\var\data`）。
 3. 启动后端：`start-dev.bat`（薄转发壳 → `ops\start.ps1 -Mode dev`；会自动跑迁移，Alembic 幂等）。
 4. 验证：首页有数据；设置页能解密已存的 AI Key（说明密钥正确）。
 
 ## 5. 换机迁移清单
 
-- [ ] 复制数据目录（含 `.encryption_key`）
+- [ ] 复制数据目录（dev 默认 `<仓库根>/var/data`，含 `.encryption_key`）
 - [ ] `setup.bat` 安装依赖
 - [ ] 若用手机访问：旧机的 `.qm-token` **不要**沿用，让新机重新生成后在手机端重填
 - [ ] 确认 `.git` 是否随项目目录备份（见 ADR/ARCHITECTURE D-12：`.git` 可能是外置 Junction）

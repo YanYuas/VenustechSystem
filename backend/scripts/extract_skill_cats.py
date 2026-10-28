@@ -114,7 +114,7 @@ def generate(cats: list[dict]) -> str:
     L.append("#       （源文件 L1094–L1117）")
     L.append("#")
     L.append("# 生成方式：**脚本提取，非手工转录**")
-    L.append(f"#   python scripts/extract_skill_cats.py")
+    L.append("#   python scripts/extract_skill_cats.py")
     L.append("#   如需增删分类或关键词，改本文件即可（引擎侧无需改动）。")
     L.append("#")
     L.append(f"# 规模：{len(cats)} 个分类 / {total_kw} 个关键词（实测）")

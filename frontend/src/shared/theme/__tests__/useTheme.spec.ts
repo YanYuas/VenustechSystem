@@ -15,7 +15,7 @@
 // ============================================================
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { mediaState, setSystemDark } from '@/test/setup'
+import { mediaState, setSystemDark } from '@/shared/test/setup'
 
 type ThemeApi = ReturnType<(typeof import('../useTheme'))['useTheme']>
 

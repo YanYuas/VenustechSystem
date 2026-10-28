@@ -59,7 +59,7 @@ setup.bat
 # 2) 开发启动：后端 127.0.0.1:8765(--reload) + 前端 http://localhost:5173
 start-dev.bat
 
-# 演示启动（独立库 backend/data_demo，不污染真实数据；缺库自动 seed）
+# 演示启动（独立库 var/demo，不污染真实数据；缺库自动 seed）
 start-demo.bat
 
 # 手机 / 局域网（后端只绑回环，唯一对外端口 3000，需要访问令牌）
@@ -73,11 +73,11 @@ powershell -ExecutionPolicy Bypass -File ops\start.ps1 -Mode dev    -WhatIf
 powershell -ExecutionPolicy Bypass -File ops\start.ps1 -Mode demo   -WhatIf
 powershell -ExecutionPolicy Bypass -File ops\start.ps1 -Mode mobile -WhatIf
 
-# 分支隔离：数据目录指到独立位置（相对 backend\，会自动转绝对路径）
-powershell -ExecutionPolicy Bypass -File ops\start.ps1 -Mode dev -DataDir .\data-fusion
+# 分支隔离：数据目录指到独立位置（相对仓库根，会自动转绝对路径）
+powershell -ExecutionPolicy Bypass -File ops\start.ps1 -Mode dev -DataDir .\var\data-branch
 
 # 旧入口仍可用（兼容壳，等价于 -Mode dev [-DataDir]）
-powershell -ExecutionPolicy Bypass -File scripts\dev.ps1 -DataDir .\data-fusion
+powershell -ExecutionPolicy Bypass -File scripts\dev.ps1 -DataDir .\var\data-branch
 ```
 
 手动启动（等价）：
@@ -94,7 +94,7 @@ cd frontend && npm run dev
 node ops/server/server.js        # → http://<本机IP>:3000
 ```
 
-> 数据目录默认 `backend/data`，可用 `VENUSTECH_DATA_DIR` 覆盖（演示/分支隔离/测试都用它）。
+> 数据目录默认 `<仓库根>/var/data`（dev/源码运行；打包后走 `%APPDATA%/VenustechSystem`），可用 `VENUSTECH_DATA_DIR` 覆盖（演示/分支隔离/测试都用它）。
 > 配置项见 [backend/.env.example](backend/.env.example)，**AI API Key 不入环境变量**（按用户加密存库，在 App 设置页填）。
 
 ---

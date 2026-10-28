@@ -770,7 +770,7 @@ python scripts/smoke_backend.py
 ## 十四、常见问题
 
 ### Q1: 数据库文件在哪里？
-A: 默认在 `backend/data/app.db`，可通过 `VENUSTECH_DATA_DIR` 环境变量修改。
+A: 默认在 `var/data/app.db`（2026-10-27 起；此前在 `backend` 的 `data/` 下），可通过 `VENUSTECH_DATA_DIR` 环境变量修改。
 
 ### Q2: 如何重置数据库？
 A: 删除 `data/app.db` 和 `data/app.db-wal`，重启服务会自动迁移并灌演示数据。

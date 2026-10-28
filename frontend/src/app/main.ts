@@ -9,10 +9,10 @@ import { setupErrorHandler } from './errorHandler'
 import { setupDirectives } from '@/shared/directives'
 
 // 样式：token 体系 → EP 覆盖 → 全局 → 动画
-import '@/styles/variables.scss'
-import '@/styles/element-plus.scss'
-import '@/styles/global.scss'
-import '@/styles/animations.scss'
+import '@/shared/styles/variables.scss'
+import '@/shared/styles/element-plus.scss'
+import '@/shared/styles/global.scss'
+import '@/shared/styles/animations.scss'
 import { setOfflineQueueHandler } from '@/kernel/http'
 import { useOfflineQueueStore } from '@/kernel/offline/offlineQueue'
 

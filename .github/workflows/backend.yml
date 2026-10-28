@@ -102,13 +102,14 @@ jobs:
           fi
           python scripts/audit_architecture.py --strict
 
-      # 后端 lint（D-13）：规则口径在 backend/pyproject.toml —— 只启 E4/E7/E9/F 正确性规则，
+      # 后端 lint（D-13 + D-16）：规则口径在 backend/pyproject.toml —— 只启 E4/E7/E9/F 正确性规则，
       # 显式忽略 E501（线长），**不跑 ruff format**（全仓格式化会产出千行纯风格 diff）。
+      # 覆盖 app + tests + scripts（D-16 起把 backend/scripts/** 也纳入，与 check_all.py 第 15 项一致）。
       # 放在 pytest 之前：lint 秒级失败，比等几分钟测试更早给信号。
       - name: "Ruff lint (correctness rules: E4/E7/E9/F)"
         working-directory: backend
         timeout-minutes: 5
-        run: python -m ruff check app tests
+        run: python -m ruff check app tests scripts
 
       - name: Backend test suite (pytest)
         working-directory: backend

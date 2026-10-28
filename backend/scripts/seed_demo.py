@@ -6,16 +6,16 @@
 不动你的真实库。
 
 ## 为什么用独立目录
-真实库（`backend/data/`）是你的正史，不该被演示数据污染。
-本脚本默认写 `backend/data_demo/`（已在 .gitignore），
+真实库（`<仓库根>/var/data/`）是你的正史，不该被演示数据污染。
+本脚本默认写 `<仓库根>/var/demo/`（var/ 已在 .gitignore），
 演示完直接删掉目录就干净了。
 
 ## 用法
 ```bash
 cd backend
-.venv/Scripts/python.exe scripts/seed_demo.py            # 灌进 data_demo（已存在则询问）
+.venv/Scripts/python.exe scripts/seed_demo.py            # 灌进 var/demo（已存在则询问）
 .venv/Scripts/python.exe scripts/seed_demo.py --reset     # 先清空再灌
-.venv/Scripts/python.exe scripts/seed_demo.py --data-dir data_demo2
+.venv/Scripts/python.exe scripts/seed_demo.py --data-dir ../var/demo2
 .venv/Scripts/python.exe scripts/seed_demo.py --verify    # 只体检，不写入
 ```
 
@@ -49,7 +49,12 @@ if str(SCRIPTS_DIR) not in sys.path:
 
 import demo_seed_data as D  # noqa: E402
 
-# 演示保险箱主密码：只用于 data_demo 这个独立库；请勿在真实库使用
+# 仓库根（backend/ 的上一级）；运行期数据统一在仓库根 var/ 下（ADR-0004）
+REPO_ROOT = BACKEND_DIR.parent
+# 演示库默认位置：<仓库根>/var/demo（2026-10-27 由 backend/data_demo 迁移而来）
+DEFAULT_DATA_DIR = REPO_ROOT / "var" / "demo"
+
+# 演示保险箱主密码：只用于 var/demo 这个独立库；请勿在真实库使用
 DEMO_MASTER_PASSWORD = "demo-master-password-2026"
 
 random.seed(20260919)  # 固定种子：每次生成同样的"随机"数据，便于复现
@@ -71,8 +76,8 @@ def aday(days: float = 0) -> date:
 # ============================================================
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="生成启明星演示数据")
-    p.add_argument("--data-dir", default="data_demo",
-                   help="数据目录（相对 backend/ 或绝对路径），默认 data_demo")
+    p.add_argument("--data-dir", default=str(DEFAULT_DATA_DIR),
+                   help="数据目录（相对 backend/ 或绝对路径），默认仓库根 var/demo")
     p.add_argument("--reset", action="store_true", help="先清空演示用户数据再灌")
     p.add_argument("--verify", action="store_true", help="只体检现有数据，不写入")
     p.add_argument("--yes", action="store_true", help="跳过确认提示")
@@ -100,7 +105,7 @@ def main() -> int:
     import app.models  # noqa: F401  注册全部表
     from sqlalchemy import delete, func, select
 
-    from app.database import Base, SessionLocal, engine
+    from app.database import SessionLocal, engine
     from app.migrate import run_migrations
     from app.models.base import utcnow
 
@@ -160,7 +165,7 @@ def assert_safe_to_reset(data_dir: Path) -> None:
     """--reset 的安全护栏。
 
     这是你的**个人人生数据**，误删不可恢复。所以在动任何删除之前先卡住：
-      1. 目标是真实数据目录（backend/data 或打包后的系统数据目录）→ 直接拒绝
+      1. 目标是真实数据目录（var/data、旧 backend/data 或打包后的系统数据目录）→ 直接拒绝
       2. 目录名不含 demo 字样 → 拒绝（要求显式 --i-know-what-im-doing）
 
     宁可多一步麻烦，也不接受「一条命令删掉正史」这种事。
@@ -177,12 +182,12 @@ def assert_safe_to_reset(data_dir: Path) -> None:
     if resolved in real_dirs:
         raise SystemExit(
             f"❌ 拒绝在该目录执行 --reset：{resolved}\n"
-            "   这是真实数据目录。演示数据请用 --data-dir data_demo。"
+            "   这是真实数据目录。演示数据请用 --data-dir var/demo。"
         )
     if "demo" not in resolved.name.lower():
         raise SystemExit(
             f"❌ 目录名不含 demo，拒绝 --reset：{resolved.name}\n"
-            "   如确认可删，请换用带 demo 的目录名（如 data_demo2）。"
+            "   如确认可删，请换用带 demo 的目录名（如 var/demo2）。"
         )
 
 
@@ -257,12 +262,12 @@ def print_summary(counts: dict[str, int], data_dir: Path) -> None:
     print(f"  合计 {total} 行 · 覆盖 {len(counts)} 张表")
     print()
     print("怎么看这套数据（不影响真实库）：")
-    print("  1) 双击根目录的 start-demo.bat  —— 用 data_demo 起后端(8765)")
+    print("  1) 双击根目录的 start-demo.bat  —— 用 var\\demo 起后端(8765)")
     print("  2) 另开一个前端：start-dev.bat 里的前端部分，或已有 Vite(5173)")
     print()
     print("  注意：不要用 Git Bash 的 /d/... 形式设置环境变量 ——")
     print('  Path("/d/x") 在 Windows 上会解析成 \\d\\x（丢盘符），服务会打开另一个库。')
-    print(f"  手动启动请用 Windows 路径：")
+    print("  手动启动请用 Windows 路径：")
     print(f'    set VENUSTECH_DATA_DIR={data_dir}')
     print("    .venv\\Scripts\\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8765")
     print()
@@ -425,6 +430,7 @@ def seed_projects(db, counts: dict[str, int]) -> None:
 
 # ---------- 4. 任务与子任务 ----------
 def seed_tasks(db, counts: dict[str, int]) -> None:
+    from app.models.base import utcnow
     from app.models.task import Subtask, Task
 
     pmap = globals()["_PMAP"]
@@ -791,7 +797,6 @@ def seed_life(db, counts: dict[str, int]) -> None:
 def seed_reviews(db, counts: dict[str, int]) -> None:
     from app.models.review import Review
 
-    pmap = globals()["_PMAP"]
     weekly = [
         ("这周把动态规划那套题过完了，比预期快一天。",
          "蒸汽蓬勃的数据源还是没定，卡在第 3 天。",
@@ -1173,7 +1178,6 @@ def seed_workspace(db, counts: dict[str, int]) -> None:
     db.add(root)
     db.flush()
 
-    idmap = globals()["_IDMAP"]
     n = 0
     total_size = 0
     for dir_path, files, identity_slug in D.WORKSPACE_TREE:

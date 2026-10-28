@@ -95,7 +95,6 @@ def main() -> int:
         r = client.post(f"/api/v1/tasks/{tid2}/subtasks", json={"title": "子任务A"})
         sa = r.json()["data"]["id"]
         r = client.post(f"/api/v1/tasks/{tid2}/subtasks", json={"title": "子任务B"})
-        sb = r.json()["data"]["id"]
         client.patch(f"/api/v1/tasks/{tid2}/subtasks/{sa}", json={"completed": True})
         r = client.get(f"/api/v1/tasks/{tid2}")
         d = r.json()["data"]
@@ -184,7 +183,7 @@ def main() -> int:
         te3 = client.get("/api/v1/dashboard").json()["data"]["today_execution"]
         ids_in_te3 = [t["id"] for g in te3["groups"] for t in g["tasks"]]
         check("today_execution: 纳入今日到期待办", due_today_id in ids_in_te3,
-              f"今日到期待办未出现在今日执行中")
+              "今日到期待办未出现在今日执行中")
         check("today_execution: 纳入后仍自洽", te3["total"] == sum(g["count"] for g in te3["groups"]),
               f"total={te3['total']} sum={sum(g['count'] for g in te3['groups'])}")
 
@@ -874,7 +873,7 @@ def main() -> int:
         _db.execute(_text("DELETE FROM identities WHERE id = :i"), {"i": rt_identity_id})
         _db.commit()
         _db.close()
-        r = client.get(f"/api/v1/identities")
+        r = client.get("/api/v1/identities")
         check("sync setup row removed", all(i["id"] != rt_identity_id for i in r.json()["data"]), r.text[:160])
         r = client.post("/api/v1/sync/import", json={"path": pkg_path2})
         d = r.json()["data"]
@@ -1044,7 +1043,7 @@ def main() -> int:
         check("plugin valid permission passes", _vp(["network", "files"])[0] is True, "should pass")
 
         # ---------- mod-platform O4/F1.2：事件总线可观测性 ----------
-        from app.core.event_bus import EVENT_TASK_CREATED as _EV_TC, event_bus as _bus
+        from app.core.event_bus import event_bus as _bus
 
         def _probe_ok(**_kw):
             return None
@@ -1256,7 +1255,6 @@ def main() -> int:
         # ---------- mod-platform 验收 8.2：轮换中断后旧数据仍可解密 ----------
         import tempfile as _tf
         from app.core.encryption import EncryptionManager as _EM
-        _rot_dir = pathlib.Path(_tf.mkdtemp()) if 'pathlib' in dir() else None
         import pathlib as _pl
         _rot_dir = _pl.Path(_tf.mkdtemp())
         _m1 = _EM(_rot_dir)
@@ -1273,7 +1271,6 @@ def main() -> int:
 
         # ---------- 验收 8.2：导入 1000 行中途失败 → 无部分写入（故障注入） ----------
         from app.database import SessionLocal as _S5
-        from app.models.task import Task as _T5
         from sqlalchemy import text as _t5
 
         _inj_db = _S5()
@@ -1373,7 +1370,6 @@ def main() -> int:
         # ---------- mod-platform 验收 8.2：轮换中断后旧数据仍可解密 ----------
         import tempfile as _tf
         from app.core.encryption import EncryptionManager as _EM
-        _rot_dir = pathlib.Path(_tf.mkdtemp()) if 'pathlib' in dir() else None
         import pathlib as _pl
         _rot_dir = _pl.Path(_tf.mkdtemp())
         _m1 = _EM(_rot_dir)

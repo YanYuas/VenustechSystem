@@ -8,7 +8,7 @@
 
 判定：
   used     = 源码里 var(--x) 的 x
-  defined  = src/styles/*.scss 的 `--x:` 声明
+  defined  = src/shared/styles/*.scss 的 `--x:` 声明
              ∪ 内联注入（:style="{ '--x': ... }" / style.setProperty('--x')）
   missing  = used - defined
 
@@ -29,7 +29,7 @@ from pathlib import Path
 _here = Path(__file__).resolve().parent
 _candidates = [_here.parent, _here.parent.parent / "frontend", _here.parent.parent]
 FRONTEND = next(
-    (c for c in _candidates if (c / "src" / "styles" / "variables.scss").exists()),
+    (c for c in _candidates if (c / "src" / "shared" / "styles" / "variables.scss").exists()),
     _here.parent,
 )
 SRC = FRONTEND / "src"
@@ -150,7 +150,7 @@ def main() -> int:
     failed = False
     if len(missing) > BASELINE:
         print(f"\n[引用审计] ❌ 未定义令牌 {len(missing)} 个 > 基线 {BASELINE}")
-        print("      → 请改用 src/styles/variables.scss 里已存在的令牌，或先在 variables.scss 补定义")
+        print("      → 请改用 src/shared/styles/variables.scss 里已存在的令牌，或先在 variables.scss 补定义")
         failed = True
     if ic_missing:
         print(f"\n[引用审计] ❌ 未定义图标 {len(ic_missing)} 个")

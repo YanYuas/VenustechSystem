@@ -30,7 +30,7 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     include: ['src/**/__tests__/**/*.spec.ts'],
-    setupFiles: ['src/test/setup.ts'],
+    setupFiles: ['src/shared/test/setup.ts'],
     // 每个用例后还原 spy / mock，避免跨用例串扰
     restoreMocks: true,
     // 不隐藏 console.warn（项目里有意为之的告警要看得见）

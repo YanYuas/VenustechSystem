@@ -34,11 +34,35 @@
 
 **D-13 lint 进 CI**
 - 后端：`ruff 0.6.2`，`select = E4/E7/E9/F`（不做 format），**245 → 0**；F841 修复一律"只剥赋值、保留有副作用的调用"；F821 连锁暴露并修复了 `project_service.export()` 的一处函数内 import 隐患。CI `backend.yml` 增加 ruff 步。
+- 覆盖面补齐（D-16）：`backend/scripts/**` 已纳入 ruff —— 13 条（F541 4 / F401 3 / F821 3 / F841 3）清零，门禁三处统一为 `ruff check app tests scripts`（`backend.yml` / `check_all.py` 第 15 项 / `pyproject.toml` 口径说明）。
 - 前端：ESLint 9 flat + Prettier + `eslint-config-prettier`；**核心是 ADR-0007 分层边界由 `no-restricted-imports` 强制**（kernel↛shared/features、shared↛features、feature 禁止深链跨域），负向验证会变红；CI `frontend.yml` 增加 `lint` 与 `format:check`。
 - 付了学费：Prettier `semi:false` 会把 Vue **多语句**内联事件处理器拆成换行（Vue 表达式解析失败 → build 红）。已把 25 处抽成 23 个命名函数，扫描器归零；约定写入 `docs/guides/frontend.md`：**模板内联 handler 必须是单次调用，多语句抽函数**。
 
 **验证入口**
 - `check_all.py` 扩到 **15 项**（新增 ruff；前端 lint/format 在 CI）。CI 四工作流覆盖：后端 lint+测试+冒烟、前端 lint+format+typecheck+测试+构建、仓库守护、Android 打包。
+
+### Changed — Phase 4：交付收尾（var 数据迁移 / styles 归位 / scripts lint / 泄漏收尾，2026-10-27）
+
+- 运行期数据目录收敛到仓库根 `var/`（ADR-0004）：真实库 `backend/data` → `var/data`、演示库 `backend/data_demo` → `var/demo`、历史副本 `backend/data_*` → `var/legacy/<原名>`。全部为**复制后逐文件 SHA256 校验一致**（41 个文件 / 0 不一致），真实库业务行数 154 → 154 不变、`alembic_version` 0021 不变。
+- `backend/app/config.py`：dev/源码运行默认数据目录改为 `<仓库根>/var/data`（**与 CWD 无关**）；保留「`var/data` 不存在而旧 `backend/data` 存在 → 回退旧目录并告警」的一次性兼容分支（迁移完成并发布一版后可删，源码注释写明删除条件）。打包（frozen）分支行为不变。
+- `ops/start.ps1`：dev/mobile 默认 `var/data`、demo 默认 `var/demo`；`-DataDir` 相对路径解析基准从 `backend/` 改为**仓库根**。`scripts/dev.ps1` 兼容壳文档与 `seed_demo.py` 默认目录同步。
+- 迁移前备份：`ops/backup-git.ps1` 生成 git bundle（4,406,419 B，`bundle verify` 通过）+ `var/backups/data-pre-var-migration-2026-10-27/`（17 文件逐文件 SHA256 校验，含 `.encryption_key`）。
+- 旧目录不删除，原样改名为 `backend/.legacy-data-2026-10-27/`（已 gitignore；确认无误后可删）。
+
+**工程文件归位（styles / test setup / d.ts）**
+- `src/styles/{variables,element-plus,global,animations}.scss` → `src/shared/styles/`；`src/test/setup.ts` → `src/shared/test/setup.ts`；`src/styles/`、`src/test/` 删除，`src/` 顶层只剩 `app/features/kernel/shared` + 3 个生成 d.ts。
+- 零变化证据：用项目 dart-sass 分别编译迁移前后，**4/4 CSS 字节完全相同**（13,319 / 1,421 / 7,347 / 2,535 B）；`main.ts` 注入顺序逐条不变；build 产物 JS `index-DKAMBqBz.js` 88,647 B、CSS `index-B4rfms-L.css` 59,251 B **哈希与大小均未变**。
+- `auto-imports.d.ts` / `components.d.ts` / `env.d.ts` 保留 `src` 根（unplugin 生成产物/全局环境声明，不属于分层资产），理由写入 `shared/README.md`。
+
+**D-16：`backend/scripts` 纳入 ruff**
+- 13 条清零（F541×4 / F401×3 / F821×3 / F841×3），门禁三处统一 `ruff check app tests scripts`（`backend.yml` / `check_all.py` / `pyproject.toml`）。
+- 3 条 F821 逐条核实：`seed_demo.py:441 utcnow` 是**真潜伏 bug**（completed 且无 `done_days` 时 NameError，已用 HEAD 源码+桩复现；当前数据走不到）→ 函数内补导入；`smoke_backend.py` 两处 `pathlib` 是死代码（`'pathlib' in dir()` 恒 False 且下一行覆盖）→ 删除。
+
+**P0-2 泄漏收尾（refs 层）**
+- `git-filter-repo` 清洗本地历史（移除 `backend/data*/**`、`*.db*`、`.encryption_key`；44 commits、main tree 逐字节不变）；本地 10 个陈旧分支删除 + reflog/gc → 旧 SHA 本地 `cat-file` 已失败。
+- 远端 `git push --mirror --force`：只剩 `main` + 3 个干净 tag，`feature/phase2-development` 等 10 个分支删除。
+- `audit_repo_secrets.py --strict` 已在 CI 与 `check_all.py` 生效（历史再出现 DB 直接红）。
+- ⚠ 实测 GitHub 仍按旧 commit/blob SHA 返回 200（悬空对象）；**彻底消除需删除+重建仓库**：`ops/rebuild-remote.ps1` 就绪，前置 `gh auth refresh -s delete_repo`（runbook §5）。
 
 ### Changed — Phase 2：收口领域边界（Repository / sync / 前端分层，2026-10-27）
 

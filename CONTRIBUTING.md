@@ -95,14 +95,14 @@ chore(scope): 描述       # 杂项/清理
 `var/`、`backend/data*`、`frontend/dist/`、`node_modules/`、`*.log`、`.qm-token`、
 `*.db`、`.env`、`.arch-audit/` 均已在 `.gitignore`。
 
-> `backend/data/app.db` 曾于 2026-09-15 移出版本控制（此前切分支会连数据库一起切）。
+> 真实库 `var/data/app.db` 曾于 2026-09-15 移出版本控制（此前切分支会连数据库一起切）；2026-10-27 起运行期数据统一在 `var/`。
 > **请勿再把它加回仓库**；全新库靠「迁移 + 种子数据」重建。
 > ⚠️ 已知历史问题：旧分支 `origin/feature/phase2-development` 里仍残留该库，
 > 处置方案见 [ARCHITECTURE.md §10 D-02](ARCHITECTURE.md)。
 
 ## 7. 设计令牌
 
-组件内颜色应走 `frontend/src/styles/variables.scss` 的 CSS 变量；存量债务用审计脚本查看：
+组件内颜色应走 `frontend/src/shared/styles/variables.scss` 的 CSS 变量；存量债务用审计脚本查看：
 
 ```bash
 python scripts/audit_hardcoded_colors.py            # 列出违规

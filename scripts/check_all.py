@@ -224,15 +224,17 @@ def main() -> int:
     results.append(("文档链接", ok, st))
 
     # 14/15 仓库敏感文件：数据库/密钥/令牌是否被提交（含历史扫描）
-    # 历史泄漏处置完成前，本项默认只告警不判红（见 docs/runbooks/security-incident-db-leak.md）
-    ok, st = _run("14/15 仓库敏感文件（索引 + 历史 + .gitignore）",
-                  [PYTHON, "scripts/audit_repo_secrets.py"], ROOT)
+    # 2026-10-27 历史已用 git-filter-repo 清洗（远端 refs 干净；SHA 级残留待仓库重建）。
+    # 因此改为 --strict：历史里再出现数据库/密钥 = 直接失败（与 repo-guard.yml 一致）。
+    ok, st = _run("14/15 仓库敏感文件（索引 + 历史 + .gitignore，--strict）",
+                  [PYTHON, "scripts/audit_repo_secrets.py", "--strict"], ROOT)
     results.append(("敏感文件守护", ok, st))
 
     # 15/15 后端 lint（ruff 正确性规则）：与 CI 的 backend.yml 保持一致，
     # 避免「CI 会红但一键入口全绿」。ruff 由 requirements-dev.txt 提供。
-    ok, st = _run("15/15 后端 lint（ruff: E4/E7/E9/F）",
-                  [PYTHON, "-m", "ruff", "check", "app", "tests"], BACKEND)
+    # D-16：覆盖面扩到 backend/scripts/**（app + tests + scripts）。
+    ok, st = _run("15/15 后端 lint（ruff: E4/E7/E9/F，app/tests/scripts）",
+                  [PYTHON, "-m", "ruff", "check", "app", "tests", "scripts"], BACKEND)
     results.append(("后端 lint(ruff)", ok, st))
 
     print(f"\n{'=' * 62}\n汇总\n{'=' * 62}")

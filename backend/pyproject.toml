@@ -45,6 +45,11 @@ extend-exclude = ["migrations/versions"]
 #   这些规则命中即代表「可能跑不起来」或「代码在骗人」，是值得 CI 拦下的。
 #
 # 不用 `--fix` 之外的自动格式化；`python -m ruff check` 即 CI 门禁。
+#
+# D-16 起门禁覆盖 backend 下 app + tests + scripts 三处（CI backend.yml 与
+# scripts/check_all.py 第 15 项同一命令：`ruff check app tests scripts`）。
+# scripts/ 无需任何 per-file-ignores —— 13 条问题全部按「删未用导入/去死代码/
+# 补真实缺导入/去多余 f 前缀」修掉，没有合法的 re-export 或动态 import 豁免。
 # ============================================================
 [tool.ruff.lint]
 select = ["E4", "E7", "E9", "F"]

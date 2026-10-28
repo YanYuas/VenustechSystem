@@ -5,15 +5,22 @@
 from __future__ import annotations
 
 from functools import lru_cache
+import logging
 import os
 import sys
 from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# 开发/源码运行的数据目录（相对**仓库根**解析，与 CWD 无关）：
+#   var/data  —— 目标位置（ARCHITECTURE.md §7 / ADR-0004：运行期数据统一在 var/）
+#   backend/data —— 旧位置，仅作一次性迁移兼容回退（见下方 _default_data_dir）
+_DEV_VAR_DATA = Path(__file__).resolve().parents[2] / "var" / "data"
+_DEV_LEGACY_DATA = Path(__file__).resolve().parents[1] / "data"
+
 
 def _default_data_dir() -> Path:
-    """数据目录：打包环境用系统标准位置，开发环境用 ./data。
+    """数据目录：打包环境用系统标准位置，开发/源码运行用仓库根 var/data。
 
     - Windows: %APPDATA%/VenustechSystem
     - macOS: ~/Library/Application Support/VenustechSystem
@@ -27,14 +34,28 @@ def _default_data_dir() -> Path:
         else:
             base = os.environ.get("XDG_DATA_HOME") or str(Path.home() / ".local" / "share")
         return Path(base) / "VenustechSystem"
-    # 开发/源码运行：**相对 backend/ 目录解析，而不是相对当前工作目录**。
+    # 开发/源码运行：**相对仓库根解析，而不是相对当前工作目录**。
     #
-    # 为什么不能写 Path("./data")：它相对 CWD。从仓库根执行
-    # `uvicorn app.main:app` 或在 IDE 里指定别的 working directory 时，
-    # 会静默创建第二份数据库（仓库根 ./data），用户看到"数据全没了"。
-    # 这是真实事故来源（2026-10 审计发现根目录已出现 data/ 残留）。
-    # 现约定：默认数据目录恒为 backend/data，与启动方式无关。
-    return Path(__file__).resolve().parents[1] / "data"
+    # 为什么不能写相对 CWD 的路径：从仓库根执行 `uvicorn app.main:app` 或在 IDE
+    # 里指定别的 working directory 时，会静默创建第二份数据库（用户看到"数据全
+    # 没了"）。这是真实事故来源（2026-10 审计发现根目录已出现 data/ 残留）。
+    # 现约定：默认数据目录恒为 <仓库根>/var/data，与启动方式无关。
+    #
+    # 兼容回退（一次性迁移辅助，2026-10-27 var/ 迁移时引入）：
+    #   老 checkout 的真实库还在 backend/data，而 var/data 尚未迁移时，回退到
+    #   旧目录并告警，避免"升级代码后数据看起来全没了"。
+    #   删除条件（满足任一即可删掉本分支）：
+    #     · 所有用户数据都已迁移到 var/data（本次 runbook 完成 + 发布一版后）；
+    #     · ARCHITECTURE.md §7 移除 backend/data 兼容说明时同步删除。
+    if not _DEV_VAR_DATA.exists() and _DEV_LEGACY_DATA.exists():
+        logging.getLogger(__name__).warning(
+            "数据目录回退：%s 不存在但旧目录 %s 存在，本次使用旧目录。"
+            "请按 docs/runbooks/backup.md 把数据迁移到 var/data（一次性兼容分支，可删除）。",
+            _DEV_VAR_DATA,
+            _DEV_LEGACY_DATA,
+        )
+        return _DEV_LEGACY_DATA
+    return _DEV_VAR_DATA
 
 
 class Settings(BaseSettings):
@@ -52,7 +73,8 @@ class Settings(BaseSettings):
     # 公网部署时通过 VENUSTECH_CORS_ORIGINS=* 允许所有来源
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000,https://localhost,capacitor://localhost"
 
-    # 数据目录（开发默认 ./data，打包后走 %APPDATA%/VenustechSystem，可由环境变量注入）
+    # 数据目录（开发/源码运行默认 <仓库根>/var/data；打包后走 %APPDATA%/VenustechSystem，
+    # 可由环境变量 VENUSTECH_DATA_DIR 注入）
     data_dir: Path = _default_data_dir()
 
     # 日志

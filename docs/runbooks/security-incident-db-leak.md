@@ -10,7 +10,7 @@
 
 | 项目 | 事实 |
 |---|---|
-| 泄漏内容 | `backend/data/app.db`（606,208 B）+ `app.db-shm` + `app.db-wal` + `backend/data_test/*.db` |
+| 泄漏内容 | 真实库 `app.db`（606,208 B，当时在 `backend` 的 `data/` 下）+ `app.db-shm` + `app.db-wal` + 测试库 `*.db`（当时在 `backend` 的 `data_test/` 下） |
 | 引入提交 | `6b5c2dd4605a4024d9819eb5a3bdb67db503a709`（2026-09-05，「add main v0.1.71」） |
 | 可达 ref | **仅** `origin/feature/phase2-development` |
 | 是否已合并 main | **否**（与 main 分叉：main 独有 40 提交 / 该分支独有 64 提交） |
@@ -122,3 +122,51 @@ git push origin --delete mod-asset mod-companion mod-dashboard mod-execution `
 
 > 执行前用 `git branch -r --merged main` 复核；`feature/phase2-development` **未合并**，
 > 删它前先确认其独有提交里没有你还需要的功能。
+
+---
+
+## 5. 执行记录（2026-10-27）与最后一步「重建远端」
+
+### 已完成（可复验）
+
+| 动作 | 结果 |
+|---|---|
+| 全量冷备 | `var/backups/venustech-*.bundle`（gitignored，3 份；bundle verify 通过） |
+| 本地历史清洗 | `git-filter-repo` 移除全部 `backend/data*/**`、`*.db*`、`.encryption_key`；**44 commits，main tree 与清洗前逐字节一致**（`1de5f671…`） |
+| 本地陈旧分支清理 | 删除 `feature/phase2-development` 等 10 个分支；`reflog expire + gc --prune=now`；旧 commit/blob 本地 `git cat-file` 已失败 |
+| 远端 refs 清洗 | `git push --mirror --force`：远端现在**只有 `main`(ef075f4) + 3 个 tag**，10 个陈旧分支已删除 |
+| 守护收紧 | `audit_repo_secrets.py` 在 CI 与 `check_all.py` 改为 `--strict`（历史再出现 DB 直接失败） |
+
+### 仍未消除：GitHub 按旧 SHA 仍可取到对象
+
+实测（清洗后、未认证）：
+
+```
+GET /repos/.../commits/6b5c2dd…  -> HTTP 200
+GET /repos/.../git/blobs/dd0fcb09… -> HTTP 200
+GET /repos/.../branches/feature/phase2-development -> HTTP 404
+```
+
+即 refs 已干净，但 GitHub 的未知/悬空对象仍在。**只有重建仓库能彻底消除。**
+
+### 彻底处置（二选一）
+
+**A. 脚本一键（推荐）**
+
+```powershell
+# 1) 一次性授权（浏览器，本机凭证更新一次即可）
+gh auth refresh -s delete_repo
+
+# 2) 预演（只打印计划，不删）
+pwsh -ExecutionPolicy Bypass -File ops\rebuild-remote.ps1
+
+# 3) 执行（删除 → 重建 → 推送干净 main+tags → 验证旧 SHA 404）
+pwsh -ExecutionPolicy Bypass -File ops\rebuild-remote.ps1 -Confirm
+```
+
+**B. 网页手工**：仓库 Settings → Danger Zone → Delete → 用 `gh repo create YanYuas/VenustechSystem --public` 重建 → `git push -u origin main && git push origin --tags`。
+
+**代价**：star（2）/fork/watch/issue/PR/Actions secrets 全部清空，需要重配描述、主页、分支保护与 secrets。
+**恢复兜底**：`var/backups/*.bundle` 可离线克隆，工作区与提交历史都在。
+
+> 完成后把本文件归档到 `docs/architecture/legacy/` 或标注"已结案"，并复查 `gh api` 的 404 验证。
