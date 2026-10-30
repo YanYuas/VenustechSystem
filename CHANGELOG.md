@@ -7,6 +7,24 @@
 
 ## [Unreleased]
 
+### Changed — Phase 10：修剩余 P2/P3 + 组件测试 + 备份恢复安全测试（2026-10-30）
+
+**D-39~D-45 修复（均带回归测试 + 负向验证）**
+- **D-42（P2）** `main.py` demo_seed 由 **fatal 改 fail-open**（try/except + rollback + exception 日志），seed 失败不再阻断启动；
+- **D-43（P2）** `register_event_handlers()` / `register_growth_handlers()` 各自独立 fail-open（一个失败不影响另一个/启动）；
+- **D-44** 自动备份由"只备份第一个用户"改为**遍历全部用户**（per-user 独立 Session/try，聚合计数，无用户不报错）；
+- **D-39** `notifiedIds` 改 `Map<id,时间戳>` + 24h TTL + 容量清理，消除级联再通知；**D-40** BaseSelect 外部改值同时清搜索词；**D-41** BaseModal 关闭动画期卸载补发 `closed`（恰好一次）；
+- **D-45（P2，新发现）** 多行日志调用里的 `%s` 被扫描器漏检（`backup_service` 版本告警、`ai/client` 两处）→ 3 处改 `{}`；`audit_log_format.py` 改为**跨行调用**检测并新增 `scan_source()` + 3 条回归测试。
+
+**测试与覆盖率**
+- 后端：**1841 passed**（1823 → +18：lifespan fail-open 24→32、备份恢复子进程 10、日志跨行回归 3）；覆盖率 **96.63% → 96.68%**（main.py/bootstrap 100%）。
+- 新增 `test_backup_import_subprocess.py`（10 条）：**子进程 + 独立数据目录**真实跑 import_——成功替换（数据回滚到备份时刻、`.bak` 生成、完整性 ok）、旧包兼容、版本不一致告警、篡改校验和/截断 ZIP/缺清单/他人备份四种拒绝且**库字节不变**；含 tokenize 守卫禁止父进程出现 `import_` 标识符。
+- 前端：**403 passed / 28 files**（344 → +59：BaseCard 8 / BaseSwitch 10 / BaseInput 16 / OfflineQueueIndicator 20 + D-39/40/41 回归 5）；lines **41.54% → 44.01%**、branches 82.36%、functions 68.06%；阈值 `{40,79,64,40}` → **`{43,81,67,43}`**。
+
+**新登记 2 个遗留（D-46/D-47，未修）**
+- D-46（P2）`import_` 在「改名旧库→写新库」之间无自动回滚（写失败/崩溃会留下缺失或半截 DB；建议临时文件 + `os.replace` 原子替换）；
+- D-47（P3）`.bak` 秒级时间戳同秒冲突（Windows 抛错 / POSIX 覆盖最早回滚副本）。
+
 ### Changed — Phase 9：修剩余 P2/P3 + 生命周期测试 + CI 增强（2026-10-30）
 
 **D-36~D-38 修复（均带回归测试 + 负向验证）**

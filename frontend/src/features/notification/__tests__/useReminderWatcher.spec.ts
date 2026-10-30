@@ -211,6 +211,31 @@ describe('useReminderWatcher：快速提醒', () => {
     expect(toastWarning).toHaveBeenCalledTimes(502)
   })
 
+  it('同一 id 超过 24h 时间窗口后允许再次提醒（D-39）', async () => {
+    const w = setup()
+    panel.listReminders.mockResolvedValue([makeQuickReminder({ id: 'r-ttl' })])
+
+    await w.checkReminders()
+    expect(toastWarning).toHaveBeenCalledTimes(1)
+
+    // 窗口内：仍然去重
+    await w.checkReminders()
+    expect(toastWarning).toHaveBeenCalledTimes(1)
+
+    // 跨过 24h 窗口后：同一 id 应可再次提醒（remind_at 同步平移，避免「超 1h 旧提醒」分支）
+    const later = new Date(NOW.getTime() + 25 * 60 * 60 * 1000)
+    vi.setSystemTime(later)
+    panel.listReminders.mockResolvedValue([
+      makeQuickReminder({
+        id: 'r-ttl',
+        remind_at: new Date(later.getTime() - 5 * 60 * 1000).toISOString(),
+      }),
+    ])
+
+    await w.checkReminders()
+    expect(toastWarning).toHaveBeenCalledTimes(2)
+  })
+
   it('未来提醒 / 超过 1 小时旧提醒 / 已 dismissed / 无 remind_at 都跳过', async () => {
     panel.listReminders.mockResolvedValue([
       makeQuickReminder({ id: 'r-201', remind_at: new Date(NOW.getTime() + 60_000).toISOString() }),

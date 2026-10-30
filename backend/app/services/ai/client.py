@@ -160,12 +160,12 @@ def get_llm_client(user) -> LLMClient:
             # 有密文但解出空值：加密密钥轮换或数据损坏，必须可观测 ——
             # 否则用户会以为"AI 坏了/Key 错了"，而日志里什么都没有。
             logger.warning(
-                "用户 %s 已配置 API Key 但解密为空，降级为 Mock（检查加密密钥是否变更）",
+                "用户 {} 已配置 API Key 但解密为空，降级为 Mock（检查加密密钥是否变更）",
                 getattr(user, "id", "?"),
             )
         except Exception:
             logger.exception(
-                "用户 %s 已配置 API Key 但解密失败，降级为 Mock",
+                "用户 {} 已配置 API Key 但解密失败，降级为 Mock",
                 getattr(user, "id", "?"),
             )
     return MockLLMClient()

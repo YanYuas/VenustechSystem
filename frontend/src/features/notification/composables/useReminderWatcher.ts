@@ -8,16 +8,41 @@ import { notificationApi } from '../api'
 import { toast } from '@/kernel/ui/toast'
 
 const CHECK_INTERVAL = 30000 // 30秒检查一次
+const NOTIFY_TTL = 24 * 60 * 60 * 1000 // D-39：24h 去重窗口（窗口外允许再次提醒）
 const NOTIFIED_MAX = 500 // 已通知 ID 的容量上限（长会话防无界增长）
-const notifiedIds = new Set<string>() // 已通知过的提醒ID，避免重复
+const notifiedIds = new Map<string, number>() // D-39：id → 通知时间戳（比裸 Set 多时间维度）
 
-/** D-38：记住已通知 ID；超过上限时按插入顺序淘汰最旧，保持跨 tick 去重语义 */
+/**
+ * D-39：记住已通知 ID。
+ * 超过容量时先清时间窗口外的过期条目，仍超出才按插入顺序清最早的部分，
+ * 避免"淘汰最旧 → 该 id 再出现 → 再挤掉下一个最旧"的级联再通知。
+ */
 function rememberNotified(id: string) {
-  notifiedIds.add(id)
-  if (notifiedIds.size > NOTIFIED_MAX) {
-    const oldest = notifiedIds.values().next().value
-    if (oldest !== undefined) notifiedIds.delete(oldest)
+  notifiedIds.set(id, Date.now())
+  if (notifiedIds.size <= NOTIFIED_MAX) return
+
+  const cutoff = Date.now() - NOTIFY_TTL
+  for (const [key, at] of notifiedIds) {
+    if (at < cutoff) notifiedIds.delete(key)
   }
+  let overflow = notifiedIds.size - NOTIFIED_MAX
+  if (overflow <= 0) return
+  for (const key of notifiedIds.keys()) {
+    if (overflow <= 0) break
+    notifiedIds.delete(key)
+    overflow -= 1
+  }
+}
+
+/** D-39：窗口内已通知过 → 去重；窗口外自动清理并允许再次提醒 */
+function wasNotifiedRecently(id: string): boolean {
+  const at = notifiedIds.get(id)
+  if (at === undefined) return false
+  if (Date.now() - at > NOTIFY_TTL) {
+    notifiedIds.delete(id)
+    return false
+  }
+  return true
 }
 
 let timer: ReturnType<typeof setInterval> | null = null
@@ -75,7 +100,7 @@ export function useReminderWatcher() {
 
       for (const r of reminders) {
         if (r.dismissed || !r.remind_at) continue
-        if (notifiedIds.has(r.id)) continue
+        if (wasNotifiedRecently(r.id)) continue
 
         const remindTime = new Date(r.remind_at).getTime()
         // 提醒时间已到（且在过去1小时内，避免太旧的提醒）

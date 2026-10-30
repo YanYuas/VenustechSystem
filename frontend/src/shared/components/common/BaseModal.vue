@@ -45,6 +45,16 @@ const emit = defineEmits<{
 
 const panelRef = ref<HTMLElement | null>(null)
 let isClosing = false
+/** D-41：关闭动画 timer 与「closed 只发一次」标记 */
+let closedTimer: ReturnType<typeof setTimeout> | undefined
+let closedEmitted = false
+
+/** closed 只发一次（正常 150ms 后 / 卸载时补发，二者互斥） */
+function emitClosedOnce() {
+  if (closedEmitted) return
+  closedEmitted = true
+  emit('closed')
+}
 
 /** 仅关闭，不触发 cancel（用于遮罩点击/Esc/关闭按钮） */
 function close() {
@@ -80,6 +90,13 @@ function onKey(e: KeyboardEvent) {
 onMounted(() => window.addEventListener('keydown', onKey))
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKey)
+  // D-41：关闭动画期间被卸载（路由跳转等）时 timer 会丢失、closed 永不触发。
+  // 这里清掉 timer 并补发 closed（emitClosedOnce 保证恰好一次）。
+  if (closedTimer) {
+    clearTimeout(closedTimer)
+    closedTimer = undefined
+    emitClosedOnce()
+  }
   // 组件带 open 状态被直接卸载（如路由跳转）时，watch(false) 不会触发，需兜底恢复滚动
   if (props.modelValue) document.body.style.overflow = ''
 })
@@ -89,11 +106,15 @@ watch(
   (v) => {
     isClosing = false
     if (v) {
+      closedEmitted = false
       document.body.style.overflow = 'hidden'
       focusFirst()
     } else {
       document.body.style.overflow = ''
-      setTimeout(() => emit('closed'), 150)
+      closedTimer = setTimeout(() => {
+        closedTimer = undefined
+        emitClosedOnce()
+      }, 150)
     }
   },
 )

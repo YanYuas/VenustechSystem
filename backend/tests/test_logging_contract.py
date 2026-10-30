@@ -22,6 +22,48 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent          # backend/
 APP_DIR = ROOT / "app"
 
+
+# D-45（2026-10-30）：旧扫描器逐行匹配，多行日志调用里的 %-占位符会漏检
+# （实测 backup_service / ai.client 共 3 处真漏）。这里把「跨行检测」钉成回归。
+def _load_log_format_auditor():
+    import importlib.util
+
+    script = Path(__file__).resolve().parent.parent.parent / "scripts" / "audit_log_format.py"
+    spec = importlib.util.spec_from_file_location("audit_log_format_regression", script)
+    assert spec and spec.loader
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+class TestMultilineLogCallDetection:
+    def test_multiline_percent_style_is_detected(self) -> None:
+        mod = _load_log_format_auditor()
+        text = (
+            "logger.warning(\n"
+            '    "备份版本 %s 与当前版本 %s 主版本号不同",\n'
+            "    a, b,\n"
+            ")\n"
+        )
+        kinds = [kind for _, kind in mod.scan_source(text)]
+        assert "PCT_STYLE" in kinds
+
+    def test_multiline_loguru_placeholders_are_accepted(self) -> None:
+        mod = _load_log_format_auditor()
+        text = (
+            "logger.warning(\n"
+            '    "备份版本 {} 与当前版本 {} 主版本号不同",\n'
+            "    a, b,\n"
+            ")\n"
+        )
+        assert mod.scan_source(text) == []
+
+    def test_exc_info_inside_multiline_call_is_detected(self) -> None:
+        mod = _load_log_format_auditor()
+        text = "logger.error(\n    \"boom\",\n    exc_info=True,\n)\n"
+        kinds = [kind for _, kind in mod.scan_source(text)]
+        assert "EXC_INFO" in kinds
+
 # `logger.info(` / `self.logger.info(` / `logger.opt(exception=True).warning(` 都覆盖
 LOGGER_CALL = re.compile(
     r"\b(?:self\.)?logger\.(?:opt\([^)]*\)\.)?"

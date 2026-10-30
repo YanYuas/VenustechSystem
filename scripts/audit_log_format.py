@@ -36,6 +36,54 @@ PCT_STYLE = re.compile(r"%s|%d|%\.\d+f")
 EXC_INFO = re.compile(r"exc_info\s*=")
 
 
+def _call_span(text: str, start: int, max_len: int = 4000) -> str:
+    """从日志调用起点截到匹配的右括号（跳过字符串内的括号）。
+
+    D-45（2026-10-30）：旧实现逐行匹配，多行调用
+        logger.warning(
+            "备份版本 %s ...", 版本,
+        )
+    的第二行不在 LOGGER_CALL 命中行上，%-占位符会漏检（实测真漏了）。
+    """
+    i, depth, quote = start, 0, ""
+    while i < len(text) and i - start < max_len:
+        ch = text[i]
+        if quote:
+            if ch == "\\":
+                i += 2
+                continue
+            if ch == quote:
+                quote = ""
+        elif ch in "'\"":
+            quote = ch
+        elif ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+            if depth == 0:
+                return text[start : i + 1]
+        i += 1
+    return text[start : start + 400]
+
+
+def scan_source(text: str) -> list[tuple[int, str]]:
+    """返回 (行号, 违规类型) 列表；供主扫描与单测复用。"""
+    findings: list[tuple[int, str]] = []
+    for m in LOGGER_CALL.finditer(text):
+        lineno = text.count("\n", 0, m.start()) + 1
+        line_start = text.rfind("\n", 0, m.start()) + 1
+        line_end = text.find("\n", m.start())
+        line = text[line_start : line_end if line_end != -1 else len(text)]
+        if line.strip().startswith("#"):
+            continue
+        span = _call_span(text, m.start())
+        if PCT_STYLE.search(span):
+            findings.append((lineno, "PCT_STYLE"))
+        if EXC_INFO.search(span):
+            findings.append((lineno, "EXC_INFO"))
+    return findings
+
+
 def scan() -> tuple[list[str], int]:
     violations: list[str] = []
     n_files = 0
@@ -43,17 +91,11 @@ def scan() -> tuple[list[str], int]:
         if "__pycache__" in path.parts:
             continue
         n_files += 1
-        for lineno, line in enumerate(path.read_text(encoding="utf-8").split("\n"), 1):
-            stripped = line.strip()
-            if stripped.startswith("#"):
-                continue
-            if not LOGGER_CALL.search(line):
-                continue
-            rel = path.relative_to(ROOT)
-            if PCT_STYLE.search(line):
-                violations.append(f"[PCT_STYLE] {rel}:{lineno}: {stripped[:120]}")
-            if EXC_INFO.search(line):
-                violations.append(f"[EXC_INFO] {rel}:{lineno}: {stripped[:120]}")
+        text = path.read_text(encoding="utf-8")
+        rel = path.relative_to(ROOT)
+        for lineno, kind in scan_source(text):
+            snippet = text.split("\n")[lineno - 1].strip()[:120]
+            violations.append(f"[{kind}] {rel}:{lineno}: {snippet}")
     return violations, n_files
 
 

@@ -90,6 +90,8 @@ watch(
   () => props.modelValue,
   () => {
     highlight.value = 0
+    // D-40：外部改值时同时清空搜索词，否则面板打开会残留旧过滤结果
+    query.value = ''
   },
 )
 </script>

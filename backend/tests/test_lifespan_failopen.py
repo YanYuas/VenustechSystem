@@ -1,12 +1,13 @@
 # ============================================================
 # app/main.py 生命周期（lifespan）异常路径与幂等测试（Phase9-B）
 #
-# 背景：lifespan 里有 7 个启动步骤，其中只有一部分是 fail-open（加密初始化、
-# 重复任务、自动备份），其余（迁移/维护/种子/事件订阅注册）按设计是 fatal。
-# 这些分支平时不跑，Phase6 term-missing 里 main.py 有 19 行未覆盖 —— 本文件
-# 用 monkeypatch 把每一步替换成「记录器」或「抛异常」，逐条断言：
-#   · fail-open 步骤抛异常时应用仍能启动 + 对应日志 + 后续步骤仍执行；
-#   · fatal 步骤抛异常时启动中断 + 后续步骤**不得**执行（防止误以为 fail-open）；
+# 背景：lifespan 启动步骤的失败策略（Phase10 D-42/D-43/D-44 统一后）：
+#   · fatal：迁移、DB 维护（基础设施不可用则不能提供正确服务）；
+#   · fail-open：加密初始化、演示种子、重复任务、自动备份（per-user）、
+#     业务/成长订阅注册（各自独立）、插件装配。
+# 本文件用 monkeypatch 把每一步替换成「记录器」或「抛异常」，逐条断言：
+#   · fail-open 步骤抛异常时应用仍能启动 + 对应 exception 日志 + 后续步骤仍执行；
+#   · fatal 步骤抛异常时启动中断 + 后续步骤**不得**执行；
 #   · 正常路径的步骤顺序 / 只执行一次 / 可重复执行；
 #   · create_app 的插件失败 fail-open、插件路由前缀、异常处理器（业务/校验/未捕获）；
 #   · `if __name__ == "__main__"` 的 uvicorn 启动参数（runpy + 假 uvicorn，不起端口）。
@@ -29,6 +30,7 @@ from fastapi import APIRouter, FastAPI
 from fastapi.testclient import TestClient
 
 from app import main as main_mod
+from app.core import logger as logger_mod
 from app.core.exceptions import NotFoundException
 from app.models.user import User
 from app.repositories import UserRepository
@@ -201,52 +203,6 @@ class TestLifespanFatalSteps:
         assert "run_maintenance" not in steps
         assert not any(isinstance(s, tuple) for s in steps)   # 加密/set_loop 都没到
 
-    def test_event_handler_registration_failure_aborts_startup(
-        self, steps, tmp_path, monkeypatch
-    ):
-        """设计如此：订阅者注册失败 = 事件永远不处理，启动应失败而非静默。
-
-        （对照：加密/重复任务/自动备份是 fail-open。）
-        """
-        monkeypatch.setattr(main_mod, "settings", _fake_settings(tmp_path))
-
-        def _boom():
-            raise RuntimeError("subscribe boom")
-
-        monkeypatch.setattr(main_mod, "register_event_handlers", _boom)
-        with pytest.raises(RuntimeError, match="subscribe boom"):
-            _run_lifespan()
-        assert "register_growth" not in steps
-
-    def test_growth_handler_registration_failure_aborts_startup(
-        self, steps, tmp_path, monkeypatch
-    ):
-        monkeypatch.setattr(main_mod, "settings", _fake_settings(tmp_path))
-
-        def _boom():
-            raise RuntimeError("growth subscribe boom")
-
-        monkeypatch.setattr(main_mod, "register_growth_handlers", _boom)
-        with pytest.raises(RuntimeError, match="growth subscribe boom"):
-            _run_lifespan()
-        assert "register_event" in steps          # 前一步已执行
-
-    def test_demo_seed_failure_propagates(self, steps, tmp_path, monkeypatch):
-        """观察记录：demo_seed 分支**没有** try/except（main.py:59-60）。
-
-        demo 模式下种子失败会阻断启动；默认生产配置 demo_seed=False 不受影响。
-        本用例钉住现状，避免未来无意把它变成静默失败。
-        """
-        monkeypatch.setattr(main_mod, "settings", _fake_settings(tmp_path, demo_seed=True))
-
-        def _boom(db):
-            raise ValueError("seed boom")
-
-        monkeypatch.setattr(main_mod, "seed_if_empty", _boom)
-        with pytest.raises(ValueError, match="seed boom"):
-            _run_lifespan()
-        assert "register_event" not in steps
-
 
 # ================================================================
 # 三、fail-open 步骤：抛异常应用仍启动 + 有日志 + 后续步骤继续
@@ -369,8 +325,261 @@ class TestLifespanFailOpen:
 
         with caplog.at_level(logging.INFO):
             assert _run_lifespan() == "started"
+        # D-44：单个用户备份失败 → per-user fail-open 日志（不再整体失败）
+        assert "自动备份失败（用户" in caplog.text
+        assert "register_growth" in steps
+
+
+    # ---------- D-42：演示种子 fail-open ----------
+    def test_demo_seed_failure_is_fail_open(
+        self, steps, db_session, tmp_path, monkeypatch, caplog
+    ):
+        monkeypatch.setattr(main_mod, "settings", _fake_settings(tmp_path, demo_seed=True))
+        _make_committed_user(db_session)   # 让后续「重复任务」步骤有用户可遍历
+
+        def _boom(db):
+            raise ValueError("seed boom")
+
+        monkeypatch.setattr(main_mod, "seed_if_empty", _boom)
+        with caplog.at_level(logging.INFO):
+            assert _run_lifespan() == "started"
+        assert "演示数据初始化失败（不影响启动）" in caplog.text
+        assert "后端启动完成" in caplog.text
+        # 后续步骤照常执行（重复任务 + 两个订阅者注册）
+        assert any(isinstance(x, tuple) and x[0] == "recurring" for x in steps)
+        assert "register_event" in steps and "register_growth" in steps
+
+    # ---------- D-43：两个订阅者各自独立 fail-open ----------
+    def test_event_handler_failure_is_fail_open_and_growth_still_registers(
+        self, steps, tmp_path, monkeypatch, caplog
+    ):
+        monkeypatch.setattr(main_mod, "settings", _fake_settings(tmp_path))
+
+        def _boom():
+            raise RuntimeError("subscribe boom")
+
+        monkeypatch.setattr(main_mod, "register_event_handlers", _boom)
+        with caplog.at_level(logging.INFO):
+            assert _run_lifespan() == "started"
+        assert "业务事件订阅者注册失败（不影响启动）" in caplog.text
+        assert "成长体系订阅者注册失败" not in caplog.text
+        assert "register_growth" in steps          # 独立注册，不受影响
+        assert "后端启动完成" in caplog.text
+
+    def test_growth_handler_failure_is_fail_open(
+        self, steps, tmp_path, monkeypatch, caplog
+    ):
+        monkeypatch.setattr(main_mod, "settings", _fake_settings(tmp_path))
+
+        def _boom():
+            raise RuntimeError("growth boom")
+
+        monkeypatch.setattr(main_mod, "register_growth_handlers", _boom)
+        with caplog.at_level(logging.INFO):
+            assert _run_lifespan() == "started"
+        assert "成长体系订阅者注册失败（不影响启动）" in caplog.text
+        assert "register_event" in steps
+        assert "后端启动完成" in caplog.text
+
+    def test_both_handler_registrations_fail_app_still_starts(
+        self, steps, tmp_path, monkeypatch, caplog
+    ):
+        monkeypatch.setattr(main_mod, "settings", _fake_settings(tmp_path))
+
+        def _boom_event():
+            raise RuntimeError("event boom")
+
+        def _boom_growth():
+            raise RuntimeError("growth boom")
+
+        monkeypatch.setattr(main_mod, "register_event_handlers", _boom_event)
+        monkeypatch.setattr(main_mod, "register_growth_handlers", _boom_growth)
+        with caplog.at_level(logging.INFO):
+            assert _run_lifespan() == "started"
+        assert "业务事件订阅者注册失败（不影响启动）" in caplog.text
+        assert "成长体系订阅者注册失败（不影响启动）" in caplog.text
+        assert "后端启动完成" in caplog.text
+
+    # ---------- D-44：自动备份遍历全部用户 ----------
+    def test_backup_runs_for_every_user(self, steps, db_session, tmp_path, monkeypatch):
+        monkeypatch.setattr(main_mod, "settings", _fake_settings(tmp_path))
+        first = _make_committed_user(db_session, prefix="backup-a")
+        second = _make_committed_user(db_session, prefix="backup-b")
+
+        _run_lifespan()
+
+        backed_up = {
+            step[1] for step in steps
+            if isinstance(step, tuple) and step[0] == "backup"
+        }
+        assert {first.id, second.id} <= backed_up
+
+    def test_backup_per_user_failure_does_not_block_others(
+        self, steps, db_session, tmp_path, monkeypatch, caplog
+    ):
+        from sqlalchemy import func, select
+
+        from app.database import SessionLocal
+
+        monkeypatch.setattr(main_mod, "settings", _fake_settings(tmp_path))
+        bad = _make_committed_user(db_session, prefix="backup-bad")
+        good = _make_committed_user(db_session, prefix="backup-good")
+
+        import app.services.backup_service as backup_service_mod
+
+        class PartialBackupService:
+            def __init__(self, db, user_id):
+                self.user_id = user_id
+
+            def auto_backup_if_due(self):
+                if self.user_id == bad.id:
+                    raise RuntimeError("disk full")
+                return {"ran": True, "path": f"/tmp/{self.user_id}.zip"}
+
+        monkeypatch.setattr(backup_service_mod, "BackupService", PartialBackupService)
+        probe = SessionLocal()
+        try:
+            user_count = int(probe.scalar(select(func.count()).select_from(User)) or 0)
+        finally:
+            probe.close()
+        expected_ran = user_count - 1          # 只有 bad 失败
+
+        with caplog.at_level(logging.INFO):
+            assert _run_lifespan() == "started"
+
+        assert f"自动备份失败（用户 {bad.id}" in caplog.text
+        assert f"/tmp/{good.id}.zip" in caplog.text
+        assert f"自动备份完成: {expected_ran} 个用户" in caplog.text
+        assert "register_growth" in steps      # 启动未被阻断
+
+    def test_backup_with_no_users_is_noop(self, steps, tmp_path, monkeypatch, caplog):
+        """D-44：无用户时保持原行为——不报错、不产生备份日志。"""
+        class _EmptyResult:
+            def all(self):
+                return []
+
+            def first(self):
+                return None
+
+        class _EmptySession:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_exc):
+                return False
+
+            def execute(self, *_args, **_kwargs):
+                return _EmptyResult()
+
+            def rollback(self):
+                pass
+
+        monkeypatch.setattr(main_mod, "settings", _fake_settings(tmp_path))
+        monkeypatch.setattr(main_mod, "SessionLocal", lambda: _EmptySession())
+        with caplog.at_level(logging.INFO):
+            assert _run_lifespan() == "started"
+        assert "自动备份完成" not in caplog.text
+        assert "自动备份失败" not in caplog.text
+
+    def test_backup_snapshot_failure_is_fail_open(
+        self, steps, db_session, tmp_path, monkeypatch, caplog
+    ):
+        """用户 id 快照失败（DB 抖动）→ 外层 try/except 兜底，不阻断启动。"""
+        calls = {"n": 0}
+
+        class _FlakySession:
+            def __enter__(self):
+                calls["n"] += 1
+                if calls["n"] >= 2:                # 第 2 次 = 备份快照
+                    raise OSError("db down during backup snapshot")
+                return self
+
+            def __exit__(self, *_exc):
+                return False
+
+            def execute(self, *_args, **_kwargs):
+                class _R:
+                    def all(self):
+                        return []
+
+                    def first(self):
+                        return None
+
+                return _R()
+
+            def rollback(self):
+                pass
+
+        monkeypatch.setattr(main_mod, "settings", _fake_settings(tmp_path))
+        monkeypatch.setattr(main_mod, "SessionLocal", lambda: _FlakySession())
+        _make_committed_user(db_session)
+
+        with caplog.at_level(logging.INFO):
+            assert _run_lifespan() == "started"
         assert "自动备份检查失败（不影响启动）" in caplog.text
         assert "register_growth" in steps
+
+# ================================================================
+# 四、日志桥接（lifespan 第一步 setup_logger 的配套工具）
+# ================================================================
+class TestLoggerBridge:
+    """loguru→stdlib 桥的提前返回 / 转发 / 幂等移除分支（cover app/core/logger.py）。"""
+
+    def test_forward_without_stdlib_handlers_is_noop(self, monkeypatch):
+        forwarded: list[tuple] = []
+
+        class _Root:
+            handlers: list = []          # 无 handler → 必须提前 return
+
+            def log(self, *args):
+                forwarded.append(args)
+
+        # 只替换 logger 模块内的 logging 引用（不动 pytest 自己的 logging.*）
+        monkeypatch.setattr(
+            logger_mod, "logging",
+            types.SimpleNamespace(getLogger=lambda *a, **kw: _Root()),
+        )
+        message = types.SimpleNamespace(
+            record={"name": "app", "level": types.SimpleNamespace(no=20), "message": "x"}
+        )
+        logger_mod._forward_to_stdlib(message)
+        assert forwarded == []           # 没有 stdlib handler 时不得转发（防双份日志）
+
+    def test_forward_with_stdlib_handler_emits_log_record(self, monkeypatch):
+        records: list[logging.LogRecord] = []
+
+        class _Capture(logging.Handler):
+            def emit(self, record: logging.LogRecord) -> None:
+                records.append(record)
+
+        root = logging.getLogger()
+        monkeypatch.setattr(root, "handlers", [_Capture()], raising=False)
+        message = types.SimpleNamespace(
+            record={
+                "name": "app.probe",
+                "level": types.SimpleNamespace(no=logging.WARNING),
+                "message": "hello bridge",
+            }
+        )
+        logger_mod._forward_to_stdlib(message)
+
+        assert len(records) == 1
+        assert records[0].getMessage() == "hello bridge"
+        assert records[0].levelno == logging.WARNING
+        assert records[0].name == "app.probe"
+
+    def test_remove_bridge_is_idempotent(self, monkeypatch):
+        removed: list[int] = []
+
+        def _raise_value_error(sink_id):
+            removed.append(sink_id)
+            raise ValueError("sink gone")     # loguru.remove 对不存在的 sink 抛 ValueError
+
+        monkeypatch.setattr(logger_mod.logger, "remove", _raise_value_error)
+        assert logger_mod.remove_stdlib_bridge(None) is None      # 未安装过：直接返回
+        assert removed == []                                       # 没有调用 loguru.remove
+        assert logger_mod.remove_stdlib_bridge(999_999_999) is None  # ValueError 被吞
+        assert removed == [999_999_999]
 
 
 # ================================================================

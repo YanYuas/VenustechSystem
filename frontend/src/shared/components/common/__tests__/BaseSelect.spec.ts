@@ -221,6 +221,18 @@ describe('BaseSelect：键盘与外部点击', () => {
     expect(wrapper.find('.select__panel').exists()).toBe(false)
   })
 
+  it('外部改 modelValue 时清空搜索词并恢复全量选项（D-40）', async () => {
+    const wrapper = mountSelect({ searchable: true })
+    await openPanel(wrapper)
+    await wrapper.find('.select__search').setValue('an')
+    expect(wrapper.findAll('.select__option').map((o) => o.text())).toEqual(['Banana'])
+
+    await wrapper.setProps({ modelValue: 'a' })
+
+    expect(wrapper.findAll('.select__option')).toHaveLength(3)
+    expect((wrapper.find('.select__search').element as HTMLInputElement).value).toBe('')
+  })
+
   it('关闭再打开时清空搜索词与高亮（不会残留上次状态）', async () => {
     const wrapper = mountSelect({ searchable: true })
     await openPanel(wrapper)

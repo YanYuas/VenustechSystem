@@ -57,7 +57,13 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  mounted.splice(0).forEach((w) => w.unmount())
+  mounted.splice(0).forEach((w) => {
+    try {
+      w.unmount()
+    } catch {
+      /* 用例内已手动卸载 */
+    }
+  })
   document.body.style.overflow = ''
   vi.useRealTimers()
 })
@@ -233,6 +239,62 @@ describe('BaseModal：Esc 与滚动锁定', () => {
     await Promise.resolve()
 
     expect(document.activeElement).toBe(wrapper.find('input.first-field').element)
+  })
+})
+
+describe('BaseModal：closed 恰好一次（D-41）', () => {
+  // 注意：VTU 在 wrapper.unmount() 之后不能再调 wrapper.emitted()（vm 已置空）。
+  // 因此这里通过挂载时的 onClosed 监听器 + vi.fn 计数，卸载后仍可断言。
+  function mountWithClosedSpy() {
+    const onClosed = vi.fn()
+    const wrapper = mount(BaseModal, {
+      props: { modelValue: false, title: 't', onClosed } as never,
+      global: { stubs: { teleport: true } },
+      attachTo: document.body,
+    })
+    mounted.push(wrapper)
+    return { wrapper, onClosed }
+  }
+
+  it('关闭动画期间被卸载：清掉 timer 并补发 closed（恰好 1 次，不重复）', async () => {
+    vi.useFakeTimers()
+    const { wrapper, onClosed } = mountWithClosedSpy()
+    await wrapper.setProps({ modelValue: true })
+    await nextTick()
+    await wrapper.setProps({ modelValue: false })
+    expect(onClosed).not.toHaveBeenCalled()
+
+    wrapper.unmount()
+    expect(onClosed).toHaveBeenCalledTimes(1)
+
+    await vi.advanceTimersByTimeAsync(300) // timer 已被清，不应再发
+    expect(onClosed).toHaveBeenCalledTimes(1)
+  })
+
+  it('未关闭直接卸载：不补发 closed', async () => {
+    vi.useFakeTimers()
+    const { wrapper, onClosed } = mountWithClosedSpy()
+    await wrapper.setProps({ modelValue: true })
+    await nextTick()
+
+    wrapper.unmount()
+    await vi.advanceTimersByTimeAsync(300)
+
+    expect(onClosed).not.toHaveBeenCalled()
+  })
+
+  it('正常 150ms 后 closed 恰好 1 次；随后卸载不重复', async () => {
+    vi.useFakeTimers()
+    const { wrapper, onClosed } = mountWithClosedSpy()
+    await wrapper.setProps({ modelValue: true })
+    await nextTick()
+    await wrapper.setProps({ modelValue: false })
+
+    await vi.advanceTimersByTimeAsync(150)
+    expect(onClosed).toHaveBeenCalledTimes(1)
+
+    wrapper.unmount()
+    expect(onClosed).toHaveBeenCalledTimes(1)
   })
 })
 

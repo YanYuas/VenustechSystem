@@ -200,7 +200,7 @@ class BackupService:
         manifest = {"app_version": info["app_version"], "user_id": info["user_id"]}
         if info["version_mismatch"]:
             logger.warning(
-                "备份版本 %s 与当前版本 %s 主版本号不同，可能存在兼容性问题",
+                "备份版本 {} 与当前版本 {} 主版本号不同，可能存在兼容性问题",
                 info["app_version"], self.settings.version,
             )
 
