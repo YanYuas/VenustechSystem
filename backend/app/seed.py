@@ -5,7 +5,7 @@
 # ============================================================
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 
 from sqlalchemy.orm import Session
 
@@ -246,7 +246,9 @@ def seed_if_empty(db: Session) -> bool:
     qtr.create(user_id=user.id, title="整理调研笔记", completed=False, sort_order=3)
     qtr.create(user_id=user.id, title="预约牙医", completed=True, sort_order=4, completed_at=utcnow() - timedelta(days=2))
 
-    now = datetime.utcnow()
+    # D-33：统一用 services/base 的 aware UTC（与其它 seed 时间一致），
+    # 避免同一文件里 naive/aware 混用；SQLite 的 DateTime 绑定时会去掉 tzinfo。
+    now = utcnow()
     rmr = ReminderRepository(db)
     rmr.create(user_id=user.id, title="项目周会", remind_at=now + timedelta(hours=2),
                type="meeting", description="每周同步开发进度", repeat="weekly")

@@ -1,0 +1,96 @@
+# ============================================================
+# Windows 启动冒烟（ops/start.ps1 -Mode dev -Verify）
+#
+# 为什么需要：启动脚本是 Windows-only（Get-NetTCPConnection / taskkill / .venv\Scripts），
+# ubuntu 的 backend.yml / frontend.yml 只能覆盖组件级；`-Verify` 此前只在本地人工跑
+# （2026-10-28 实测 dev/demo/mobile 全 PASS），**脚本坏掉没有任何自动化兜住**。
+# 本 workflow 在 windows-latest 上真启动 dev 模式（后端 :8765 + 前端 :5173）→ 健康检查
+# → taskkill 自动停止 → 退出码 0/1；失败时把 var/logs 下的子进程日志端上来。
+#
+# 与本地环境的差异（重要）：
+#   - CI 没有 backend/.venv → Resolve-Python 'dev' 会回退到 PATH 上的 python
+#     （ops/start.ps1 的 dev 分支：打印 WARN 后返回 PATH python，demo/mobile 才强制要求 venv），
+#     因此这里用 setup-python 装 3.11，并把依赖装到这个 PATH python 上；
+#   - frontend/node_modules 由 npm ci 提供（Assert-FrontendDeps 只检查它存在）；
+#   - 数据目录由启动器自己设为 var/data（工作区可写），日志落 var/logs（已 gitignore）。
+# ============================================================
+name: windows-startup
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "ops/**"
+      - "scripts/**"
+      - "backend/**"
+      - "frontend/**"
+      - ".github/workflows/windows-startup.yml"
+
+# 最小权限：只读仓库内容（本 workflow 不写回、不发版）
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-startup-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  startup-smoke:
+    name: dev 真启动 + 健康检查 + 自动停止
+    runs-on: windows-latest
+    timeout-minutes: 25
+    env:
+      # 启动器本身只设 VENUSTECH_DATA_DIR；UTF-8 固定住，避免 runner 代码页影响中文日志
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: utf-8
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # CI 无 venv：装到 setup-python 的 PATH python，供启动器 dev 模式的回退分支使用
+      - name: Install backend deps into PATH python (no venv)
+        timeout-minutes: 10
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r backend/requirements-dev.txt
+
+      - name: Install frontend deps (npm ci)
+        working-directory: frontend
+        timeout-minutes: 10
+        run: npm ci --no-audit --no-fund
+
+      # 先跑启动器契约（秒级、纯静态），再跑真启动；两者都红时先看到契约问题更有指向性
+      - name: Launcher contract (audit_delivery.py)
+        run: python scripts/audit_delivery.py
+
+      - name: Startup self-check (dev, -Verify)
+        shell: pwsh
+        timeout-minutes: 15
+        run: pwsh -NoProfile -ExecutionPolicy Bypass -File ops/start.ps1 -Mode dev -Verify
+
+      # 只在失败时上传：成功时 var/logs 里是被杀掉的子进程日志，没有留存价值
+      - name: Upload launcher logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-startup-logs
+          path: var/logs/**
+          if-no-files-found: ignore
+          retention-days: 7

@@ -115,14 +115,19 @@ describe('GlobalSearch：搜索防抖与结果', () => {
     expect(text).toContain('新建文档')
   })
 
-  it('无匹配时只剩两个操作项（操作项恒定，空态文案不出现）', async () => {
+  it('无匹配时显示引导式空态，且两个操作项仍常驻（D-29）', async () => {
     const wrapper = mountSearch()
     await typeAndWait(wrapper, '不存在')
 
+    // 操作项恒定：清空搜索词之外的任何情况下都保留「新建任务/新建文档」
     const buttons = wrapper.findAll('.gsearch__result')
     expect(buttons).toHaveLength(2)
     expect(wrapper.text()).toContain('新建任务')
-    expect(wrapper.find('.gsearch__empty').exists()).toBe(false)
+
+    // 但空态判断只看"真实结果"（排除 action），所以引导文案必须出现
+    const empty = wrapper.find('.gsearch__empty')
+    expect(empty.exists()).toBe(true)
+    expect(empty.text()).toContain('没有找到相关内容，可试试下面的操作')
   })
 
   it('加载中显示「搜索中…」，完成后隐藏', async () => {
@@ -154,6 +159,8 @@ describe('GlobalSearch：搜索防抖与结果', () => {
     expect(wrapper.find('.gsearch__loading').exists()).toBe(false)
     expect(wrapper.findAll('.gsearch__result')).toHaveLength(2)
     expect(wrapper.text()).toContain('新建任务')
+    // 失败同样等价于"没有真实结果"：显示引导文案，但不影响操作项
+    expect(wrapper.find('.gsearch__empty').text()).toContain('没有找到相关内容，可试试下面的操作')
   })
 
   it('过期响应被丢弃：先发的请求后到，不能覆盖新结果', async () => {

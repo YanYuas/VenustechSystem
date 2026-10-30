@@ -60,8 +60,11 @@ ops\start.ps1 -Mode dev -DataDir .\var\data-feature-x
 
 ## 4. 与 CI 的边界
 
-启动脚本是 **Windows-only**（`Get-NetTCPConnection` / `taskkill` / `.venv\Scripts`），所以不进
-ubuntu CI；CI 用 `.github/workflows/backend.yml` / `.github/workflows/frontend.yml` 覆盖组件级（ruff/pytest/typecheck/vitest/build）。
+启动脚本是 **Windows-only**（`Get-NetTCPConnection` / `taskkill` / `.venv\Scripts`），
+ubuntu runner 不跑它 —— 组件级由 `.github/workflows/backend.yml` /
+`.github/workflows/frontend.yml` 覆盖（ruff / pytest / typecheck / vitest / build）。
+**脚本本身**由 `.github/workflows/windows-startup.yml` 在 Windows runner 上守（见 §5）。
+
 本机改完启动逻辑后，最低验证要求：
 
 ```powershell
@@ -69,3 +72,53 @@ ops\start.ps1 -Mode dev -WhatIf        # 计划正确
 ops\start.ps1 -Mode dev -Verify        # 真启动 + 健康检查 + 清理
 python scripts\audit_delivery.py       # 转发壳/唯一实现/ASCII/BOM 契约
 ```
+
+## 5. CI 冒烟（Windows runner）
+
+`windows-startup` workflow 是**启动脚本本身的回归测试**：在 `windows-latest` 上真实启动
+dev 模式（后端 :8765 + 前端 :5173）→ 等端口 + `GET /api/v1/health` → `taskkill` 停止 →
+退出码 0/1。脚本坏掉时 CI 直接变红，不再依赖"有人记得本机跑一次 `-Verify`"。
+
+**触发条件**
+
+- 手动：Actions → `windows-startup` → Run workflow（`workflow_dispatch`）；
+- 自动：push 到 `main` 且改动命中 `ops/**`、`scripts/**`、`backend/**`、`frontend/**`
+  或该 workflow 文件本身（`paths` 过滤 —— Windows 分钟约为 Linux 的 2×，不开 PR 触发）。
+
+**跑什么（8 步）**
+
+| # | 步骤 | 说明 |
+|---|---|---|
+| 1 | `actions/checkout@v4` | — |
+| 2 | `actions/setup-python@v5`（3.11，cache pip） | 缓存键含 `backend/requirements*.txt` |
+| 3 | `actions/setup-node@v4`（24，cache npm） | 缓存键含 `frontend/package-lock.json` |
+| 4 | `python -m pip install -r backend/requirements-dev.txt` | **装到 PATH python（CI 无 venv）** |
+| 5 | `npm ci`（cwd=`frontend`） | 满足 `Assert-FrontendDeps` 对 `frontend/node_modules` 的硬检查 |
+| 6 | `python scripts/audit_delivery.py` | 先跑秒级的启动器契约（单一实现 / 薄转发壳 / ASCII / BOM / 冒烟水分） |
+| 7 | `pwsh -NoProfile -ExecutionPolicy Bypass -File ops/start.ps1 -Mode dev -Verify` | 真启动 + 健康检查 + 自动停止 |
+| 8 | `actions/upload-artifact@v4`（`if: failure()`） | 上传 `var/logs/**` → artifact `windows-startup-logs`（保留 7 天） |
+
+**CI 没有 `backend/.venv`，dev 为什么能跑**：`ops/start.ps1` 的 `Resolve-Python 'dev'` 在 venv
+缺失时会打印 `[WARN] project venv not found` 并**回退到 PATH 上的 `python`**；`demo` / `mobile`
+分支则硬要求 venv（直接 `[ERROR] project venv not found`）。所以 CI 固定用 `-Mode dev`，
+依赖由第 4 步装进同一个 PATH python。三条前置硬检查在 CI 的满足方式：
+
+| 检查 | CI 里怎么满足 |
+|---|---|
+| 解释器（`Resolve-Python 'dev'`） | setup-python 提供 PATH `python` → 走 venv 缺失回退分支 |
+| 后端依赖（`Test-BackendDeps` 探针 `import uvicorn, fastapi`） | 第 4 步 pip 安装成功 |
+| 前端依赖（`Assert-FrontendDeps` 查 `frontend/node_modules`） | 第 5 步 `npm ci` |
+
+**失败怎么看**
+
+1. Actions 运行页底部 **Artifacts → `windows-startup-logs`** 下载；
+2. 看 `var/logs/<时间>-backend-FastAPI.err.log`（uvicorn / 迁移 / 依赖问题）与
+   `<时间>-frontend-Vite.err.log`（npm / vite 问题）；
+3. 常见原因：依赖漏装（第 4/5 步）、`--reload` 下 app import 失败（日志里 `ModuleNotFoundError`）、
+   端口被占用（runner 上罕见，日志里 `EADDRINUSE`）。
+
+**注意**
+
+- **首次真实结果只能在 push 后看到**：本机无法复现 runner 的"无 `backend/.venv` + 全新
+  `frontend/node_modules`"环境；本机等价验证用 §2 的 `-Verify` 与 §4 的三条命令。
+- 本 workflow 只覆盖 **dev**；demo / mobile 仍靠本机 `-Verify`（§2 实测表）覆盖，暂不进 CI。

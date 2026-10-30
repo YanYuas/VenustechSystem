@@ -228,6 +228,18 @@ class TestRootCrud:
         finally:
             db.close()
 
+    def test_delete_root_clears_scan_progress_registry(self, svc, root_dir):
+        """D-34：删除根必须清掉进程内 _SCAN_PROGRESS（否则同 id 复活带陈旧状态）。"""
+        root = svc.register_root(str(root_dir), None, None)
+        ws_mod._progress_set(root["id"], phase="walking", found=3)
+        assert ws_mod._progress_get(root["id"])["phase"] == "walking"
+
+        svc.delete_root(root["id"])
+
+        assert ws_mod._progress_get(root["id"]) == {}
+        with pytest.raises(NotFoundException):
+            svc.scan_progress(root["id"])
+
     def test_list_roots_only_returns_own(self, db_session, test_user, other_user, root_dir):
         mine = WorkspaceService(db_session, test_user.id).register_root(
             str(root_dir), "我的", None

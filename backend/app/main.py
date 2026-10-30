@@ -69,7 +69,7 @@ async def lifespan(_app: FastAPI):
                 for (uid,) in db.execute(select(User.id)).all()
             )
             if total:
-                logger.info(f"重复任务生成 {total} 个实例")
+                logger.info("重复任务生成 {} 个实例", total)
         except Exception:
             logger.exception("重复任务生成失败（不影响启动）")
     # 自动备份（PRD F7.1）：默认关闭；开启后按配置间隔判断是否到期
@@ -84,7 +84,7 @@ async def lifespan(_app: FastAPI):
             if _uid_row:
                 _info = BackupService(_bdb, _uid_row[0]).auto_backup_if_due()
                 if _info.get("ran"):
-                    logger.info(f"自动备份完成: {_info.get('path')}")
+                    logger.info("自动备份完成: {}", _info.get("path"))
     except Exception:
         logger.exception("自动备份检查失败（不影响启动）")
 
@@ -136,7 +136,7 @@ def create_app() -> FastAPI:
 
     @app.exception_handler(AppException)
     async def app_exception_handler(_request: Request, exc: AppException):
-        logger.warning(f"业务异常 {exc.code}: {exc.message}")
+        logger.warning("业务异常 {}: {}", exc.code, exc.message)
         return JSONResponse(
             status_code=exc.http_status, content=error(exc.code, exc.message)
         )

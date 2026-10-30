@@ -64,9 +64,15 @@ def _deadline_from_text(text: str, today: date) -> tuple[datetime | None, bool]:
                 return datetime.combine(today + timedelta(days=offset), datetime.min.time()), False
         wm = re.search(r"(?:下)?周([一二三四五六日天])", text)
         if wm:
-            delta = (WEEKDAY[wm.group(1)] - today.weekday()) % 7 or 7
+            weekday = WEEKDAY[wm.group(1)]
             if wm.group(0).startswith("下周"):
-                delta += 7 - ((today.weekday() + 1) % 7 or 7) if False else delta  # 下周至少推 7 天
+                # D-31 "下周X" = 下一自然周的周X：先到下一个周一，再加周内偏移
+                # （下周一的偏移 = 7 - today.weekday()；今天周一下周三 = 7+2 = 9 天，
+                #   今天周三下周三 = 5+2 = 7 天，均落在下一自然周）
+                delta = (7 - today.weekday()) + weekday
+            else:
+                # D-30 "周X" = 未来最近的那个周X（今天就是周X → 下同一天）
+                delta = (weekday - today.weekday()) % 7 or 7
             return datetime.combine(today + timedelta(days=delta), datetime.min.time()), False
         return None, False
     day_part, period, hour, minute = m.groups()
@@ -80,8 +86,13 @@ def _deadline_from_text(text: str, today: date) -> tuple[datetime | None, bool]:
     elif day_part == "大后天":
         offset = 3
     else:
-        base = today + timedelta(days=(WEEKDAY[day_part[-1]] - today.weekday()) % 7 or 7)
-        offset = (base - today).days
+        # D-30："周X" = 未来最近的那个周X；"下周X" = 下一自然周的周X。
+        # 关键：只算一次 offset，base 固定为 today，避免 base 前进后又叠加 offset（旧 bug）。
+        weekday = WEEKDAY[day_part[-1]]
+        if day_part.startswith("下周"):
+            offset = (7 - today.weekday()) + weekday
+        else:
+            offset = (weekday - today.weekday()) % 7 or 7
     h = int(hour)
     if period:
         if period in ("下午", "晚上") and h < 12:

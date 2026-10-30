@@ -103,28 +103,91 @@ class TestDeadlineParsing:
         assert deadline.isoformat() == expected
         assert has_time is True
 
-    def test_numeric_weekday_double_adds_offset_bug(self):
-        """BUG(已记录 B-4)：_NUM_TIME 的 day_part=周X 分支里 base 已前进 7 天，
-
-        随后 `offset=(base-today).days` 再叠加一次 → "周三下午3点" 得到 +14 天
-        （应为 +7）。本轮只修 D-22 的长词顺序，不改此分支；按当前行为钉住。
-        """
-        deadline, _ = _deadline_from_text("周三下午3点开会", self.TODAY)
+    # ---------- D-30："周X" = 未来最近的那个周X（今天=周三，TODAY=2026-10-28） ----------
+    @pytest.mark.parametrize(
+        "weekday_char,expected_date,delta_days",
+        [
+            ("一", "2026-11-02", 5),
+            ("二", "2026-11-03", 6),
+            ("三", "2026-11-04", 7),  # 今天就是周三 → 下同一天（沿用 % 7 or 7）
+            ("四", "2026-10-29", 1),
+            ("五", "2026-10-30", 2),
+            ("六", "2026-10-31", 3),
+            ("日", "2026-11-01", 4),
+            ("天", "2026-11-01", 4),
+        ],
+    )
+    def test_weekday_nearest_future_matrix(self, weekday_char, expected_date, delta_days):
+        deadline, has_time = _deadline_from_text(f"周{weekday_char}交表", self.TODAY)
         assert deadline is not None
-        assert deadline.date().isoformat() == "2026-11-11"  # 修复后应为 11-04
+        assert deadline.date().isoformat() == expected_date
+        assert (deadline.date() - self.TODAY).days == delta_days
+        assert has_time is False
 
-    def test_next_week_prefix_weekday_double_adds_bug(self):
-        """BUG(已记录 B-5)："下周X" 的 `delta += ... if False else delta` 实际执行 delta += delta。"""
-        deadline, _ = _deadline_from_text("下周三开会", self.TODAY)
+    @pytest.mark.parametrize(
+        "weekday_char,expected",
+        [
+            ("一", "2026-11-02T15:00:00"),
+            ("三", "2026-11-04T15:00:00"),
+            ("四", "2026-10-29T15:00:00"),
+            ("日", "2026-11-01T15:00:00"),
+        ],
+    )
+    def test_weekday_numeric_time_matrix(self, weekday_char, expected):
+        """D-30 分支修复：'周X下午3点' 只前进一次，不再 +14 天。"""
+        deadline, has_time = _deadline_from_text(f"周{weekday_char}下午3点开会", self.TODAY)
         assert deadline is not None
-        assert deadline.date().isoformat() == "2026-11-11"  # 修复后应为 11-04
+        assert deadline.isoformat() == expected
+        assert has_time is True
 
-    def test_next_weekday_rolls_to_next_week(self):
-        # 今天周三（weekday=2），"周三" 应推到下周
-        deadline, has_time = _deadline_from_text("周三交表", self.TODAY)
+    def test_weekday_same_day_still_moves_seven_days(self):
+        deadline, _ = _deadline_from_text("周三交表", self.TODAY)
         assert deadline is not None
         assert deadline.date().isoformat() == "2026-11-04"
+        assert (deadline.date() - self.TODAY).days == 7
+
+    # ---------- D-31："下周X" = 下一自然周的周X ----------
+    @pytest.mark.parametrize(
+        "weekday_char,expected_date,delta_days",
+        [
+            ("一", "2026-11-02", 5),
+            ("二", "2026-11-03", 6),
+            ("三", "2026-11-04", 7),
+            ("四", "2026-11-05", 8),
+            ("五", "2026-11-06", 9),
+            ("六", "2026-11-07", 10),
+            ("日", "2026-11-08", 11),
+        ],
+    )
+    def test_next_week_weekday_matrix(self, weekday_char, expected_date, delta_days):
+        deadline, has_time = _deadline_from_text(f"下周{weekday_char}开会", self.TODAY)
+        assert deadline is not None
+        assert deadline.date().isoformat() == expected_date
+        assert (deadline.date() - self.TODAY).days == delta_days
         assert has_time is False
+
+    @pytest.mark.parametrize(
+        "today,text,expected_date,delta_days",
+        [
+            (date(2026, 10, 26), "下周三", "2026-11-04", 9),   # 今天周一 → 9 天
+            (date(2026, 10, 26), "下周一", "2026-11-02", 7),
+            (date(2026, 10, 26), "下周日", "2026-11-08", 13),
+            (date(2026, 10, 28), "下周三", "2026-11-04", 7),   # 今天周三 → 7 天
+            (date(2026, 11, 1), "下周一", "2026-11-02", 1),    # 今天周日 → 明天
+        ],
+    )
+    def test_next_week_cross_boundary_matrix(self, today, text, expected_date, delta_days):
+        deadline, has_time = _deadline_from_text(f"{text}开会", today)
+        assert deadline is not None
+        assert deadline.date().isoformat() == expected_date
+        assert (deadline.date() - today).days == delta_days
+        assert has_time is False
+
+    def test_next_week_weekday_with_numeric_time(self):
+        deadline, has_time = _deadline_from_text("下周三下午3点开会", self.TODAY)
+        assert deadline is not None
+        assert deadline.isoformat() == "2026-11-04T15:00:00"
+        assert has_time is True
 
 
 class TestLocalParse:

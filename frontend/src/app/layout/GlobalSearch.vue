@@ -96,7 +96,8 @@ function byType(g: SearchResultItem['type']) {
 }
 
 const flatList = computed(() => GROUPS.flatMap((g) => byType(g)))
-const hasAny = computed(() => flatList.value.length > 0)
+/** 真实搜索结果（排除恒在的「操作」项）——D-29：空态判断不能把操作项算进去 */
+const realResults = computed(() => flatList.value.filter((r) => r.type !== 'action'))
 
 /** 高亮匹配词 —— 返回 vnode 片段 */
 function hl(text: string) {
@@ -257,9 +258,9 @@ onBeforeUnmount(() => {
                 </template>
               </section>
 
-              <div v-if="debounced.trim() && !hasAny" class="gsearch__empty">
+              <div v-if="debounced.trim() && !realResults.length" class="gsearch__empty">
                 <AppIcon name="search" :size="32" class="gsearch__empty-icon" />
-                <p>没有找到相关内容</p>
+                <p>没有找到相关内容，可试试下面的操作</p>
               </div>
             </template>
           </div>

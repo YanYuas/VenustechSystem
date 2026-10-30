@@ -375,13 +375,16 @@ CI：`.github/workflows/{backend,frontend,repo-guard}.yml` + `android-build.yml`
 | D-26 | P2 | 多个 app 模块用 stdlib `logging.getLogger` 却按 loguru 风格 `{}` 传参（参数被丢弃），且 `logger.opt()` 在 stdlib 上会 AttributeError | health/event_bus/plugin_manager/9 个 service 等 | ✅ 已修（2026-10-30）：12 文件统一 `get_logger` + 21 处 f-string→`{}` 惰性占位；`config.py` 因导入环保留 stdlib 并进白名单；契约新增"禁止 logging.getLogger"+ caplog 按需桥；顺带修掉 health/dashboard/pet 的 latent AttributeError |
 | D-27 | P3 | `useSettingsDiagnostics` 的 400ms `ruleTimer` 未在 scope dispose 清理 | `useSettingsDiagnostics.ts` | ✅ 已修（2026-10-30）：`onScopeDispose` 清理 + 卸载后不触发预览回归测试 |
 | D-28 | P3 | `offlineQueue` store `init()` 重复调用会重复注册网络监听 | `offlineQueue.ts` | ✅ 已修（2026-10-30）：`listenersBound` 幂等 + dispose 复位；2 条回归测试 |
-| D-29 | P3 | `GlobalSearch` 的"没有找到相关内容"空态不可达：恒定操作项使 `hasAny` 恒 true（UX 决策：删分支或改文案） | `app/layout/GlobalSearch.vue` | Phase 8 |
-| D-30 | P2 | `_NUM_TIME` 的 `周X` 分支 base 已前进 7 天又叠加 offset → "周三" 解析成 **+14 天**（应 +7） | `assistant_service.py`；测试按当前行为钉住 | Phase 8 |
-| D-31 | P2 | 同函数"下周X"分支 `delta += 7 - (...) if False else delta` 实际执行 `delta += delta` → "下周三" **+14 天**（应 +7）；且 `if False` 死代码 | `assistant_service.py` | Phase 8 |
-| D-32 | P2 | `domain_engine.build_unit_defs` 阶段公式（0.4/0.85 比例）使 4 单元通用兜底计划**永不出现 phase 3**（长尾技能/无 API Key 默认路径的技能树少一个"整合实战"阶段） | `services/rules/domain_engine.py`；测试已记录实测 | Phase 8 |
-| D-33 | P3 | `app/seed.py` 仍用 `datetime.utcnow()`（DeprecationWarning） | `app/seed.py:249` | Phase 8 |
-| D-34 | P3 | `WorkspaceService.delete_root` 不清理 `_SCAN_PROGRESS` 注册表 → 僵尸条目（个人规模影响极小） | `workspace_service.py` | Phase 8 |
-| D-35 | P3 | `app/main.py` 仍有 3 处 f-string 日志（loguru 下可用但非惰性；不在 D-26 清单内） | `app/main.py` | Phase 8 |
+| D-29 | P3 | `GlobalSearch` 的空态"没有找到相关内容"不可达：恒定操作项使 `hasAny` 恒 true（UX 决策） | `app/layout/GlobalSearch.vue` | ✅ 已修（2026-10-30）：新增 `realResults` 排除 action 项，空态条件改 `!realResults.length`+引导文案，操作项仍常驻 |
+| D-30 | P2 | `_NUM_TIME` 的 `周X` 分支 base 已前进又叠加 offset → "周三" 解析成 +14 天 | `assistant_service.py` | ✅ 已修（2026-10-30）：`base=today`+只算一次 offset（未来最近周X），周 7 天矩阵 + numeric 矩阵 |
+| D-31 | P2 | "下周X" 分支 `delta += delta`（+ `if False` 死代码）→ +14 天 | `assistant_service.py` | ✅ 已修（2026-10-30）：`delta=(7-today.weekday())+WEEKDAY[day]`，跨周边界矩阵（周一"下周三"+9 等） |
+| D-32 | P2 | `domain_engine` 阶段公式使 4 单元通用兜底计划永不出现 phase 3 | `services/rules/domain_engine.py` | ✅ 已修（2026-10-30）：`phase=min(3,(i*3)//total+1)`，total≥3 恒三段齐全；内置 13 领域分布同步修正 |
+| D-33 | P3 | `app/seed.py` 用 `datetime.utcnow()`（DeprecationWarning） | `app/seed.py` | ✅ 已修（2026-10-30）：改 `utcnow()`（aware UTC），移除多余 import |
+| D-34 | P3 | `WorkspaceService.delete_root` 不清理 `_SCAN_PROGRESS` 僵尸条目 | `workspace_service.py` | ✅ 已修（2026-10-30）：commit 后 `_progress_clear(root_id)`；404 语义不变 |
+| D-35 | P3 | `app/main.py` 3 处 f-string 日志（非惰性） | `app/main.py` | ✅ 已修（2026-10-30）：改 loguru `{}` 惰性占位，渲染文本不变 |
+| D-36 | P2 | `useSettingsSync.loadDataDir` 硬编码 `http://127.0.0.1:8765/api/v1/health`（未走 `getApiBase()`）→ 移动端/局域网模式健康检查打本机回环，可能误报"后端未连接" | `features/settings/composables/useSettingsSync.ts` | Phase 9 |
+| D-37 | P3 | `useSettingsSync` 的导出/导入 `catch` 为空（依赖 http 层 toast）→ api 层非 http 错误会静默 | 同上 | Phase 9 |
+| D-38 | P3 | `useReminderWatcher` 模块级单例 `notifiedIds` 永不清理（长会话内存缓慢增长；多实例共享状态） | `features/notification/composables/useReminderWatcher.ts` | Phase 9 |
 
 > 原则：**先修 P0/P1 的"正确性"，再谈结构搬迁**。在事务边界、迁移基线、备份导入还有问题时做领域分包，只是把混乱打包进更漂亮的新目录。
 
@@ -399,6 +402,7 @@ CI：`.github/workflows/{backend,frontend,repo-guard}.yml` + `android-build.yml`
 | **Phase 5** | 结构治理 + 测试质量 + 启动可靠性 | 工作区卫生守护（`audit_workspace_hygiene.py`，check_all 16 项，清理 193MB）；后端 pytest-cov 85.18%→88.48%（+166 测试，1450 全绿）；前端 coverage-v8 +49 测试（135 全绿，kernel/http 92.23%）；启动脚本真修：根治 `Start-Process` 新窗口死锁 + `-Verify` 自检 + `var/logs`；登记 D-17~D-21 | ✅ 本轮完成（2026-10-28） |
 | **Phase 6** | 修测试发现的真 bug + 补测试缺口 | D-17/18/19（auth 500、logs loguru/envelope）、D-20（avatar IDOR）、D-21（SSE token）全部修复 + 回归测试；后端 +118 测试（1598 收集 / 1588 passed），覆盖率 89.04%→92.02%；前端 +59 测试（196 passed），lines 12.76%→20.95%、阈值棘轮 20/72/52/20 进 CI；新登记 D-22~D-28 | ✅ 本轮完成（2026-10-28） |
 | **Phase 7** | 修 P1/P2 缺陷 + 日志统一 + 覆盖率棘轮 | D-22~D-28 全部修复（aihot 双信封/死分支、大后天解析、AI 响应错误映射、加密单例、日志后端统一、前端定时器/监听幂等）；后端 1706 passed、覆盖率 92.02%→**96%**（CI 阈值 91→95）；前端 239 passed、lines 20.95%→32.24%（阈值 {31,76,59,31} 进 CI）；架构负向探针改 uuid 防并发假红；新登记 D-29~D-35 | ✅ 本轮完成（2026-10-30） |
+| **Phase 8** | 修剩余 P2/P3 缺陷 + 测试补缺 + 启动脚本进 CI | D-29~D-35 全部修复（GlobalSearch 空态、日期 +14 天×2、阶段划分、seed utcnow、扫描僵尸、main f-string）；后端 1743 passed、覆盖率 95.92%（CI 阈值 95）；前端 291 passed、lines 37.44%（阈值 {36,78,63,36}）；新增 windows-startup workflow（Windows runner 真跑 `ops/start.ps1 -Mode dev -Verify`）；新登记 D-36~D-38 | ✅ 本轮完成（2026-10-30） |
 
 **明确不做（以及为什么）**：
 

@@ -236,6 +236,27 @@ def _unit(name: str, task_count: int = 1) -> de.PlannedUnit:
     return de.PlannedUnit(name=name, tasks=tasks, phase=1)
 
 
+def _unit_defs(count: int) -> tuple[UnitDef, ...]:
+    """造 count 个能力单元（各 1 条任务），用于验证阶段划分的 N 分布。"""
+    return tuple(
+        UnitDef(
+            name=f"单元{i}",
+            tasks=(TaskDef(task=f"任务{i}", duration="30分钟", acceptance="a"),),
+        )
+        for i in range(count)
+    )
+
+
+def _domain_with(count: int) -> DomainDef:
+    return DomainDef(
+        key=f"phase-{count}",
+        name=f"{count}单元领域",
+        patterns=(f"phase-{count}",),
+        verify_task="验证任务",
+        units=_unit_defs(count),
+    )
+
+
 class TestPlanScheduling:
     def test_generate_plan_without_units_returns_verify_only(self):
         plan = de.generate_plan((), 30, 45, "完成验证")
@@ -292,32 +313,66 @@ class TestPlanScheduling:
         assert result.verify_task
         assert result.items[-1].is_verify is True
 
-    def test_build_unit_defs_marks_three_phases(self):
-        # 阶段公式：i < 40% → 1；40%~85% → 2；≥85% → 3。
-        # 通用拆解只有 4 个单元 → 0.85*4=3.4，最后一个仍落在阶段 2。
+    def test_generic_fallback_plan_contains_phase_3_regression_d32(self):
+        """D-32 回归：通用兜底计划（4 单元）必须出现 phase 3「整合实战」。
+
+        旧公式 `i < total*0.4 / 0.85` 对 total=4 的末单元（i=3 < 3.4）判为 2，
+        导致长尾技能 / 无 API Key 的默认路径技能树只有 {1,2} 两个阶段。
+        """
         generic = de.build_unit_defs(None, "织毛衣")
-        assert [u.phase for u in generic] == [1, 1, 2, 2]
+        phases = [u.phase for u in generic]
+        assert phases == [1, 1, 2, 3]
+        assert set(phases) == {1, 2, 3}
+        assert generic[-1].phase == 3
+        assert generic[-1].name.endswith("实战产出")
 
-        # 单元数足够多（8 个）时才会出现阶段 3：3/8=37.5% → 1，7/8=87.5% → 3
-        many_units = tuple(
-            UnitDef(
-                name=f"单元{i}",
-                tasks=(TaskDef(task=f"任务{i}", duration="30分钟", acceptance="a"),),
-            )
-            for i in range(8)
-        )
-        many_domain = DomainDef(
-            key="many", name="多单元", patterns=("多单元",),
-            verify_task="验证", units=many_units,
-        )
-        phases = [u.phase for u in de.build_unit_defs(many_domain, "多单元")]
-        assert phases == [1, 1, 1, 1, 2, 2, 2, 3]
+        # 端到端：生成计划走的就是 build_unit_defs → 同样的分布
+        result = de.generate_study_plan("我想学织毛衣", total_days=30, minutes_per_day=45)
+        assert result.matched is False            # 未命中领域库 → 通用兜底
+        assert [u.phase for u in result.units] == [1, 1, 2, 3]
 
-        # 真实领域库：单元数不同，但阶段必须单调不减
+    def test_phase_distribution_is_stable_for_unit_counts(self):
+        """参数化分布表：首单元=1、末单元=3、三阶段齐全、不跳阶、无 0/4。"""
+        expected = {
+            3: [1, 2, 3],
+            4: [1, 1, 2, 3],
+            6: [1, 1, 2, 2, 3, 3],
+            10: [1, 1, 1, 1, 2, 2, 2, 3, 3, 3],
+            13: [1, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3],
+        }
+        for total, want in expected.items():
+            phases = [u.phase for u in de.build_unit_defs(_domain_with(total), "x")]
+            assert phases == want
+            assert phases[0] == 1 and phases[-1] == 3
+            assert set(phases) == {1, 2, 3}          # total>=3 时三段都出现
+            assert all(1 <= p <= 3 for p in phases)  # 不会出现 0 / 4
+            assert all(b - a in (0, 1) for a, b in zip(phases, phases[1:]))  # 不跳阶
+
+    def test_phase_distribution_degenerate_totals(self):
+        """退化行为有明确语义：1 个单元 [1]；2 个单元 [1,2]（不跳阶）；0 个单元空。"""
+        assert [u.phase for u in de.build_unit_defs(_domain_with(1), "x")] == [1]
+        # 2 个单元：第二个同时承担「核心练习 + 整合实战」，选择不跳阶 → [1,2]
+        assert [u.phase for u in de.build_unit_defs(_domain_with(2), "x")] == [1, 2]
+        assert de.build_unit_defs(_domain_with(0), "x") == ()
+
+    def test_build_unit_defs_only_changes_phase_not_content(self):
+        """D-32 要求：只改 phase，单元数量 / 名称 / 任务内容一律不变。"""
+        domain = _domain_with(4)
+        built = de.build_unit_defs(domain, "x")
+        assert len(built) == len(domain.units)
+        assert [u.name for u in built] == [u.name for u in domain.units]
+        assert [u.tasks for u in built] == [u.tasks for u in domain.units]
+        assert [len(u.tasks) for u in built] == [len(u.tasks) for u in domain.units]
+
+    def test_build_unit_defs_real_domain_monotone(self):
+        # 真实领域库（雅思 5 单元）：单调不减、首 1 末 3、不跳阶
         domain = de.match_domain("我想学雅思")
+        assert len(domain.units) == 5
         ielts_phases = [u.phase for u in de.build_unit_defs(domain, "雅思")]
         assert ielts_phases == sorted(ielts_phases)
         assert ielts_phases[0] == 1
+        assert ielts_phases[-1] == 3
+        assert ielts_phases == [1, 1, 2, 2, 3]
 
     def test_generic_units_have_executable_acceptance(self):
         units = de.generic_units("织毛衣")

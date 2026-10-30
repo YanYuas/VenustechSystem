@@ -7,6 +7,28 @@
 
 ## [Unreleased]
 
+### Changed — Phase 8：修剩余 P2/P3 + 测试补缺 + 启动脚本进 CI（2026-10-30）
+
+**D-29~D-35 全部修复（均带回归测试 + 负向验证）**
+- **D-30/D-31** `assistant_service` 日期解析 **+14 天 bug**：`周X` 分支重复叠加 offset、`下周X` 分支 `delta += delta`（含 `if False` 死代码）→ 分别改为"未来最近周X"与"下一自然周周X"；补一周 7 天矩阵 + numeric-time 矩阵 + 跨周边界用例。
+- **D-32** `domain_engine` 阶段公式使 4 单元通用兜底计划永不出现 phase 3 → `phase=min(3,(i*3)//total+1)`；total≥3 恒三段齐全、首 1 末 3 不跳阶，内置 13 个领域分布同步修正（3 单元 `[1,1,2]→[1,2,3]` 等）。
+- **D-29** `GlobalSearch` 空态可达：`realResults` 排除恒定操作项，文案改"没有找到相关内容，可试试下面的操作"，操作项仍常驻。
+- **D-33** `app/seed.py` `datetime.utcnow()` → aware `utcnow()`；**D-34** `delete_root` 清理 `_SCAN_PROGRESS` 僵尸条目；**D-35** `app/main.py` 3 处 f-string 日志 → loguru `{}` 惰性占位。
+
+**测试与覆盖率**
+- 后端：**1743 passed**（1706 → +37）；覆盖率 **95.80% → 95.92%**；assistant / workspace_service / seed / domain_engine 均 **100%**。
+- 前端：**291 passed / 21 files**（239 → +52：useReminderWatcher 18 / useSettingsConfig 17 / useSettingsSync 17）；lines **32.24% → 37.44%**、branches 79.0%、functions 64.04%；阈值 `{31,76,59,31}` → **`{36,78,63,36}`**。
+- 测试基建：架构负向探针 uuid 文件名防并发假红已在 Phase 7 落地并通过本轮验证。
+
+**启动脚本进 CI（D-11 收尾）**
+- 新增 `.github/workflows/windows-startup.yml`：windows-latest 上真跑 `python scripts/audit_delivery.py` + `pwsh -File ops/start.ps1 -Mode dev -Verify`（启动→端口+健康检查→自动停止），失败上传 `var/logs/**` artifact；首次真实结果随本提交触发。
+- runbook `startup.md` 新增 §5（CI 冒烟：触发/步骤/无 venv 回退证据/失败排障）。
+
+**登记 3 个新遗留（D-36~D-38，未修）**
+- D-36（P2）`useSettingsSync.loadDataDir` 硬编码 `127.0.0.1:8765`（移动端/局域网可能误报后端未连接）；
+- D-37（P3）导出/导入 catch 为空（非 http 错误静默）；
+- D-38（P3）`useReminderWatcher` 模块级 `notifiedIds` 无上限清理。
+
 ### Changed — Phase 7：修 P1/P2 缺陷 + 日志统一 + 覆盖率棘轮（2026-10-30）
 
 **D-22~D-28 全部修复（均带回归测试 + 负向验证）**

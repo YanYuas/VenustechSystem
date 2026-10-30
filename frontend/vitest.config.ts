@@ -40,15 +40,15 @@ export default defineConfig({
     // 不隐藏 console.warn（项目里有意为之的告警要看得见）
     silent: false,
     // 覆盖率：阈值棘轮（只许上调；下调须在 CHANGELOG 说明理由）。
-    // 阈值依据（2026-10-30，Phase7 task-33 实测）：lines 32.24 / branches 77.7 /
-    // functions 60.42 / statements 32.24。此处各留约 1 个百分点余量（31/76/59/31）
+    // 阈值依据（2026-10-30，Phase8 task-37 实测）：lines 37.44 / branches 79.0 /
+    // functions 64.04 / statements 37.44。此处各留约 1 个百分点余量（36/78/63/36）
     // 吸收 CI 环境抖动；上涨后覆盖率回退会直接让 CI 的 threshold ratchet 变红。
-    // 上调历史：{12,65,40,12}（Phase5）→ {20,72,52,20}（Phase6）→ 当前。
+    // 上调历史：{12,65,40,12}（Phase5）→ {20,72,52,20}（Phase6）→ {31,76,59,31}（Phase7）→ 当前。
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json-summary'],
       reportsDirectory: './coverage',
-      thresholds: { lines: 31, branches: 76, functions: 59, statements: 31 },
+      thresholds: { lines: 36, branches: 78, functions: 63, statements: 36 },
       // 统计 src 下全部实现代码；测试自身与生成物不计入
       include: ['src/**/*.{ts,vue}'],
       exclude: [

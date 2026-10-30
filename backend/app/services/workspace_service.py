@@ -129,6 +129,9 @@ class WorkspaceService:
         self.file_repo.delete_by_root(root.id)
         self.root_repo.delete(root)
         self.db.commit()
+        # D-34：删除根必须同时清掉进程内扫描进度，否则 _SCAN_PROGRESS 留僵尸条目
+        # （同 id 重新登记时会复用陈旧 phase/error 状态）。
+        _progress_clear(root_id)
         return {"deleted": True, "id": root_id}
 
     # ---------- 扫描（噪声过滤 + 只存元数据） ----------

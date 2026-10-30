@@ -401,7 +401,21 @@ def generic_verify_task(what: str) -> str:
 def build_unit_defs(domain: DomainDef | None, what: str = "") -> tuple[PlannedUnit, ...]:
     """得到能力单元列表，并按位置划分三阶段。
 
-    阶段规则（源实现原样）：前 40% 打基础、中间到 85% 核心练习、其余整合实战。
+    阶段规则（D-32 修复后）：**按单元序号比例均匀铺开**
+        phase = min(3, (i * 3) // total + 1)
+
+    与旧实现（`1 if i < total*0.4 else 2 if i < total*0.85 else 3`）的区别：
+      · 旧公式是「阈值切分」，单元数少时末单元跨不过 85% 的阈值：
+        total=4 时 0.85*4=3.4 > i=3 → 最后一个「实战产出」仍是 phase 2，
+        通用兜底计划（恰是长尾技能/无 API Key 的主路径）**永远缺 phase 3**；
+      · 新公式把 total 个单元按 1:1:1 分配到三段（余数优先给后段），
+        total>=3 时首单元必为 1、末单元必为 3、三段齐全且不跳阶：
+          total=3 → [1,2,3]      total=4  → [1,1,2,3]
+          total=6 → [1,1,2,2,3,3]  total=10 → [1,1,1,1,2,2,2,3,3,3]
+      · 退化行为：total=1 → [1]；total=2 → [1,2]（两个单元时第二段同时承担
+        「核心练习 + 整合实战」的语义；若返回 [1,3] 会跳阶、技能树缺阶段 2，
+        故选择不跳阶）；total=0 → 空元组。
+    单元数量 / 名称 / 任务内容一律不变，只改 phase 取值（D-32 验收要求）。
 
     关于源实现的单元过滤：源码里有一个
         `(!u.adv || opts.wantsAdvanced) && (!u.beginnerOnly || opts.isZero)`
@@ -416,11 +430,13 @@ def build_unit_defs(domain: DomainDef | None, what: str = "") -> tuple[PlannedUn
         base = generic_units(what)
 
     total = len(base)
+    if total == 0:
+        return ()
     return tuple(
         PlannedUnit(
             name=unit.name,
             tasks=unit.tasks,
-            phase=1 if i < total * 0.4 else (2 if i < total * 0.85 else 3),
+            phase=min(3, (i * 3) // total + 1),
         )
         for i, unit in enumerate(base)
     )
