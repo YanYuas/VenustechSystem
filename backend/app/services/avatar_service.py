@@ -4,7 +4,6 @@
 # ============================================================
 from __future__ import annotations
 
-import logging
 import uuid
 from sqlalchemy.orm import Session
 
@@ -13,8 +12,9 @@ from app.core.exceptions import NotFoundException, ValidationException
 from app.repositories.avatar_repo import AvatarMemoryRepository, AvatarInspirationRepository, AvatarConfigRepository
 from app.repositories.identity_repo import IdentityRepository
 from app.schemas.avatar import CreateMemoryRequest, GenerateInspirationRequest, UpdateConfigRequest
+from app.core.logger import get_logger
 
-logger = logging.getLogger("app.avatar")
+logger = get_logger("app.avatar")
 
 EVENT_INSPIRATION_GENERATED = "inspiration.generated"
 EVENT_INSPIRATION_EXECUTED = "inspiration.executed"
@@ -100,7 +100,7 @@ class AvatarService:
         # 写完 → commit → publish：订阅者用独立 Session 反查记忆
         self.db.commit()
         event_bus.publish(EVENT_MEMORY_UPDATED, memory_id=memory.id, action="create")
-        self.logger.info(f"记忆创建: {memory.id} ({memory.memory_type})")
+        self.logger.info("记忆创建: {} ({})", memory.id, memory.memory_type)
         return self._memory_to_dict(memory)
 
     def update_memory(self, user_id: str, memory_id: str, data: dict) -> dict:
@@ -162,7 +162,7 @@ class AvatarService:
         # 写完 → commit → publish：批量灵感一次性提交，订阅者再读
         self.db.commit()
         event_bus.publish(EVENT_INSPIRATION_GENERATED, batch_id=batch_id, count=len(selected))
-        self.logger.info(f"灵感生成: batch={batch_id}, {len(selected)}个")
+        self.logger.info("灵感生成: batch={}, {}个", batch_id, len(selected))
         return {"batch_id": batch_id, "inspirations": selected, "count": len(selected)}
 
     def list_inspirations(self, user_id: str, status: str | None = None,
@@ -229,7 +229,7 @@ class AvatarService:
             config = self.config_repo.create(user_id=user_id)
         update_data = {k: v for k, v in data.model_dump(exclude_none=True).items()}
         updated = self.config_repo.update(config, **update_data)
-        self.logger.info(f"分身配置更新: {user_id}")
+        self.logger.info("分身配置更新: {}", user_id)
         return self._config_to_dict(updated)
 
     # ==================== 序列化辅助 ====================

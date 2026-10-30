@@ -6,7 +6,7 @@
 // 规则预览防抖、日志/插件/密钥操作的成功与失败分支。
 // ============================================================
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { nextTick } from 'vue'
+import { effectScope, nextTick } from 'vue'
 
 import { systemApi } from '@/features/system'
 import { toast } from '@/kernel/ui/toast'
@@ -225,6 +225,21 @@ describe('规则引擎预览：防抖与热重载', () => {
     await vi.advanceTimersByTimeAsync(400)
     await nextTick()
 
+    expect(d.rulePreview.value).toBeNull()
+  })
+
+  it('作用域销毁（卸载）时清掉 400ms 定时器：之后不再请求预览（D-27）', async () => {
+    vi.useFakeTimers()
+    const scope = effectScope()
+    const d = scope.run(() => useSettingsDiagnostics())!
+
+    d.setRuleText('我想学雅思')
+    await nextTick()
+    scope.stop()
+
+    await vi.advanceTimersByTimeAsync(600)
+
+    expect(api.rulePreview).not.toHaveBeenCalled()
     expect(d.rulePreview.value).toBeNull()
   })
 

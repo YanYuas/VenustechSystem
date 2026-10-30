@@ -4,15 +4,15 @@
 # ============================================================
 from __future__ import annotations
 
-import logging
 from sqlalchemy.orm import Session
 
 from app.core.event_bus import EVENT_WORKFLOW_APPLIED, event_bus
+from app.core.logger import get_logger
 from app.repositories import WorkflowRepository, WorkflowApplicationRepository
 from app.repositories import TaskRepository, TemplateRepository, DomainRepository
 from app.schemas.workflow import CreateWorkflowRequest, ApplyWorkflowRequest
 
-logger = logging.getLogger("app.workflow")
+logger = get_logger("app.workflow")
 
 # 注：EVENT_WORKFLOW_APPLIED 原定义在此处，2026-09-16 已归位到
 # app/core/event_bus.py —— 事件常量集中存放，其他模块订阅时不必反向
@@ -52,7 +52,7 @@ class WorkflowService:
 
     def create_workflow(self, user_id: str, data: CreateWorkflowRequest) -> dict:
         wf = self.wf_repo.create(**data.model_dump(exclude_none=True))
-        self.logger.info(f"工作流创建: {wf.id}")
+        self.logger.info("工作流创建: {}", wf.id)
         return self._wf_to_dict(wf)
 
     # PATCH 允许修改的字段白名单（2026-10-11 补测发现）。
@@ -180,7 +180,7 @@ class WorkflowService:
         # 订阅者（EXP 结算）用独立 Session 反查时才看得到。
         self.db.commit()
         event_bus.publish(EVENT_WORKFLOW_APPLIED, workflow_id=workflow_id, user_id=user_id)
-        self.logger.info(f"工作流应用: {workflow_id}, {summary}")
+        self.logger.info("工作流应用: {}, {}", workflow_id, summary)
 
         results["application_id"] = app_record.id
         results["summary"] = summary

@@ -120,11 +120,11 @@ jobs:
         run: python -m pytest tests -q -p no:cacheprovider --tb=short
 
       # Phase6 测试质量基建：覆盖率**阈值棘轮**（只升不降）。
-      # 当前实测 92.02% statements；阈值 91（留约 1pp 余量防抖动），
+      # 当前实测 95.76% statements；阈值 95（留约 1pp 余量防抖动），
       # 后续补测后应同步上调（下调必须在 CHANGELOG 说明理由）。
-      # 与本地同一条命令：pytest tests -q --cov=app --cov-report=term-missing --cov-fail-under=91
+      # 与本地同一条命令：pytest tests -q --cov=app --cov-report=term-missing --cov-fail-under=95
       # 不再 continue-on-error：覆盖率回退要能拦住合并。
-      - name: "Coverage (threshold ratchet: 91%)"
+      - name: "Coverage (threshold ratchet: 95%)"
         if: always()
         working-directory: backend
         timeout-minutes: 20

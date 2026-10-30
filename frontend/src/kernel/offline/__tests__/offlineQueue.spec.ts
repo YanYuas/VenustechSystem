@@ -188,6 +188,30 @@ describe('offlineQueue store：网络事件', () => {
     expect(kinds).toContain('flushed')
   })
 
+  it('重复 init 不会叠加 online/offline 监听（D-28 幂等）', async () => {
+    const addSpy = vi.spyOn(window, 'addEventListener')
+    await store.store.init()
+    await store.store.init()
+    await store.store.init()
+
+    const onlineCalls = addSpy.mock.calls.filter((c) => c[0] === 'online')
+    const offlineCalls = addSpy.mock.calls.filter((c) => c[0] === 'offline')
+    expect(onlineCalls).toHaveLength(1)
+    expect(offlineCalls).toHaveLength(1)
+  })
+
+  it('dispose 之后可以重新 init 并重新注册监听（D-28）', async () => {
+    const addSpy = vi.spyOn(window, 'addEventListener')
+    const removeSpy = vi.spyOn(window, 'removeEventListener')
+    await store.store.init()
+
+    store.store.dispose()
+    expect(removeSpy.mock.calls.filter((c) => c[0] === 'online')).toHaveLength(1)
+
+    await store.store.init()
+    expect(addSpy.mock.calls.filter((c) => c[0] === 'online')).toHaveLength(2)
+  })
+
   it('dispose 移除 online/offline 监听', async () => {
     await store.store.init()
     const removeSpy = vi.spyOn(window, 'removeEventListener')

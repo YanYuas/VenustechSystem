@@ -43,8 +43,10 @@ _TIME_HINTS: list[tuple[str, int]] = [
     ("今晚|今天晚上", 0),
     ("今天", 0),
     ("明天", 1),
-    ("后天", 2),
+    # D-22：**长词必须在短词前**。"大后天" 若排在 "后天" 之后，会被
+    # `re.search` 先命中 "后天" → 解析成 +2 天；"今天晚上" 同理须在 "今天" 前。
     ("大后天", 3),
+    ("后天", 2),
 ]
 _PRIORITY_WORDS = ("尽快", "紧急", "马上", "立刻", "重要")
 _SPLIT_RE = re.compile(r"[。；;！!？?\n]+|然后|接着|另外|还有|以及|，.*?(?:要|得|需要|打算|准备)")
@@ -154,7 +156,16 @@ class AssistantService:
         return self.status()
 
     def _encryption(self) -> EncryptionManager:
-        return EncryptionManager(Path(get_settings().data_dir))
+        """复用全局加密单例（D-25）。
+
+        原先每次 new EncryptionManager：会重复读密钥文件/重复派生（PBKDF2 20 万次），
+        且与主进程 lifespan 初始化的全局实例不是同一份状态。改为
+        `ensure_encryption(data_dir)`：已初始化则直接复用，未初始化（单测/CLI）
+        才在锁内懒初始化；密钥文件路径仍由 data_dir 决定，行为不变。
+        """
+        from app.core.encryption import ensure_encryption
+
+        return ensure_encryption(Path(get_settings().data_dir))
 
     def _model(self) -> str:
         from app.services.settings_service import SettingsService

@@ -42,7 +42,15 @@ const TYPE_META: Record<SearchResultItem['type'], { icon: string; color: string 
 
 const GROUPS: SearchResultItem['type'][] = ['task', 'doc', 'conv', 'action']
 
-/** 后端 SearchResult → 面板条目 */
+/** 前端固定操作项：无论搜索成功/失败/无结果都常驻，保证"总能新建" */
+function buildActionItems(): SearchResultItem[] {
+  return [
+    { type: 'action', title: '新建任务', path: '操作', id: 'action-new-task' },
+    { type: 'action', title: '新建文档', path: '操作', id: 'action-new-doc' },
+  ]
+}
+
+/** 后端 SearchResult → 面板条目（结果 + 恒定操作项） */
 function mapResult(data: SearchResult): SearchResultItem[] {
   const items: SearchResultItem[] = []
   for (const t of data.tasks)
@@ -56,9 +64,7 @@ function mapResult(data: SearchResult): SearchResultItem[] {
     })
   for (const c of data.conversations)
     items.push({ type: 'conv', title: c.title, path: '对话', id: c.id })
-  // 操作项（前端固定）：新建任务 / 新建文档
-  items.push({ type: 'action', title: '新建任务', path: '操作', id: 'action-new-task' })
-  items.push({ type: 'action', title: '新建文档', path: '操作', id: 'action-new-doc' })
+  items.push(...buildActionItems())
   return items
 }
 
@@ -78,7 +84,8 @@ async function doSearch(q: string) {
     results.value = mapResult(data)
   } catch {
     if (mySeq !== searchSeq) return
-    results.value = []
+    // 失败降级：搜索不可用时仍保留操作项，用户依然能新建任务/文档
+    results.value = buildActionItems()
   } finally {
     if (mySeq === searchSeq) loading.value = false
   }

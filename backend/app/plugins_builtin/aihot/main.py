@@ -73,7 +73,14 @@ def _load_cache(name: str) -> dict | None:
 
 
 async def _fetch(name: str, path: str, params: dict) -> dict:
-    """统一取数：成功 → 存缓存；失败 → 降级缓存；无缓存 → 诚实报错。"""
+    """统一取数：返回**裸结果 dict**（不包 success 信封）。
+
+    为什么不再返回信封（D-24）：`items()` / `hot_topics()` 端点会各自
+    `return success(await _fetch(...))`，若这里再包一层就是双重信封；而
+    `daily()` 还要用 `result.get("ok")` 判断成功/失败并走 404 回退——
+    信封里没有 `ok` 键，导致回退成功分支运行期永远不可达。
+    端点负责"唯一一层信封"，`_fetch` 只负责数据/降级语义。
+    """
     try:
         async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
             resp = await client.get(f"{BASE_URL}{path}", params=params)
@@ -81,12 +88,12 @@ async def _fetch(name: str, path: str, params: dict) -> dict:
             data = resp.json()
         _cache[name] = data
         _save_cache(name, data)
-        return success({"ok": True, "source": "live", "data": data})
+        return {"ok": True, "source": "live", "data": data}
     except Exception as e:  # 网络/上游任何失败都不应 500
         cached = _cache.get(name) or _load_cache(name)
         if cached is not None:
-            return success({"ok": True, "source": "cache", "degraded": True, "data": cached})
-        return success({"ok": False, "error": f"AI HOT 暂不可达: {e}"[:200]})
+            return {"ok": True, "source": "cache", "degraded": True, "data": cached}
+        return {"ok": False, "error": f"AI HOT 暂不可达: {e}"[:200]}
 
 
 @router.get("/items", summary="精选/全量动态（window: 24h|7d）")

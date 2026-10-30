@@ -9,6 +9,7 @@ import base64
 import hashlib
 import json
 import os
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -268,15 +269,39 @@ class EncryptionManager:
 
 # 全局单例（在 main.py 中初始化）
 _encryption_manager: EncryptionManager | None = None
+# D-25：懒初始化需要并发安全（首个并发请求可能同时发现未初始化）
+_encryption_init_lock = threading.Lock()
 
 
 def init_encryption(data_dir: Path, master_key: str | None = None) -> EncryptionManager:
-    """初始化全局加密管理器"""
+    """初始化全局加密管理器（主进程 lifespan 调用；显式覆盖旧实例）。"""
     global _encryption_manager
     _encryption_manager = EncryptionManager(data_dir, master_key)
     return _encryption_manager
 
 
 def get_encryption() -> EncryptionManager | None:
-    """获取全局加密管理器"""
+    """获取全局加密管理器（未初始化时返回 None）。"""
     return _encryption_manager
+
+
+def ensure_encryption(
+    data_dir: Path, master_key: str | None = None
+) -> EncryptionManager:
+    """获取全局单例；未初始化则懒初始化（双检锁，线程安全）。
+
+    - 已初始化：直接复用（忽略传入的 data_dir —— 全局只有一个密钥库，
+      避免"同一进程内两套密钥文件"导致加密/解密不对称）；
+    - 未初始化：在锁内初始化一次。适用于单测 / CLI / 插件等未经 lifespan 的场景。
+
+    注意：主进程仍应在 lifespan 里显式 `init_encryption(settings.data_dir)`，
+    这里的懒初始化只是兜底；不要在请求路径里用不同 data_dir 反复调用。
+    """
+    global _encryption_manager
+    manager = _encryption_manager
+    if manager is not None:
+        return manager
+    with _encryption_init_lock:
+        if _encryption_manager is None:
+            _encryption_manager = EncryptionManager(data_dir, master_key)
+        return _encryption_manager

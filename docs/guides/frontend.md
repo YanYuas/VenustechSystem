@@ -357,10 +357,11 @@ npm run test:coverage # 覆盖率报告（v8；text + json-summary，输出到 f
 
 - provider `v8`，`reporter: ['text', 'json-summary']`；`include: src/**`、排除 views/生成物/样式（见 `vitest.config.ts`）。
 - **阈值棘轮（只许上调）**：`vitest.config.ts` 的 `coverage.thresholds` 当前为
-  `{ lines: 20, branches: 72, functions: 52, statements: 20 }`
-  （2026-10-28 Phase6 实测 20.95 / 73.25 / 53.65 / 20.95，各留约 1 个百分点余量防抖动；
-  历史上从 `{12,65,40,12}` 上调而来）。
+  `{ lines: 31, branches: 76, functions: 59, statements: 31 }`
+  （2026-10-30 Phase7 实测 32.24 / 77.7 / 60.42 / 32.24，各留约 1 个百分点余量防抖动；
+  上调历史：`{12,65,40,12}`（Phase5）→ `{20,72,52,20}`（Phase6）→ 当前）。
   `npm run test:coverage` 与 CI 的 `Coverage (threshold ratchet)` 步骤**都会因此失败**，即覆盖率回退会直接卡住合并。
+- **测试并发**：`test.maxWorkers: 2`。jsdom + `@vue/test-utils` 组件测试内存占用高，默认按 CPU 核数并发在多文件（18+）时会 OOM（本机 16 核曾 `FATAL ERROR: Zone Allocation failed`）；显式限并发使本地与 2 核 CI runner 行为一致。
 - **规则**：阈值只允许上调；若因重构/删测试需要下调，**必须在 `CHANGELOG.md` 说明理由**并经评审，不允许静默调低。
 - 口径提醒：`lines` 的分母是 `src/**/*.{ts,vue}` 全量实现文件（含大量未测 Vue 组件），且 views 按约定排除；
   v8 provider 对"从未执行的文件"不生成 branch/function 计数，故 `branches/functions` 会显著高于 `lines` —— 评估覆盖率以 **lines** 为主。

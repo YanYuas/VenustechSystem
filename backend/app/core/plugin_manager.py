@@ -8,12 +8,12 @@ from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeou
 
 import importlib
 import importlib.util
-import logging
 from dataclasses import dataclass, replace, field
 from pathlib import Path
 from typing import Any
+from app.core.logger import get_logger
 
-logger = logging.getLogger("app.plugin")
+logger = get_logger("app.plugin")
 
 
 @dataclass
@@ -41,7 +41,10 @@ class PluginContext:
     event_bus: Any  # EventBus
     config: dict[str, Any]
     data_dir: Path
-    logger: logging.Logger
+    # loguru 的 bound logger（app.core.logger.get_logger 返回值）。
+    # 不能用 logging.Logger 注解：宿主日志后端已统一为 loguru（D-26），
+    # 插件侧拿到的是 loguru logger（`{}` 占位、`opt(exception=True)`）。
+    logger: Any
     plugin_id: str = ""
     router: Any = None  # mount_router 注册的路由（宿主统一挂载）
 

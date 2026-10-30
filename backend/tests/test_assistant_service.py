@@ -51,10 +51,8 @@ class TestDeadlineParsing:
             ("今天写周报", "2026-10-28"),
             ("明天交作业", "2026-10-29"),
             ("后天开会", "2026-10-30"),
-            # BUG(已记录)：_TIME_HINTS 里 "后天" 排在 "大后天" 前面，
-            # "大后天体检" 会先命中 "后天" → 实际解析为 +2 天（应 +3）。不改 app，
-            # 这里按**当前行为**钉住，避免 bug 悄悄变化。
-            ("大后天体检", "2026-10-30"),
+            # D-22：长词优先（大后天 在 后天 之前），不再被抢先命中为 +2 天
+            ("大后天体检", "2026-10-31"),
         ],
     )
     def test_relative_day_hints(self, text, expected_date):
@@ -79,6 +77,47 @@ class TestDeadlineParsing:
         assert deadline is not None
         assert deadline.isoformat() == expected
         assert has_time is True
+
+    def test_grand_day_after_tomorrow_with_clock_time(self):
+        """"大后天下午3点" 走 _NUM_TIME 分支，日期 +3、时间 15:00。"""
+        deadline, has_time = _deadline_from_text("大后天下午3点开会", self.TODAY)
+        assert deadline is not None
+        assert deadline.isoformat() == "2026-10-31T15:00:00"
+        assert has_time is True
+
+    def test_local_parse_grand_day_after_tomorrow_deadline(self):
+        items = local_parse("大后天体检", datetime(2026, 10, 28, 9, 0, 0))
+        assert items[0]["deadline"].startswith("2026-10-31")
+
+    @pytest.mark.parametrize(
+        "text,expected",
+        [
+            ("后天下午3点开会", "2026-10-30T15:00:00"),
+            ("中午10点吃饭", "2026-10-28T12:00:00"),
+        ],
+    )
+    def test_numeric_time_branches(self, text, expected):
+        """覆盖 day_part=后天 / 周X 与中午 h<12 的分支。"""
+        deadline, has_time = _deadline_from_text(text, self.TODAY)
+        assert deadline is not None
+        assert deadline.isoformat() == expected
+        assert has_time is True
+
+    def test_numeric_weekday_double_adds_offset_bug(self):
+        """BUG(已记录 B-4)：_NUM_TIME 的 day_part=周X 分支里 base 已前进 7 天，
+
+        随后 `offset=(base-today).days` 再叠加一次 → "周三下午3点" 得到 +14 天
+        （应为 +7）。本轮只修 D-22 的长词顺序，不改此分支；按当前行为钉住。
+        """
+        deadline, _ = _deadline_from_text("周三下午3点开会", self.TODAY)
+        assert deadline is not None
+        assert deadline.date().isoformat() == "2026-11-11"  # 修复后应为 11-04
+
+    def test_next_week_prefix_weekday_double_adds_bug(self):
+        """BUG(已记录 B-5)："下周X" 的 `delta += ... if False else delta` 实际执行 delta += delta。"""
+        deadline, _ = _deadline_from_text("下周三开会", self.TODAY)
+        assert deadline is not None
+        assert deadline.date().isoformat() == "2026-11-11"  # 修复后应为 11-04
 
     def test_next_weekday_rolls_to_next_week(self):
         # 今天周三（weekday=2），"周三" 应推到下周

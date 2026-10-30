@@ -4,7 +4,6 @@
 # ============================================================
 from __future__ import annotations
 
-import logging
 from sqlalchemy.orm import Session
 
 from app.core.event_bus import EVENT_SOP_USED, EVENT_PROMPT_USED, EVENT_PROJECT_MEMORY_CREATED, event_bus
@@ -12,8 +11,9 @@ from app.core.exceptions import NotFoundException, ValidationException
 from app.repositories import SOPRepository, SOPVersionRepository, PromptRepository, SkillRepository, ProjectMemoryRepository, ProjectRepository
 from app.repositories.identity_repo import IdentityRepository
 from app.schemas.asset import CreateSOPRequest, CreatePromptTemplateRequest, CreateSkillRequest, CreateProjectMemoryRequest
+from app.core.logger import get_logger
 
-logger = logging.getLogger("app.asset")
+logger = get_logger("app.asset")
 
 
 class AssetService:
@@ -107,7 +107,7 @@ class AssetService:
 
     def create_sop(self, user_id: str, data: CreateSOPRequest) -> dict:
         sop = self.sop_repo.create(user_id=user_id, **data.model_dump(exclude_none=True))
-        self.logger.info(f"SOP创建: {sop.id}")
+        self.logger.info("SOP创建: {}", sop.id)
         return self._sop_to_dict(sop)
 
     def update_sop(self, user_id: str, sop_id: str, data: dict,
@@ -130,7 +130,7 @@ class AssetService:
         update_data = self._pick(data, self._SOP_FIELDS)
         update_data["version"] = old_version + 1
         updated = self.sop_repo.update(sop, **update_data)
-        self.logger.info(f"SOP更新: {sop_id}, v{old_version}→v{updated.version}")
+        self.logger.info("SOP更新: {}, v{}→v{}", sop_id, old_version, updated.version)
         return self._sop_to_dict(updated)
 
     def delete_sop(self, user_id: str, sop_id: str) -> None:
@@ -173,7 +173,7 @@ class AssetService:
 
     def create_prompt(self, user_id: str, data: CreatePromptTemplateRequest) -> dict:
         prompt = self.prompt_repo.create(user_id=user_id, **data.model_dump(exclude_none=True))
-        self.logger.info(f"Prompt创建: {prompt.id}")
+        self.logger.info("Prompt创建: {}", prompt.id)
         return self._prompt_to_dict(prompt)
 
     def update_prompt(self, user_id: str, prompt_id: str, data: dict) -> dict:
@@ -248,7 +248,7 @@ class AssetService:
 
     def create_skill(self, user_id: str, data: CreateSkillRequest) -> dict:
         skill = self.skill_repo.create(user_id=user_id, **data.model_dump(exclude_none=True))
-        self.logger.info(f"Skill创建: {skill.id}")
+        self.logger.info("Skill创建: {}", skill.id)
         return self._skill_to_dict(skill)
 
     def update_skill(self, user_id: str, skill_id: str, data: dict) -> dict:
@@ -288,7 +288,7 @@ class AssetService:
         # 写完 → commit → publish：EXP 结算订阅者用独立 Session 反查项目记忆
         self.db.commit()
         event_bus.publish(EVENT_PROJECT_MEMORY_CREATED, memory_id=memory.id)
-        self.logger.info(f"项目记忆创建: {memory.id}")
+        self.logger.info("项目记忆创建: {}", memory.id)
         return self._memory_to_dict(memory)
 
     def update_memory(self, user_id: str, memory_id: str, data: dict) -> dict:

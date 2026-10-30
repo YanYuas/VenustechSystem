@@ -205,3 +205,31 @@ def clean_db():
         conn.exec_driver_sql("PRAGMA foreign_keys=ON")
         conn.close()
     yield
+
+
+# ============================================================
+# D-26：让 pytest 的 `caplog` 能捕获 loguru 记录（**按需**桥接）
+#
+# 背景：应用日志后端已统一为 loguru（app/core/logger.py 的 get_logger），而
+# caplog 只监听 stdlib logging —— 不桥接时 caplog 永远捕不到应用日志
+# （D-18 排查时因此只能改用 spy 打桩）。桥接实现见
+# `app.core.logger.add_stdlib_bridge()`。
+#
+# 为什么做成 autouse 但**只在请求 caplog 时**安装：
+#   全局常驻桥有副作用（生产双份日志；本机 pytest fd 级捕获下还会引发
+#   `UnicodeDecodeError` 级联），而只有真正用 caplog 的测试才需要它。
+# ============================================================
+@pytest.fixture(autouse=True)
+def _loguru_stdlib_bridge_for_caplog(request):
+    """请求了 `caplog` 的测试 → 临时安装 loguru→stdlib 桥；其余测试零开销。"""
+    if "caplog" not in request.fixturenames:
+        yield
+        return
+
+    from app.core.logger import add_stdlib_bridge, remove_stdlib_bridge
+
+    sink_id = add_stdlib_bridge()
+    try:
+        yield
+    finally:
+        remove_stdlib_bridge(sink_id)

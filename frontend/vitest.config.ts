@@ -33,17 +33,22 @@ export default defineConfig({
     setupFiles: ['src/shared/test/setup.ts'],
     // 每个用例后还原 spy / mock，避免跨用例串扰
     restoreMocks: true,
+    // jsdom + @vue/test-utils 组件测试内存占用高：默认按 CPU 核数并发在 16+ 文件时会 OOM
+    // （本机 16 核曾出现 `FATAL ERROR: Zone Allocation failed`）。显式限并发，
+    // 使本地与 2 核 CI runner 行为一致。
+    maxWorkers: 2,
     // 不隐藏 console.warn（项目里有意为之的告警要看得见）
     silent: false,
     // 覆盖率：阈值棘轮（只许上调；下调须在 CHANGELOG 说明理由）。
-    // 阈值依据（2026-10-28，Phase6 task-30 实测）：lines 20.95 / branches 73.25 /
-    // functions 53.65 / statements 20.95。此处各留约 1 个点余量（20/72/52/20）
-    // 吸收 CI 环境抖动；上调后覆盖率回退会直接让 CI 的 threshold ratchet 变红。
+    // 阈值依据（2026-10-30，Phase7 task-33 实测）：lines 32.24 / branches 77.7 /
+    // functions 60.42 / statements 32.24。此处各留约 1 个百分点余量（31/76/59/31）
+    // 吸收 CI 环境抖动；上涨后覆盖率回退会直接让 CI 的 threshold ratchet 变红。
+    // 上调历史：{12,65,40,12}（Phase5）→ {20,72,52,20}（Phase6）→ 当前。
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json-summary'],
       reportsDirectory: './coverage',
-      thresholds: { lines: 20, branches: 72, functions: 52, statements: 20 },
+      thresholds: { lines: 31, branches: 76, functions: 59, statements: 31 },
       // 统计 src 下全部实现代码；测试自身与生成物不计入
       include: ['src/**/*.{ts,vue}'],
       exclude: [

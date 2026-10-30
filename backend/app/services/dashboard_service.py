@@ -4,7 +4,6 @@
 # ============================================================
 from __future__ import annotations
 
-import logging
 from datetime import date, datetime
 
 from sqlalchemy.orm import Session
@@ -56,8 +55,9 @@ from app.services.resource_service import ResourceService
 from app.services.learning_service import LearningService
 from app.services.life_service import LifeService
 from app.services.asset_service import AssetService
+from app.core.logger import get_logger
 
-logger = logging.getLogger("app.dashboard")
+logger = get_logger("app.dashboard")
 
 
 # ---------- 模块开发状态清单（供前端灰度判断） ----------

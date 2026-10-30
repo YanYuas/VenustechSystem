@@ -4,7 +4,6 @@
 # ============================================================
 from __future__ import annotations
 
-import logging
 from datetime import date, timedelta
 from sqlalchemy.orm import Session
 
@@ -18,8 +17,9 @@ from app.repositories import (
     DiaryRepository,
 )
 from app.schemas.life import CreateHabitRequest, CreateMoodLogRequest, CreateDiaryRequest
+from app.core.logger import get_logger
 
-logger = logging.getLogger("app.life")
+logger = get_logger("app.life")
 
 
 class LifeService:
@@ -50,7 +50,7 @@ class LifeService:
 
     def create_habit(self, user_id: str, data: CreateHabitRequest) -> dict:
         habit = self.habit_repo.create(user_id=user_id, **data.model_dump(exclude_none=True))
-        self.logger.info(f"习惯创建: {habit.id}")
+        self.logger.info("习惯创建: {}", habit.id)
         return self._habit_to_dict(habit)
 
     def update_habit(self, user_id: str, habit_id: str, data: dict) -> dict:
@@ -77,7 +77,7 @@ class LifeService:
         # 写完 → commit → publish：EXP 结算订阅者用独立 Session 反查打卡记录
         self.db.commit()
         event_bus.publish(EVENT_HABIT_CHECKIN, habit_id=habit_id, date=cdate.isoformat())
-        self.logger.info(f"习惯打卡: {habit_id} @ {cdate}")
+        self.logger.info("习惯打卡: {} @ {}", habit_id, cdate)
         return self._checkin_to_dict(checkin)
 
     def uncheck_habit(self, habit_id: str, checkin_date: date | None = None) -> None:
@@ -219,7 +219,7 @@ class LifeService:
         # 写完 → commit → publish：订阅者用独立 Session 反查日记
         self.db.commit()
         event_bus.publish(EVENT_DIARY_CREATED, diary_id=diary.id)
-        self.logger.info(f"日记创建: {diary.id}")
+        self.logger.info("日记创建: {}", diary.id)
         return self._diary_to_dict(diary)
 
     def update_diary(self, user_id: str, diary_id: str, data: dict) -> dict:

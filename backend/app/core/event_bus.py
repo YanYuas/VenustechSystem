@@ -6,12 +6,12 @@
 from __future__ import annotations
 
 import asyncio
-import logging
 import time
 from collections import deque
 from typing import Any, Callable
+from app.core.logger import get_logger
 
-logger = logging.getLogger("app.event_bus")
+logger = get_logger("app.event_bus")
 
 # ---------- 事件类型常量 ----------
 EVENT_TASK_COMPLETED = "task.completed"
@@ -180,7 +180,7 @@ class EventBus:
         rate = cls._window_failure_rate(event)
         if stat["consecutive_failures"] >= cls.CONSECUTIVE_FAIL_ALERT:
             logger.warning(
-                "事件 %s 连续失败 %d 次，请检查插件或服务（失败 handler: %s）",
+                "事件 {} 连续失败 {} 次，请检查插件或服务（失败 handler: {}）",
                 event, stat["consecutive_failures"], ", ".join(stat.get("failed_handlers", [])),
             )
         elif rate is not None and rate > cls.FAILURE_RATE_ALERT and stat["failed"] > 0:

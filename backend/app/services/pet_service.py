@@ -4,7 +4,6 @@
 # ============================================================
 from __future__ import annotations
 
-import logging
 from datetime import date, datetime
 from sqlalchemy.orm import Session
 
@@ -20,8 +19,9 @@ from app.schemas.pet import (
     UpdatePetStatsRequest,
 )
 from app.services.growth_service import STAT_MAX, STAT_MIN, apply_stat_decay
+from app.core.logger import get_logger
 
-logger = logging.getLogger("app.pet")
+logger = get_logger("app.pet")
 
 # 时间段定义
 TIME_STATES = [
@@ -97,7 +97,7 @@ class PetService:
             self._owned_avatar(user_id, update_data["current_avatar_id"])
             self._set_active_avatar(user_id, update_data["current_avatar_id"])
         updated = self.config_repo.update(config, **update_data)
-        self.logger.info(f"桌宠配置更新: {user_id}")
+        self.logger.info("桌宠配置更新: {}", user_id)
         return self._config_to_dict(updated)
 
     def _set_active_avatar(self, user_id: str, avatar_id: str) -> None:

@@ -263,11 +263,37 @@ class TestDeepSeekClient:
             asyncio.run(_client().chat([]))
         assert len(fake_http.client.calls) == 3  # 1 + MAX_RETRIES
 
-    def test_malformed_200_payload_is_not_mapped_to_ai_exception(self, fake_http):
-        """当前行为（缺陷已登记）：200 但缺 choices 时抛 KeyError，而非 AIRequestFailedException。"""
-        fake_http.client.script.append(_Resp(200, {}))
-        with pytest.raises(KeyError):
+    @pytest.mark.parametrize(
+        "payload,cause_type",
+        [
+            ({}, KeyError),                                    # 缺 choices
+            ({"choices": []}, IndexError),                     # choices 为空
+            ({"choices": [{}]}, KeyError),                     # 缺 message
+            ({"choices": [{"message": {}}]}, KeyError),        # 缺 content
+            ({"choices": [{"message": {"content": None}}]}, TypeError),  # content 非字符串
+            ({"usage": {"total_tokens": None},
+              "choices": [{"message": {"content": "x"}}]}, TypeError),
+        ],
+    )
+    def test_malformed_200_payload_maps_to_ai_exception(
+        self, fake_http, payload, cause_type
+    ):
+        """D-23：200 但响应结构异常 → AIRequestFailedException（保留原因链），不再裸 KeyError。"""
+        fake_http.client.script.append(_Resp(200, payload))
+        with pytest.raises(AIRequestFailedException) as exc:
             asyncio.run(_client().chat([]))
+        assert "AI 响应格式异常" in str(exc.value)
+        assert isinstance(exc.value.__cause__, cause_type)
+
+    def test_invalid_json_body_maps_to_ai_exception(self, fake_http):
+        class _BadJsonResp(_Resp):
+            def json(self):
+                raise ValueError("Expecting value")
+
+        fake_http.client.script.append(_BadJsonResp(200, {}))
+        with pytest.raises(AIRequestFailedException) as exc:
+            asyncio.run(_client().chat([]))
+        assert "AI 响应格式异常" in str(exc.value)
 
 
 class _StreamResp:

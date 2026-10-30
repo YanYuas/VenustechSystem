@@ -36,6 +36,8 @@ function emit(detail: QueueEventDetail) {
 }
 
 let manager: QueueManager | null = null
+/** D-28：网络监听是否已挂载（模块级，保证重复 init 幂等；dispose 复位） */
+let listenersBound = false
 
 export const useOfflineQueueStore = defineStore('offlineQueue', () => {
   const pending = ref(0)
@@ -87,20 +89,26 @@ export const useOfflineQueueStore = defineStore('offlineQueue', () => {
     return manager
   }
 
-  /** 应用启动时调用一次：载入存量队列并挂上网络监听 */
+  /** 应用启动时调用一次：载入存量队列并挂上网络监听（幂等：重复调用不叠加监听） */
   async function init() {
     const m = getManager()
     if (!m) return
     items.value = await m.list()
     pending.value = await m.pending()
     failed.value = await m.failed()
-    window.addEventListener('online', onOnline)
-    window.addEventListener('offline', onOffline)
+    // D-28：重复 init 不再重复 addEventListener；dispose() 会复位该标志，
+    // 因此「dispose 后再次 init」仍能重新挂上监听。
+    if (!listenersBound) {
+      window.addEventListener('online', onOnline)
+      window.addEventListener('offline', onOffline)
+      listenersBound = true
+    }
   }
 
   function dispose() {
     window.removeEventListener('online', onOnline)
     window.removeEventListener('offline', onOffline)
+    listenersBound = false
   }
 
   function onOnline() {

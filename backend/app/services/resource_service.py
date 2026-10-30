@@ -4,20 +4,20 @@
 # ============================================================
 from __future__ import annotations
 
-import logging
 import re
 from datetime import datetime
 from sqlalchemy.orm import Session
 
 from app.core.event_bus import EVENT_INBOX_ITEM_CREATED, EVENT_INBOX_ITEM_PROCESSED, event_bus
 from app.core.exceptions import NotFoundException, ValidationException
+from app.core.logger import get_logger
 from app.repositories import InboxItemRepository, TemplateRepository, DomainRepository
 from app.schemas.resource import (
     CreateInboxItemRequest, UpdateInboxItemRequest,
     CreateTemplateRequest, CreateDomainRequest,
 )
 
-logger = logging.getLogger("app.resource")
+logger = get_logger("app.resource")
 
 # 收集箱状态白名单：模型注释即权威（pending/processed/archived）。
 # 不加白名单的话，写入任意字符串既不报错也永不出现在任何筛选结果里 —— 静默失败。
@@ -101,7 +101,7 @@ class ResourceService:
         self.db.commit()
         event_bus.publish(EVENT_INBOX_ITEM_CREATED, item_id=item.id, user_id=user_id,
                        content_type=item.content_type)
-        self.logger.info(f"收集箱条目创建: {item.id} ({item.content_type})")
+        self.logger.info("收集箱条目创建: {} ({})", item.id, item.content_type)
         return self._inbox_to_dict(item)
 
     def update_inbox_item(self, item_id: str, data: UpdateInboxItemRequest) -> dict:
@@ -116,7 +116,7 @@ class ResourceService:
     def delete_inbox_item(self, item_id: str) -> None:
         item = self._owned(self.inbox_repo, item_id)
         self.inbox_repo.delete(item)
-        self.logger.info(f"收集箱条目删除: {item_id}")
+        self.logger.info("收集箱条目删除: {}", item_id)
 
     def process_inbox_item(self, item_id: str, action: str,
                            target_id: str | None = None) -> dict:
@@ -151,7 +151,7 @@ class ResourceService:
         # 写完 → commit → publish：订阅者用独立 Session 反查条目状态
         self.db.commit()
         event_bus.publish(EVENT_INBOX_ITEM_PROCESSED, item_id=item_id, action=action)
-        self.logger.info(f"收集箱条目处理: {item_id} -> {action}")
+        self.logger.info("收集箱条目处理: {} -> {}", item_id, action)
         return result
 
     def batch_process(self, user_id: str, item_ids: list[str], action: str) -> dict:

@@ -28,7 +28,6 @@
 # ============================================================
 from __future__ import annotations
 
-import logging
 from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
@@ -41,8 +40,9 @@ from app.repositories import (
 )
 from app.services.rules.domain_engine import js_round
 from app.services.rules.skill_cats import SKILL_CAT_BY_ID, SKILL_CATS
+from app.core.logger import get_logger
 
-logger = logging.getLogger("app.growth")
+logger = get_logger("app.growth")
 
 MAX_LEVEL = 30
 

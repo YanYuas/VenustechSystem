@@ -82,10 +82,21 @@ class DeepSeekClient(LLMClient):
             "temperature": temperature,
             "max_tokens": max_tokens,
         }
-        data = await self._request_with_retry(url, payload)
-        content = data["choices"][0]["message"]["content"]
-        tokens = (data.get("usage") or {}).get("total_tokens", 0)
-        return AIResponse(content=content, tokens=int(tokens))
+        # D-23：200 但响应结构异常（缺 choices/message/content、类型不对、
+        # JSON 解析失败等）此前会抛裸 KeyError/IndexError/TypeError/ValueError
+        # 冒到路由层 → 500。统一映射为 AIRequestFailedException（保留原因链），
+        # 让 API 层按 502/AI 错误处理，而不是"服务器内部错误"。
+        try:
+            data = await self._request_with_retry(url, payload)
+            content = data["choices"][0]["message"]["content"]
+            if not isinstance(content, str):
+                raise TypeError(f"content 类型异常: {type(content).__name__}")
+            tokens = (data.get("usage") or {}).get("total_tokens", 0)
+            return AIResponse(content=content, tokens=int(tokens))
+        except AIRequestFailedException:
+            raise
+        except (KeyError, IndexError, TypeError, ValueError) as exc:
+            raise AIRequestFailedException(f"AI 响应格式异常: {exc}") from exc
 
     async def stream_chat(self, messages, *, temperature=0.7, max_tokens=2000) -> AsyncIterator[str]:
         url = f"{self.base_url}/chat/completions"

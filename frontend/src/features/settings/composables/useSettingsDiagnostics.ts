@@ -6,7 +6,7 @@
 // 这四个模块后端一直都在，但此前前端没有任何入口 —— 相当于埋没了。
 // 这里只做「接出来 + 展示」；危险操作（轮换密钥、清空日志）都保留确认。
 // ============================================================
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onScopeDispose } from 'vue'
 import { systemApi } from '@/features/system'
 import { useToast } from '@/kernel/ui/toast'
 import { useModal } from '@/kernel/ui/modal'
@@ -76,6 +76,15 @@ export function useSettingsDiagnostics() {
   }
 
   watch(ruleText, onRuleInput)
+
+  // D-27：400ms 规则预览防抖定时器必须在作用域销毁时清掉。
+  // 否则设置页已卸载后仍会触发一次 systemApi.rulePreview，并写已销毁的 ref。
+  onScopeDispose(() => {
+    if (ruleTimer) {
+      clearTimeout(ruleTimer)
+      ruleTimer = null
+    }
+  })
 
   async function onReloadDomains() {
     try {

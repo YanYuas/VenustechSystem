@@ -4,7 +4,6 @@
 # ============================================================
 from __future__ import annotations
 
-import logging
 import os
 import platform
 import sys
@@ -16,8 +15,9 @@ from sqlalchemy import text
 from app.config import get_settings
 from app.core.response import success
 from app.database import engine
+from app.core.logger import get_logger
 
-logger = logging.getLogger("app.health")
+logger = get_logger("app.health")
 
 router = APIRouter(tags=["health"])
 

@@ -105,6 +105,21 @@ class TestCacheLayer:
         path.write_text("{not json", encoding="utf-8")
         assert aihot._load_cache("broken") is None
 
+    def test_cache_file_oserror_returns_none(self, plugin_ctx):
+        """data_dir 指向普通文件 → mkdir 抛 OSError → 返回 None（不冒泡）。"""
+        blocker = Path(get_settings().data_dir) / "aihot-blocker-file"
+        blocker.write_text("x", encoding="utf-8")
+        plugin_ctx.data_dir = blocker
+        assert aihot._cache_file("items") is None
+
+    def test_save_cache_oserror_is_swallowed(self, plugin_ctx, monkeypatch):
+        target = Path(get_settings().data_dir) / "no-such-dir" / "items.json"
+        monkeypatch.setattr(aihot, "_cache_file", lambda name: target)
+        # 写失败只 pass，不抛 —— 但「吞掉异常」不等于成功：必须没留下任何文件
+        aihot._save_cache("items", {"a": 1})
+        assert target.parent.exists() is False
+        assert target.exists() is False
+
     def test_save_cache_without_context_is_noop(self, monkeypatch):
         aihot._ctx = None
         written: list[str] = []
@@ -122,9 +137,10 @@ class TestFetchFallback:
     def test_live_success_caches_memory_and_disk(self, plugin_ctx, fake_http):
         fake_http.script.append(_Resp(200, {"items": [1, 2]}))
         result = asyncio.run(aihot._fetch("items", "/items", {"window": "24h"}))
-        assert result["code"] == 0
-        assert result["data"]["source"] == "live"
-        assert result["data"]["data"] == {"items": [1, 2]}
+        # D-24：_fetch 返回**裸结果**，信封只由端点在唯一一层包
+        assert result["ok"] is True
+        assert result["source"] == "live"
+        assert result["data"] == {"items": [1, 2]}
         assert aihot._cache["items"] == {"items": [1, 2]}
         assert (plugin_ctx.data_dir / "plugins" / "aihot" / "items.json").is_file()
 
@@ -132,29 +148,30 @@ class TestFetchFallback:
         aihot._cache["items"] = {"cached": True}
         fake_http.script.append(RuntimeError("network down"))
         result = asyncio.run(aihot._fetch("items", "/items", {}))
-        assert result["data"]["source"] == "cache"
-        assert result["data"]["degraded"] is True
-        assert result["data"]["data"] == {"cached": True}
+        assert result["ok"] is True
+        assert result["source"] == "cache"
+        assert result["degraded"] is True
+        assert result["data"] == {"cached": True}
 
     def test_live_failure_uses_disk_cache(self, plugin_ctx, fake_http):
         aihot._save_cache("items", {"disk": True})
         aihot._cache.clear()
         fake_http.script.append(RuntimeError("down"))
         result = asyncio.run(aihot._fetch("items", "/items", {}))
-        assert result["data"]["data"] == {"disk": True}
-        assert result["data"]["degraded"] is True
+        assert result["data"] == {"disk": True}
+        assert result["degraded"] is True
 
     def test_live_failure_without_cache_reports_honest_error(self, plugin_ctx, fake_http):
         fake_http.script.append(RuntimeError("upstream down"))
         result = asyncio.run(aihot._fetch("items", "/items", {}))
-        assert result["data"]["ok"] is False
-        assert "AI HOT 暂不可达" in result["data"]["error"]
-        assert len(result["data"]["error"]) <= 200
+        assert result["ok"] is False
+        assert "AI HOT 暂不可达" in result["error"]
+        assert len(result["error"]) <= 200
 
     def test_http_status_error_is_caught(self, plugin_ctx, fake_http):
         fake_http.script.append(_Resp(503, {}))
         result = asyncio.run(aihot._fetch("items", "/items", {}))
-        assert result["data"]["ok"] is False
+        assert result["ok"] is False
 
 
 # ================================================================
@@ -190,17 +207,19 @@ class TestItemsEndpoint:
             "category": "ai-ml", "q": "agent",
         }
 
-    def test_fetch_result_is_wrapped_by_route(self, plugin_ctx, monkeypatch):
-        """路由对 _fetch 结果再包一层 success（当前契约——已知双重信封，见回信 bug 记录）。"""
+    def test_fetch_result_single_envelope(self, plugin_ctx, monkeypatch):
+        """D-24：_fetch 返回裸结果，items 端点只包一层 success（无双重信封）。"""
         async def fake_fetch(name, path, params):
-            return {"code": 0, "message": "success", "data": {"ok": True}}
+            return {"ok": True, "source": "live", "data": {"items": []}}
 
         monkeypatch.setattr(aihot, "_fetch", fake_fetch)
         result = asyncio.run(
             aihot.items(window="24h", mode="selected", limit=10, category=None, q=None)
         )
         assert result["code"] == 0
-        assert result["data"]["code"] == 0  # 内层信封原样保留（现状）
+        assert result["data"] == {"ok": True, "source": "live", "data": {"items": []}}
+        assert "code" not in result["data"], "不得出现内层信封"
+        assert "timestamp" not in result["data"]
 
 
 # ================================================================
@@ -210,47 +229,52 @@ class TestHotTopicsAndDaily:
     def test_hot_topics_live(self, plugin_ctx, fake_http):
         fake_http.script.append(_Resp(200, {"hot": True}))
         result = asyncio.run(aihot.hot_topics())
-        assert result["data"]["data"]["data"] == {"hot": True}
+        assert result["code"] == 0
+        assert result["data"]["ok"] is True
+        assert result["data"]["data"] == {"hot": True}  # 单信封：data = 裸结果
         assert fake_http.calls[0]["url"].endswith("/hot-topics")
 
     def test_daily_live_ok(self, plugin_ctx, fake_http):
         fake_http.script.append(_Resp(200, {"date": "2026-10-28"}))
         result = asyncio.run(aihot.daily())
         assert result["code"] == 0
+        assert result["data"]["ok"] is True
+        assert result["data"]["source"] == "live"
+        assert result["data"]["data"] == {"date": "2026-10-28"}
         assert fake_http.calls[0]["url"].endswith("/dailies/latest")
 
-    def test_daily_fallback_when_latest_fails(self, plugin_ctx, monkeypatch, fake_http):
-        """latest 失败 → 拉 /dailies 索引 → 用真实日期再取一次。"""
-        calls: list = []
+    def test_daily_fallback_when_latest_fails(self, plugin_ctx, fake_http):
+        """D-24 运行期可达性：latest 404 → /dailies 索引 → 真实日期再取。
 
-        async def fake_fetch(name, path, params):
-            calls.append((name, path))
-            if name == "daily":
-                return {"ok": False, "error": "404", "code": 0}
-            return {"ok": True, "source": "live", "data": {"date": "2026-10-28"}, "code": 0}
-
-        monkeypatch.setattr(aihot, "_fetch", fake_fetch)
-        fake_http.script.append(_Resp(200, {"dailies": [{"date": "2026-10-28"}]}))
+        全程走真实 _fetch 路径（只替身 HTTP），断言 source=live/fallback-* 分支
+        不再是死代码。
+        """
+        fake_http.script.extend([
+            _Resp(404, {}),
+            _Resp(200, {"dailies": [{"date": "2026-10-28"}]}),
+            _Resp(200, {"date": "2026-10-28", "items": [{"title": "日报"}]}),
+        ])
         result = asyncio.run(aihot.daily())
-        assert ("daily-2026-10-28", "/dailies/2026-10-28") in calls
+        assert result["code"] == 0
+        assert result["data"]["ok"] is True
         assert result["data"]["source"] == "live/fallback-2026-10-28"
+        assert result["data"]["data"]["items"] == [{"title": "日报"}]
+        urls = [c["url"] for c in fake_http.calls]
+        assert urls[0].endswith("/dailies/latest")
+        assert urls[1].endswith("/dailies")
+        assert urls[2].endswith("/dailies/2026-10-28")
 
-    def test_daily_fallback_empty_index(self, plugin_ctx, monkeypatch, fake_http):
-        async def fake_fetch(name, path, params):
-            return {"ok": False, "error": "404"}
-
-        monkeypatch.setattr(aihot, "_fetch", fake_fetch)
-        fake_http.script.append(_Resp(200, {"dailies": []}))
+    def test_daily_fallback_empty_index(self, plugin_ctx, fake_http):
+        fake_http.script.extend([_Resp(404, {}), _Resp(200, {"dailies": []})])
         result = asyncio.run(aihot.daily())
         assert result["data"]["ok"] is False
         assert "暂无日报" in result["data"]["error"]
 
-    def test_daily_fallback_index_without_date(self, plugin_ctx, monkeypatch, fake_http):
-        async def fake_fetch(name, path, params):
-            return {"ok": False, "error": "404"}
-
-        monkeypatch.setattr(aihot, "_fetch", fake_fetch)
-        fake_http.script.append(_Resp(200, {"items": [{"title": "no-date"}]}))
+    def test_daily_fallback_index_without_date(self, plugin_ctx, fake_http):
+        fake_http.script.extend([
+            _Resp(404, {}),
+            _Resp(200, {"items": [{"title": "no-date"}]}),
+        ])
         result = asyncio.run(aihot.daily())
         assert result["data"]["ok"] is False
         assert "索引异常" in result["data"]["error"]
@@ -265,6 +289,13 @@ class TestHotTopicsAndDaily:
         result = asyncio.run(aihot.daily())
         assert result["data"]["source"] == "cache"
         assert result["data"]["data"] == {"cached": "daily"}
+
+    def test_daily_fallback_no_cache_returns_error(self, plugin_ctx, fake_http):
+        """latest 404 + 索引异常 + 无缓存 → 诚实错误（覆盖 daily 最终兜底）。"""
+        fake_http.script.extend([_Resp(404, {}), RuntimeError("index down")])
+        result = asyncio.run(aihot.daily())
+        assert result["data"]["ok"] is False
+        assert "AI HOT 暂不可达" in result["data"]["error"]
 
     def test_initialize_and_get_router(self, plugin_ctx):
         assert aihot.get_router() is aihot.router

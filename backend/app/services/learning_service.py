@@ -4,7 +4,6 @@
 # ============================================================
 from __future__ import annotations
 
-import logging
 from datetime import date, datetime, timedelta
 from sqlalchemy.orm import Session
 
@@ -18,8 +17,9 @@ from app.schemas.learning import (
     GeneratePlanRequest, ReviewSubmitRequest, CreateStudyTimeLogRequest,
 )
 from app.services.rules.domain_engine import generate_study_plan, parse_duration_minutes
+from app.core.logger import get_logger
 
-logger = logging.getLogger("app.learning")
+logger = get_logger("app.learning")
 
 
 class LearningService:
@@ -41,7 +41,7 @@ class LearningService:
 
     def create_plan(self, user_id: str, data: CreateStudyPlanRequest) -> dict:
         plan = self.plan_repo.create(user_id=user_id, **data.model_dump(exclude_none=True))
-        self.logger.info(f"学习计划创建: {plan.id}")
+        self.logger.info("学习计划创建: {}", plan.id)
         return self._plan_to_dict(plan)
 
     def update_plan(self, user_id: str, plan_id: str, data: dict) -> dict:
@@ -140,8 +140,8 @@ class LearningService:
         created_ids = [t.id for t in tasks]
 
         self.logger.info(
-            f"领域引擎生成计划: plan={plan.id} 任务数={len(created_ids)} "
-            f"命中领域={result.domain_name or '(通用兜底)'}"
+            "领域引擎生成计划: plan={} 任务数={} 命中领域={}",
+            plan.id, len(created_ids), result.domain_name or "(通用兜底)",
         )
 
         return {
@@ -167,7 +167,7 @@ class LearningService:
             next_review=date.today(),
             **data.model_dump(exclude_none=True),
         )
-        self.logger.info(f"知识卡片创建: {card.id}")
+        self.logger.info("知识卡片创建: {}", card.id)
         return self._card_to_dict(card)
 
     def update_card(self, user_id: str, card_id: str, data: dict) -> dict:
@@ -238,7 +238,7 @@ class LearningService:
         self.db.commit()
         event_bus.publish(EVENT_FLASHCARD_REVIEWED, card_id=card_id, quality=quality,
                           next_interval=interval)
-        self.logger.info(f"卡片复习: {card_id}, quality={quality}, next={next_review}")
+        self.logger.info("卡片复习: {}, quality={}, next={}", card_id, quality, next_review)
 
         return {
             "card_id": card_id,

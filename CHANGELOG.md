@@ -7,6 +7,28 @@
 
 ## [Unreleased]
 
+### Changed — Phase 7：修 P1/P2 缺陷 + 日志统一 + 覆盖率棘轮（2026-10-30）
+
+**D-22~D-28 全部修复（均带回归测试 + 负向验证）**
+- **D-24（P1）** `aihot` 双重响应信封 + 死分支：`_fetch` 改返回裸结果、端点只包一层 `success()`；`daily()` 用 `ok` 判断后 **404→fallback 成功分支运行期可达**（真实 HTTP 路径测试断言 3 次请求顺序 + `source=live/fallback-*`）。
+- **D-22** `_TIME_HINTS` 长词前置："大后天" → +3（原被 "后天" 抢先 +2）；"今天晚上" 优先 "今天"。
+- **D-23** `ai/client.chat()` 缺字段/异常结构/非法 JSON → `AIRequestFailedException("AI 响应格式异常…")`（保留 cause 链），6 种坏结构参数化测试。
+- **D-25** 加密单例：新增 `core.encryption.ensure_encryption()`（双检锁线程安全），`AssistantService` 复用；7 条测试含 4 线程并发同一实例。
+- **D-26** 日志后端统一：12 个文件 stdlib `logging.getLogger` → loguru `get_logger`（`config.py` 因 `logger.py→config` 导入环保留 stdlib 并进白名单），21 处 f-string 日志改 `{}` 惰性占位；契约新增 4 条规则（禁止 `logging.getLogger`/白名单须有理由/caplog 按需桥/logger 必须真 loguru）并修复 `logger.opt(...)` 漏检；**顺带修掉 health/dashboard/pet 的 latent AttributeError**（`opt()` 挂在 stdlib logger 上）。
+- **D-27** `useSettingsDiagnostics` 的 400ms `ruleTimer` 增加 `onScopeDispose` 清理（卸载后不再发预览请求）。
+- **D-28** `offlineQueue.init()` 幂等（`listenersBound` + dispose 复位），重复 init 不叠加网络监听。
+
+**测试与覆盖率**
+- 后端：**1706 passed**（1588 → +118）；覆盖率 **92.02% → 95.76%**；重点模块 workspace_service/app/seed.py/domain_engine/vault_service **全部 100%**、aihot/assistant 100%、ai/client 99%；CI 覆盖率阈值 **91% → 95%**（阻断）。
+- 前端：**239 passed / 18 files**（196 → +43：GlobalSearch 14 / AdvancedSection 12 / SystemDiagnosticsSection 14 + D-27/D-28 回归 3）；lines **20.95% → 32.24%**、branches 73.25→77.7、functions 53.65→60.42；阈值棘轮 `{20,72,52,20}` → **`{31,76,59,31}`**；`maxWorkers: 2` 修复 16 核下 jsdom+VTU 并发 OOM（`FATAL ERROR: Zone Allocation failed`）。
+- 顺带修复 `GlobalSearch` 搜索失败时丢失常驻操作项的组件行为缺口（失败降级 = 仅操作项）。
+- 测试基建：`test_architecture.py` 的 R1/R2/R14 负向探针改 **uuid 文件名**，消除多 agent 并行 pytest 时的互踩假红；`test_service_boundaries`、`test_aihot_plugin` 的 NO_ASSERT 用例补真实断言。
+
+**登记 7 个新问题（D-29~D-35，未修）**
+- D-30/D-31（P2）：`assistant_service` 的 `周X`/`下周X` 分支日期**重复 +7** → 解析成 +14 天（应 +7；含 `if False` 死代码）；
+- D-32（P2）：`domain_engine` 阶段公式使 4 单元通用兜底计划**永不出现 phase 3**（长尾技能/无 API Key 默认路径少"整合实战"阶段）；
+- D-29（P3）GlobalSearch 空态不可达；D-33 `app/seed.py` utcnow 弃用；D-34 workspace 扫描进度僵尸条目；D-35 `app/main.py` 3 处 f-string 日志。
+
 ### Changed — Phase 6：修测试发现的真 bug + 测试补缺（2026-10-28）
 
 **真 bug 修复（D-17~D-21，均带回归测试 + 负向验证）**

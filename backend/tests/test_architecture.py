@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import subprocess
 import sys
+import uuid
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -28,8 +29,14 @@ GUARD = ROOT / "scripts" / "audit_architecture.py"
 #   · R7 命名规则只扫 services/ 顶层，不会误报；
 #   · R8 领域归属把 rules/ 视为 shared 包，不会误报；
 #   · R13 是 rglob 扫描，能命中 —— 正好隔离出唯一一条 R13 违规。
-PROBE = ROOT / "backend" / "app" / "services" / "rules" / "_r13_probe.py"
-PROBE_SRC = '''# 临时探针（仅测试期间存在）：故意直连 ORM，验证 R13 会变红
+# 文件名带**进程唯一后缀**：多个 agent 并发跑全量时，固定文件名会让两个
+# 进程互相写入/删除对方的探针，导致「注入后守护没红」或「清理后仍未绿」
+# 的假失败（2026-10-30 实测过一次）。
+R13_PROBE = (
+    ROOT / "backend" / "app" / "services" / "rules"
+    / f"_r13_probe_{uuid.uuid4().hex[:8]}.py"
+)
+R13_PROBE_SRC = '''# 临时探针（仅测试期间存在）：故意直连 ORM，验证 R13 会变红
 def probe(db):
     return db.scalars("SELECT 1")
 '''
@@ -64,26 +71,22 @@ def test_r13_negative_probe_turns_guard_red() -> None:
     main），全量测试仍会显示"架构守护通过" —— 护栏变成装饰。这条用例让
     "规则真的会失败"成为可执行断言。
     """
-    assert not PROBE.exists(), f"探针文件已存在，先清理: {PROBE}"
-    try:
-        PROBE.write_text(PROBE_SRC, encoding="utf-8")
-        proc = _run_guard()
-        output = (proc.stdout or "") + (proc.stderr or "")
-        assert proc.returncode != 0, (
-            "注入 service 直连 ORM 后守护仍然通过 → R13 规则失效：\n" + output
-        )
-        assert "R13-service-no-direct-orm" in output, (
-            "守护失败了，但不是 R13 报的（说明探针触发了别的规则，需调整探针）：\n" + output
-        )
-    finally:
-        PROBE.unlink(missing_ok=True)
+    proc = _run_with_probe(R13_PROBE, R13_PROBE_SRC)
+    output = (proc.stdout or "") + (proc.stderr or "")
+    assert proc.returncode != 0, (
+        "注入 service 直连 ORM 后守护仍然通过 → R13 规则失效：\n" + output
+    )
+    assert "R13-service-no-direct-orm" in output, (
+        "守护失败了，但不是 R13 报的（说明探针触发了别的规则，需调整探针）：\n" + output
+    )
 
     # 清理后必须恢复绿色，证明红/绿差异确实来自探针
     proc_after = _run_guard()
+    after_output = (proc_after.stdout or "") + (proc_after.stderr or "")
     assert proc_after.returncode == 0, (
-        "删除探针后守护仍未通过：\n"
-        + (proc_after.stdout or "")
-        + (proc_after.stderr or "")
+        "删除 R13 探针后守护仍未通过"
+        "（若本机有其它 agent 正在并发跑架构负向测试，其临时探针可能瞬时存在；"
+        "串行复跑即可确认）：\n" + after_output
     )
 
 
@@ -99,13 +102,16 @@ def _load_guard_module():
 
 
 # R1 探针：service 依赖 api（反向依赖）。放 rules/ shared 包只触发 R1。
-R1_PROBE = ROOT / "backend" / "app" / "services" / "rules" / "_r1_probe.py"
+# 文件名带 uuid：同一工作树上并行跑多个 pytest（人 + 子智能体）时，
+# 固定文件名会互相写/删探针造成假红（2026-10-30 实测）。
+R1_PROBE = ROOT / "backend" / "app" / "services" / "rules" / f"_r1_probe_{uuid.uuid4().hex[:8]}.py"
 R1_PROBE_SRC = '''# 临时探针（仅测试期间存在）：service 反依赖 api，验证 R1 会变红
 from app.api.task import router  # noqa: F401
 '''
 
 # R2 探针：core 依赖 services。放 app/core/（shared 包）只触发 R2。
-R2_PROBE = ROOT / "backend" / "app" / "core" / "_r2_probe.py"
+# 同 R1：uuid 文件名防并发互踩。
+R2_PROBE = ROOT / "backend" / "app" / "core" / f"_r2_probe_{uuid.uuid4().hex[:8]}.py"
 R2_PROBE_SRC = '''# 临时探针（仅测试期间存在）：core 反依赖 service，验证 R2 会变红
 from app.services.task_service import TaskService  # noqa: F401
 '''
@@ -197,7 +203,8 @@ def test_r14_frontend_layer_negative_probe_turns_guard_red() -> None:
     防的是 R14（ADP-0007 前端分层）写错或没接进 main —— 前端目录搬迁后
     "规则在但没生效"同样属于护栏装饰。
     """
-    probe = ROOT / "frontend" / "src" / "kernel" / "_r14_probe.ts"
+    # uuid 文件名：防并行 pytest 互踩探针（同 R1/R2）
+    probe = ROOT / "frontend" / "src" / "kernel" / f"_r14_probe_{uuid.uuid4().hex[:8]}.ts"
     src = "// 临时探针（仅测试期间存在）：kernel 反依赖 feature\nexport const probe = 1\n"
     import_line = "import '@/features/pet'\n"
     assert not probe.exists(), f"探针文件已存在，先清理: {probe}"

@@ -368,13 +368,20 @@ CI：`.github/workflows/{backend,frontend,repo-guard}.yml` + `android-build.yml`
 | D-19 | P2 | `api/logs.py` 错误分支返回裸 dict，绕过统一响应信封 | `api/logs.py` | ✅ 已修（2026-10-28）：400/404/500 改 `error()`，补信封契约测试 |
 | D-20 | P1 | `avatar_service` memory/inspiration 写操作无 `user_id` 归属校验（IDOR） | `avatar_service.py` | ✅ 已修（2026-10-28）：7 个写方法加 `user_id` + 归属校验（NotFound，不泄漏存在性）；13 条 IDOR 用例 + 独立 Session 复核 |
 | D-21 | P2 | SSE 请求未带 `X-API-Token` → 启用令牌后流式对话 401 | `frontend/src/kernel/http/sse.ts` | ✅ 已修（2026-10-28）：与普通请求对齐；+2 条头断言测试 |
-| D-22 | P2 | `assistant_service._TIME_HINTS` 顺序使 **"大后天" 先命中 "后天"** → 解析成 +2 天（应 +3） | `assistant_service.py:41-48`；测试按当前行为钉住 | Phase 7 |
-| D-23 | P2 | `ai/client.chat()` 对 200 响应直接取 `choices[0]`，缺字段/非法 JSON 抛裸 KeyError/JSONDecodeError，未映射 `AIRequestFailedException`（调用方可能 500） | `ai/client.py:85-88`；characterization 测试注释登记 | Phase 7 |
-| D-24 | P1 | `plugins_builtin/aihot/main.py` **双重响应信封**（`_fetch` 已返回信封，调用方又 `success(...)` 包一层）；`daily()` 对信封取 `ok` 恒 None → 404 回退成功的 `live/fallback-*` 分支运行期永远走不到 | `aihot/main.py:84/89/111/116/121/135/137` | Phase 7 |
-| D-25 | P3 | `AssistantService._encryption()` 每次新建 `EncryptionManager` 而非复用全局 `init_encryption` 单例 | `assistant_service.py` | Phase 7 |
-| D-26 | P2 | 多个 app 模块用 stdlib `logging.getLogger` 却按 loguru 风格 `{}` 传参（stdlib 下参数被丢弃，消息留 `{}`）；现有契约测试只查 %-style 漏掉此形态 | health/event_bus/plugin_manager/ai/asset/avatar/dashboard 等 | Phase 7 |
-| D-27 | P3 | `useSettingsDiagnostics` 的 400ms `ruleTimer` 未在 scope dispose 清理，卸载后仍可能发一次预览请求（低危） | `features/settings/composables/useSettingsDiagnostics.ts` | Phase 7 |
-| D-28 | P3 | `kernel/offline/offlineQueue` store 的 `manager` 模块级缓存 + `init()` 每次 `addEventListener`：重复 init 会重复注册网络监听（生产路径当前只调一次） | `kernel/offline/offlineQueue.ts` | Phase 7 |
+| D-22 | P2 | `assistant_service._TIME_HINTS` 顺序使 "大后天" 先命中 "后天" → 解析成 +2 天 | `assistant_service.py:41-48` | ✅ 已修（2026-10-30）：长词前置（大后天+3、今晚优先）；同日发现 D-30/D-31 两个新分支 bug |
+| D-23 | P2 | `ai/client.chat()` 200 缺字段抛裸 KeyError，未映射 `AIRequestFailedException` | `ai/client.py` | ✅ 已修（2026-10-30）：解析整体 try + 6 种坏结构/非法 JSON → `AIRequestFailedException`（保留 cause 链） |
+| D-24 | P1 | `aihot` 双重响应信封 + `daily()` 对信封取 `ok` 恒 None → 404 回退成功分支运行期不可达 | `aihot/main.py` | ✅ 已修（2026-10-30）：`_fetch` 返回裸结果、端点单层信封；真实 HTTP 路径测试证明 `source=live/fallback-*` 可达 |
+| D-25 | P3 | `AssistantService._encryption()` 每次 new `EncryptionManager` | `assistant_service.py` | ✅ 已修（2026-10-30）：`core/encryption.ensure_encryption()` 双检锁单例；7 条测试含 4 线程并发 |
+| D-26 | P2 | 多个 app 模块用 stdlib `logging.getLogger` 却按 loguru 风格 `{}` 传参（参数被丢弃），且 `logger.opt()` 在 stdlib 上会 AttributeError | health/event_bus/plugin_manager/9 个 service 等 | ✅ 已修（2026-10-30）：12 文件统一 `get_logger` + 21 处 f-string→`{}` 惰性占位；`config.py` 因导入环保留 stdlib 并进白名单；契约新增"禁止 logging.getLogger"+ caplog 按需桥；顺带修掉 health/dashboard/pet 的 latent AttributeError |
+| D-27 | P3 | `useSettingsDiagnostics` 的 400ms `ruleTimer` 未在 scope dispose 清理 | `useSettingsDiagnostics.ts` | ✅ 已修（2026-10-30）：`onScopeDispose` 清理 + 卸载后不触发预览回归测试 |
+| D-28 | P3 | `offlineQueue` store `init()` 重复调用会重复注册网络监听 | `offlineQueue.ts` | ✅ 已修（2026-10-30）：`listenersBound` 幂等 + dispose 复位；2 条回归测试 |
+| D-29 | P3 | `GlobalSearch` 的"没有找到相关内容"空态不可达：恒定操作项使 `hasAny` 恒 true（UX 决策：删分支或改文案） | `app/layout/GlobalSearch.vue` | Phase 8 |
+| D-30 | P2 | `_NUM_TIME` 的 `周X` 分支 base 已前进 7 天又叠加 offset → "周三" 解析成 **+14 天**（应 +7） | `assistant_service.py`；测试按当前行为钉住 | Phase 8 |
+| D-31 | P2 | 同函数"下周X"分支 `delta += 7 - (...) if False else delta` 实际执行 `delta += delta` → "下周三" **+14 天**（应 +7）；且 `if False` 死代码 | `assistant_service.py` | Phase 8 |
+| D-32 | P2 | `domain_engine.build_unit_defs` 阶段公式（0.4/0.85 比例）使 4 单元通用兜底计划**永不出现 phase 3**（长尾技能/无 API Key 默认路径的技能树少一个"整合实战"阶段） | `services/rules/domain_engine.py`；测试已记录实测 | Phase 8 |
+| D-33 | P3 | `app/seed.py` 仍用 `datetime.utcnow()`（DeprecationWarning） | `app/seed.py:249` | Phase 8 |
+| D-34 | P3 | `WorkspaceService.delete_root` 不清理 `_SCAN_PROGRESS` 注册表 → 僵尸条目（个人规模影响极小） | `workspace_service.py` | Phase 8 |
+| D-35 | P3 | `app/main.py` 仍有 3 处 f-string 日志（loguru 下可用但非惰性；不在 D-26 清单内） | `app/main.py` | Phase 8 |
 
 > 原则：**先修 P0/P1 的"正确性"，再谈结构搬迁**。在事务边界、迁移基线、备份导入还有问题时做领域分包，只是把混乱打包进更漂亮的新目录。
 
@@ -391,6 +398,7 @@ CI：`.github/workflows/{backend,frontend,repo-guard}.yml` + `android-build.yml`
 | **Phase 4** | 收尾与交付 | P0-2 泄漏处置（已重建仓库彻底消除）、CI 四 workflow 首跑全绿（修正 runner 上下文 / 文档审计跨平台 / Node 24）、`styles/`+`test/setup` 归位（sass 输出逐字节一致）、D-16 `backend/scripts` 纳入 ruff（13→0，含 1 个真潜伏 bug）、`var/` 数据物理迁移（SHA256+行数校验）、敏感文件守护 `--strict` | ✅ 本轮完成（2026-10-27，1284 后端 + 86 前端测试；**仅剩仓库重建需 delete_repo 权限**） |
 | **Phase 5** | 结构治理 + 测试质量 + 启动可靠性 | 工作区卫生守护（`audit_workspace_hygiene.py`，check_all 16 项，清理 193MB）；后端 pytest-cov 85.18%→88.48%（+166 测试，1450 全绿）；前端 coverage-v8 +49 测试（135 全绿，kernel/http 92.23%）；启动脚本真修：根治 `Start-Process` 新窗口死锁 + `-Verify` 自检 + `var/logs`；登记 D-17~D-21 | ✅ 本轮完成（2026-10-28） |
 | **Phase 6** | 修测试发现的真 bug + 补测试缺口 | D-17/18/19（auth 500、logs loguru/envelope）、D-20（avatar IDOR）、D-21（SSE token）全部修复 + 回归测试；后端 +118 测试（1598 收集 / 1588 passed），覆盖率 89.04%→92.02%；前端 +59 测试（196 passed），lines 12.76%→20.95%、阈值棘轮 20/72/52/20 进 CI；新登记 D-22~D-28 | ✅ 本轮完成（2026-10-28） |
+| **Phase 7** | 修 P1/P2 缺陷 + 日志统一 + 覆盖率棘轮 | D-22~D-28 全部修复（aihot 双信封/死分支、大后天解析、AI 响应错误映射、加密单例、日志后端统一、前端定时器/监听幂等）；后端 1706 passed、覆盖率 92.02%→**96%**（CI 阈值 91→95）；前端 239 passed、lines 20.95%→32.24%（阈值 {31,76,59,31} 进 CI）；架构负向探针改 uuid 防并发假红；新登记 D-29~D-35 | ✅ 本轮完成（2026-10-30） |
 
 **明确不做（以及为什么）**：
 
