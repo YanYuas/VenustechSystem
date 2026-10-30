@@ -81,12 +81,18 @@ backend/app/
 
 - pytest，测试放 `backend/tests/`（当前 60 个测试文件；最新条数以 `pytest --collect-only -q` 为准）
 - **测试规范唯一入口**：[`backend/tests/README.md`](../../backend/tests/README.md)（分层/命名/AAA/夹具/null 语义/覆盖率/慢测试登记）
-- 覆盖率（本地与 CI 同一条命令，CI 只报告不 hard fail）：
+- 覆盖率（本地与 CI 同一条命令；CI 另有阈值棘轮 `--cov-fail-under`，覆盖率回退会拦合并）：
 
 ```bash
 cd backend
 python -m pytest tests -q --cov=app --cov-report=term-missing
 ```
+
+- **CI 覆盖率报告可作为 artifact 下载**（Actions 运行页底部 Artifacts 区，保留 **7 天**）：
+  `backend-coverage`（`coverage.xml`，Cobertura 格式）与 `frontend-coverage`
+  （`frontend/coverage/` 目录，含 `coverage-summary.json` 便于做趋势）。
+  artifact 上传是 `if: always()` —— **上传失败只会丢报告，不影响测试/门禁结论**
+  （结论看 pytest / vitest 退出码与覆盖率阈值步骤）。
 
 ## 4. 前端规范（Vue 3 + TypeScript）
 

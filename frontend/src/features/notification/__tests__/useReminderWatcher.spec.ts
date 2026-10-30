@@ -191,6 +191,26 @@ describe('useReminderWatcher：快速提醒', () => {
     expect(panel.updateReminder).toHaveBeenCalledTimes(1)
   })
 
+  it('notifiedIds 有 500 上限：超出后淘汰最旧，最新 id 去重仍生效（D-38）', async () => {
+    panel.listReminders.mockResolvedValue(
+      Array.from({ length: 501 }, (_, i) => makeQuickReminder({ id: `r-cap-${i}` })),
+    )
+    const w = setup()
+
+    await w.checkReminders()
+    expect(toastWarning).toHaveBeenCalledTimes(501)
+
+    // 容量 500：最旧 r-cap-0 已被淘汰 → 下一轮会再次通知
+    panel.listReminders.mockResolvedValue([makeQuickReminder({ id: 'r-cap-0' })])
+    await w.checkReminders()
+    expect(toastWarning).toHaveBeenCalledTimes(502)
+
+    // 最新的 r-cap-500 仍在集合中 → 仍然去重，不重复通知
+    panel.listReminders.mockResolvedValue([makeQuickReminder({ id: 'r-cap-500' })])
+    await w.checkReminders()
+    expect(toastWarning).toHaveBeenCalledTimes(502)
+  })
+
   it('未来提醒 / 超过 1 小时旧提醒 / 已 dismissed / 无 remind_at 都跳过', async () => {
     panel.listReminders.mockResolvedValue([
       makeQuickReminder({ id: 'r-201', remind_at: new Date(NOW.getTime() + 60_000).toISOString() }),

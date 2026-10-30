@@ -7,6 +7,11 @@
 # 本 workflow 在 windows-latest 上真启动 dev 模式（后端 :8765 + 前端 :5173）→ 健康检查
 # → taskkill 自动停止 → 退出码 0/1；失败时把 var/logs 下的子进程日志端上来。
 #
+# 成本（为什么要 paths 过滤）：Windows runner 约 2–3 分钟/次，约为 Linux 的 2×。
+#   - push 只跟 main；
+#   - PR 只在「改动启动器（ops/**、scripts/**）/ 后端 / 前端 / 本文件」时触发，
+#     其余 PR 不烧 Windows 分钟；改 backend/** 的 PR 会同时多跑一次 backend-ci(Linux) + 本 workflow。
+#
 # 与本地环境的差异（重要）：
 #   - CI 没有 backend/.venv → Resolve-Python 'dev' 会回退到 PATH 上的 python
 #     （ops/start.ps1 的 dev 分支：打印 WARN 后返回 PATH python，demo/mobile 才强制要求 venv），
@@ -20,6 +25,15 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
+    paths:
+      - "ops/**"
+      - "scripts/**"
+      - "backend/**"
+      - "frontend/**"
+      - ".github/workflows/windows-startup.yml"
+  # PR 也跑：合并前就挡住「启动脚本/启动链路」回归；paths 与 push 一致，
+  # 不碰这些路径的 PR 不会触发（Windows 分钟约 2–3 分钟/次，见文件头成本说明）。
+  pull_request:
     paths:
       - "ops/**"
       - "scripts/**"

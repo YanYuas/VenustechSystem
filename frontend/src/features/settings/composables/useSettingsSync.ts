@@ -12,11 +12,21 @@ import { ref } from 'vue'
 import { syncApi } from '@/features/sync'
 import { backupApi } from '@/features/dashboard'
 import type { SyncPackage } from '@/features/sync'
-import { getApiBase, setApiBase, getApiToken, setApiToken } from '@/kernel/http'
+import { ApiError, getApiBase, setApiBase, getApiToken, setApiToken } from '@/kernel/http'
 import { useToast } from '@/kernel/ui/toast'
 
 export function useSettingsSync() {
   const toast = useToast()
+
+  /**
+   * D-37：http 层对 ApiError 已经 toast 过（避免重复提示）；
+   * 但「非 ApiError 的意外错误」（api 层直接 throw / 运行时异常）此前被空 catch 吞掉，
+   * 用户完全无感知 —— 这里补一条兜底提示。
+   */
+  function reportUnexpected(title: string, err: unknown) {
+    if (err instanceof ApiError) return
+    toast.error(title, String(err))
+  }
 
   // ---------- 数据同步（S6-3b 前端出口） ----------
   const syncExporting = ref(false)
@@ -39,8 +49,8 @@ export function useSettingsSync() {
       toast.success('同步包已导出', res.path)
       await loadSyncPackages()
       syncPackagesOpen.value = true
-    } catch {
-      /* http 层已提示 */
+    } catch (err) {
+      reportUnexpected('同步导出失败', err)
     } finally {
       syncExporting.value = false
     }
@@ -49,8 +59,8 @@ export function useSettingsSync() {
   async function loadSyncPackages() {
     try {
       syncPackages.value = (await syncApi.packages()).items
-    } catch {
-      /* http 层已提示 */
+    } catch (err) {
+      reportUnexpected('同步包列表加载失败', err)
     }
   }
 
@@ -60,8 +70,8 @@ export function useSettingsSync() {
       const s = await syncApi.import(p.path)
       if (s.ops === 0) toast.info('没有需要应用的变化', '本地数据已是最新（LWW）')
       else toast.success(`已应用 ${s.ops} 处变化`, `新增 ${s.insert} · 更新 ${s.update}`)
-    } catch {
-      /* http 层已提示 */
+    } catch (err) {
+      reportUnexpected('同步导入失败', err)
     } finally {
       syncImporting.value = ''
     }
@@ -127,7 +137,9 @@ export function useSettingsSync() {
   const dataDir = ref('')
   async function loadDataDir() {
     try {
-      const res = await fetch('http://127.0.0.1:8765/api/v1/health')
+      // D-36：必须走运行时 baseURL（移动端/Tailscale 覆盖后仍是同一台后端），
+      // 不能硬编码回环地址，否则局域网/App 壳会误报「后端未连接」。
+      const res = await fetch(`${getApiBase()}/health`)
       const json = await res.json()
       dataDir.value = json.data?.data_dir || '默认目录'
     } catch {

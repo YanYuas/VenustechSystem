@@ -8,7 +8,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { syncApi } from '@/features/sync'
 import { backupApi } from '@/features/dashboard'
-import { getApiBase, getApiToken, setApiBase, setApiToken } from '@/kernel/http'
+import { ApiError, getApiBase, getApiToken, setApiBase, setApiToken } from '@/kernel/http'
+import { ApiErrorCode } from '@/kernel/http/types'
 import type { SyncPackage } from '@/features/sync'
 import { useSettingsSync } from '../composables/useSettingsSync'
 
@@ -18,12 +19,16 @@ vi.mock('@/features/sync', () => ({
 vi.mock('@/features/dashboard', () => ({
   backupApi: { stats: vi.fn(), export: vi.fn(), import: vi.fn() },
 }))
-vi.mock('@/kernel/http', () => ({
-  getApiBase: vi.fn(),
-  getApiToken: vi.fn(),
-  setApiBase: vi.fn(),
-  setApiToken: vi.fn(),
-}))
+vi.mock('@/kernel/http', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/kernel/http')>()
+  return {
+    ...actual,
+    getApiBase: vi.fn(),
+    getApiToken: vi.fn(),
+    setApiBase: vi.fn(),
+    setApiToken: vi.fn(),
+  }
+})
 
 const toastMock = vi.hoisted(() => ({
   error: vi.fn(),
@@ -53,6 +58,11 @@ function makePackage(patch: Partial<SyncPackage> = {}): SyncPackage {
     created_at: '2026-10-30T10:00:00',
     ...patch,
   } as unknown as SyncPackage
+}
+
+/** 构造 http 层错误（此类错误在 request.ts 里已经 toast 过） */
+function makeApiError(message = 'server error') {
+  return new ApiError(ApiErrorCode.SERVER_ERROR, message)
 }
 
 function stubFetch(impl: (input: RequestInfo | URL) => Promise<Response>) {
@@ -123,6 +133,18 @@ describe('useSettingsSync：同步包导出 / 列表 / 导入', () => {
     expect(s.syncExporting.value).toBe(false)
     expect(s.syncPackagesOpen.value).toBe(false)
     expect(s.syncPackages.value).toHaveLength(0)
+    // D-37：非 ApiError 的意外错误不再静默
+    expect(toastError).toHaveBeenCalledWith('同步导出失败', 'Error: export down')
+  })
+
+  it('导出遇到 ApiError：http 层已提示，不重复 toast（D-37）', async () => {
+    sync.export.mockRejectedValueOnce(makeApiError('boom'))
+    const s = useSettingsSync()
+
+    await s.onSyncExport()
+
+    expect(toastError).not.toHaveBeenCalled()
+    expect(s.syncExporting.value).toBe(false)
   })
 
   it('loadSyncPackages 成功写入 items；失败时保留旧列表', async () => {
@@ -133,6 +155,16 @@ describe('useSettingsSync：同步包导出 / 列表 / 导入', () => {
     sync.packages.mockRejectedValueOnce(new Error('list down'))
     await s.loadSyncPackages()
     expect(s.syncPackages.value.map((p) => p.name)).toEqual(['pkg-a'])
+    expect(toastError).toHaveBeenCalledWith('同步包列表加载失败', 'Error: list down')
+  })
+
+  it('包列表遇到 ApiError：http 层已提示，不重复 toast（D-37）', async () => {
+    const s = useSettingsSync()
+    sync.packages.mockRejectedValueOnce(makeApiError())
+
+    await s.loadSyncPackages()
+
+    expect(toastError).not.toHaveBeenCalled()
   })
 
   it('导入：ops=0 时提示"没有需要应用的变化"', async () => {
@@ -166,14 +198,24 @@ describe('useSettingsSync：同步包导出 / 列表 / 导入', () => {
     expect(s.syncImporting.value).toBe('')
   })
 
-  it('导入失败：静默（http 层已提示），但 importing 复位', async () => {
-    sync.import.mockRejectedValueOnce(new Error('import down'))
+  it('导入失败（ApiError）：http 层已提示，不重复 toast，importing 复位', async () => {
+    sync.import.mockRejectedValueOnce(makeApiError('import boom'))
     const s = useSettingsSync()
 
     await s.onSyncImport(makePackage())
 
     expect(s.syncImporting.value).toBe('')
     expect(toastError).not.toHaveBeenCalled()
+  })
+
+  it('导入遇到非 ApiError 的意外错误：补 toast 兜底（D-37）', async () => {
+    sync.import.mockRejectedValueOnce(new Error('unexpected'))
+    const s = useSettingsSync()
+
+    await s.onSyncImport(makePackage())
+
+    expect(toastError).toHaveBeenCalledWith('同步导入失败', 'Error: unexpected')
+    expect(s.syncImporting.value).toBe('')
   })
 
   it('toggleSyncPackages 翻转展开状态', () => {
@@ -265,6 +307,20 @@ describe('useSettingsSync：数据目录', () => {
     stubFetch(async () => ({ json: async () => ({ data: {} }) }) as unknown as Response)
     await s.loadDataDir()
     expect(s.dataDir.value).toBe('默认目录')
+  })
+
+  it('loadDataDir：必须用运行时 baseURL（移动端/局域网覆盖后不再打回环，D-36）', async () => {
+    http.getApiBase.mockReturnValue('http://192.168.1.5:3000/api/v1')
+    const fetchMock = stubFetch(
+      async () =>
+        ({ json: async () => ({ data: { data_dir: '/lan/data' } }) }) as unknown as Response,
+    )
+    const s = useSettingsSync()
+
+    await s.loadDataDir()
+
+    expect(fetchMock.mock.calls[0][0]).toBe('http://192.168.1.5:3000/api/v1/health')
+    expect(s.dataDir.value).toBe('/lan/data')
   })
 
   it('loadDataDir：请求失败时显示"后端未连接"', async () => {

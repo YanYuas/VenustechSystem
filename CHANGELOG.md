@@ -7,6 +7,27 @@
 
 ## [Unreleased]
 
+### Changed — Phase 9：修剩余 P2/P3 + 生命周期测试 + CI 增强（2026-10-30）
+
+**D-36~D-38 修复（均带回归测试 + 负向验证）**
+- **D-36（P2）** `useSettingsSync.loadDataDir` 硬编码 `http://127.0.0.1:8765/api/v1/health` → 改 `` `${getApiBase()}/health` ``，移动端/Tailscale 覆盖 base 后不再误报"后端未连接"；baseURL 覆盖回归测试。
+- **D-37** 三个同步 catch 由空实现改为 `reportUnexpected()`：`ApiError` 保持静默（http 层已提示），非 ApiError 意外错误补 `toast.error` 兜底（导出/包列表/导入），4 条测试覆盖两类分支。
+- **D-38** `useReminderWatcher.notifiedIds` 加 `NOTIFIED_MAX=500` 上限，按插入顺序淘汰最旧，跨 tick 去重语义不变；容量回归测试。
+
+**测试与覆盖率**
+- 后端：**1823 passed**（1743 → +80：lifespan fail-open 24 / bootstrap handlers 44 / startup auto-backup 12）；覆盖率 **95.91% → 96.63%**；`app/main.py` 84→**100%**、`bootstrap/event_handlers` 66→**100%**、`growth_handlers` 95→**100%**、`backup_service` 82→**99%**；CI 阈值 95→**96%**。
+- 前端：**344 passed / 24 files**（291 → +53：dimensions 14 / BaseSelect 18 / BaseModal 16 + D-36/37/38 回归 5）；lines **37.44% → 41.54%**、branches 80.46%、functions 65.86%；阈值 `{36,78,63,36}` → **`{40,79,64,40}`**。
+- 测试覆盖了 lifespan 的 fatal/fail-open 双策略、事件订阅注册、文档 AI 摘要/标签独立持久化、任务通知、成长经验结算、自动备份到期/校验/修剪、异常处理器信封与不泄堆栈、`__main__` 启动参数（runpy 假 uvicorn，不占端口）。
+
+**CI 增强**
+- `windows-startup.yml` 支持 **PR 触发**（paths 与 push 一致；仅无人值守的 `contents: read`，无 secrets），并在文件头写明 Windows 分钟成本。
+- 后端/前端覆盖率产物上传 artifact：`backend-coverage`（coverage.xml）、`frontend-coverage`（coverage-summary.json），保留 7 天，上传失败不阻断（`continue-on-error`）。
+- 修正既有口径不一致：backend 覆盖率命令 `--cov-fail-under` 实际值 88 与步骤名 95 不符，已对齐为 96。
+
+**新登记 6 个问题（D-39~D-44，未修）**
+- **P2**：`app/main.py` demo_seed 分支无 try/except（seed 失败直接阻断启动，与其它 fail-open 不一致）；订阅注册无 try/except（异常中断启动）。
+- P3：提醒 id 淘汰级联再通知理论风险、BaseSelect 搜索词不重置、BaseModal closed 在动画期卸载不触发、自动备份只对第一个用户。
+
 ### Changed — Phase 8：修剩余 P2/P3 + 测试补缺 + 启动脚本进 CI（2026-10-30）
 
 **D-29~D-35 全部修复（均带回归测试 + 负向验证）**

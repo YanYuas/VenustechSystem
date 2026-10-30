@@ -8,7 +8,17 @@ import { notificationApi } from '../api'
 import { toast } from '@/kernel/ui/toast'
 
 const CHECK_INTERVAL = 30000 // 30秒检查一次
+const NOTIFIED_MAX = 500 // 已通知 ID 的容量上限（长会话防无界增长）
 const notifiedIds = new Set<string>() // 已通知过的提醒ID，避免重复
+
+/** D-38：记住已通知 ID；超过上限时按插入顺序淘汰最旧，保持跨 tick 去重语义 */
+function rememberNotified(id: string) {
+  notifiedIds.add(id)
+  if (notifiedIds.size > NOTIFIED_MAX) {
+    const oldest = notifiedIds.values().next().value
+    if (oldest !== undefined) notifiedIds.delete(oldest)
+  }
+}
 
 let timer: ReturnType<typeof setInterval> | null = null
 let running = false
@@ -70,7 +80,7 @@ export function useReminderWatcher() {
         const remindTime = new Date(r.remind_at).getTime()
         // 提醒时间已到（且在过去1小时内，避免太旧的提醒）
         if (remindTime <= now && now - remindTime < 3600000) {
-          notifiedIds.add(r.id)
+          rememberNotified(r.id)
 
           // 1. 桌面通知
           showDesktopNotification(r.title, r.description ?? '启明星提醒')

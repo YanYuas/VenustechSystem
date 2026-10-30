@@ -97,6 +97,20 @@ jobs:
         timeout-minutes: 15
         run: npm run test:coverage
 
+      # 覆盖率报告进 artifact（frontend/coverage/，重点 coverage-summary.json）。
+      # if: always()：测试/阈值失败时也要能下载报告排障；
+      # continue-on-error：上传动作自身失败（网络/artifact 服务抖动）不把 job 判红 ——
+      # 结论只由 vitest 退出码与 thresholds 决定。
+      - name: Upload frontend coverage report
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage
+          path: frontend/coverage/
+          if-no-files-found: ignore
+          retention-days: 7
+
       - name: Build (vite build)
         timeout-minutes: 10
         run: npm run build

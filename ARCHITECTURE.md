@@ -382,9 +382,15 @@ CI：`.github/workflows/{backend,frontend,repo-guard}.yml` + `android-build.yml`
 | D-33 | P3 | `app/seed.py` 用 `datetime.utcnow()`（DeprecationWarning） | `app/seed.py` | ✅ 已修（2026-10-30）：改 `utcnow()`（aware UTC），移除多余 import |
 | D-34 | P3 | `WorkspaceService.delete_root` 不清理 `_SCAN_PROGRESS` 僵尸条目 | `workspace_service.py` | ✅ 已修（2026-10-30）：commit 后 `_progress_clear(root_id)`；404 语义不变 |
 | D-35 | P3 | `app/main.py` 3 处 f-string 日志（非惰性） | `app/main.py` | ✅ 已修（2026-10-30）：改 loguru `{}` 惰性占位，渲染文本不变 |
-| D-36 | P2 | `useSettingsSync.loadDataDir` 硬编码 `http://127.0.0.1:8765/api/v1/health`（未走 `getApiBase()`）→ 移动端/局域网模式健康检查打本机回环，可能误报"后端未连接" | `features/settings/composables/useSettingsSync.ts` | Phase 9 |
-| D-37 | P3 | `useSettingsSync` 的导出/导入 `catch` 为空（依赖 http 层 toast）→ api 层非 http 错误会静默 | 同上 | Phase 9 |
-| D-38 | P3 | `useReminderWatcher` 模块级单例 `notifiedIds` 永不清理（长会话内存缓慢增长；多实例共享状态） | `features/notification/composables/useReminderWatcher.ts` | Phase 9 |
+| D-36 | P2 | `useSettingsSync.loadDataDir` 硬编码 `127.0.0.1:8765` 健康检查（未走 `getApiBase()`）→ 移动端/局域网误报后端未连接 | `useSettingsSync.ts` | ✅ 已修（2026-10-30）：改 `` `${getApiBase()}/health` ``；baseURL 覆盖回归测试 |
+| D-37 | P3 | `useSettingsSync` 导出/导入/包列表 catch 为空（非 http 错误静默） | 同上 | ✅ 已修（2026-10-30）：`reportUnexpected()` 区分 `ApiError`（http 层已提示）与意外错误（补 toast）；4 条测试 |
+| D-38 | P3 | `useReminderWatcher` 模块级 `notifiedIds` 无上限（长会话缓慢增长） | `useReminderWatcher.ts` | ✅ 已修（2026-10-30）：`NOTIFIED_MAX=500` 按插入顺序淘汰最旧；容量回归测试 |
+| D-39 | P3 | `notifiedIds` 淘汰存在"级联再通知"理论风险（被淘汰 id 再次通知会挤掉下一个最旧；当前 id 只增不重复，影响极小） | `useReminderWatcher.ts` | Phase 10 |
+| D-40 | P3 | `BaseSelect` 外部改 `modelValue` 只重置 highlight、不重置搜索词（面板打开时保留旧过滤，正常流程选完即关） | `shared/components/common/BaseSelect.vue` | Phase 10 |
+| D-41 | P3 | `BaseModal` 的 `closed` 事件依赖 150ms setTimeout，关闭动画期间被卸载时 `closed` 不触发（命令式层若依赖 Promise 需兜底） | `shared/components/common/BaseModal.vue` | Phase 10 |
+| D-42 | P2 | `app/main.py` demo_seed 分支无 try/except：`VENUSTECH_DEMO_SEED=true` 时 seed 失败**直接阻断启动**，与其它启动步骤 fail-open 策略不一致 | `app/main.py:59-60` | Phase 10 |
+| D-43 | P2 | `app/main.py` 订阅注册（event/growth handlers）无 try/except：异常会中断启动（与"插件失败不影响启动"策略不一致；事件丢业务仍可继续） | `app/main.py:94/98` | Phase 10 |
+| D-44 | P3 | `app/main.py` 自动备份只对第一个用户执行（多用户模型下其余用户不备份；当前单用户设计无影响） | `app/main.py:83` | Phase 10 |
 
 > 原则：**先修 P0/P1 的"正确性"，再谈结构搬迁**。在事务边界、迁移基线、备份导入还有问题时做领域分包，只是把混乱打包进更漂亮的新目录。
 
@@ -403,6 +409,7 @@ CI：`.github/workflows/{backend,frontend,repo-guard}.yml` + `android-build.yml`
 | **Phase 6** | 修测试发现的真 bug + 补测试缺口 | D-17/18/19（auth 500、logs loguru/envelope）、D-20（avatar IDOR）、D-21（SSE token）全部修复 + 回归测试；后端 +118 测试（1598 收集 / 1588 passed），覆盖率 89.04%→92.02%；前端 +59 测试（196 passed），lines 12.76%→20.95%、阈值棘轮 20/72/52/20 进 CI；新登记 D-22~D-28 | ✅ 本轮完成（2026-10-28） |
 | **Phase 7** | 修 P1/P2 缺陷 + 日志统一 + 覆盖率棘轮 | D-22~D-28 全部修复（aihot 双信封/死分支、大后天解析、AI 响应错误映射、加密单例、日志后端统一、前端定时器/监听幂等）；后端 1706 passed、覆盖率 92.02%→**96%**（CI 阈值 91→95）；前端 239 passed、lines 20.95%→32.24%（阈值 {31,76,59,31} 进 CI）；架构负向探针改 uuid 防并发假红；新登记 D-29~D-35 | ✅ 本轮完成（2026-10-30） |
 | **Phase 8** | 修剩余 P2/P3 缺陷 + 测试补缺 + 启动脚本进 CI | D-29~D-35 全部修复（GlobalSearch 空态、日期 +14 天×2、阶段划分、seed utcnow、扫描僵尸、main f-string）；后端 1743 passed、覆盖率 95.92%（CI 阈值 95）；前端 291 passed、lines 37.44%（阈值 {36,78,63,36}）；新增 windows-startup workflow（Windows runner 真跑 `ops/start.ps1 -Mode dev -Verify`）；新登记 D-36~D-38 | ✅ 本轮完成（2026-10-30） |
+| **Phase 9** | 修剩余 P2/P3 + 生命周期测试 + CI 增强 | D-36~D-38 修复（健康检查 baseURL、同步错误兜底、提醒去重上限）；后端 1823 passed、覆盖率 96.63%（main.py/bootstrap 100%）；前端 344 passed、lines 41.54%（阈值 {40,79,64,40}）；windows-startup 支持 PR 触发 + 前后端覆盖率 artifact；backend 覆盖率阈值对齐 95→96；新登记 D-39~D-44 | ✅ 本轮完成（2026-10-30） |
 
 **明确不做（以及为什么）**：
 

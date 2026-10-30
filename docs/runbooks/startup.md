@@ -82,8 +82,13 @@ dev 模式（后端 :8765 + 前端 :5173）→ 等端口 + `GET /api/v1/health` 
 **触发条件**
 
 - 手动：Actions → `windows-startup` → Run workflow（`workflow_dispatch`）；
-- 自动：push 到 `main` 且改动命中 `ops/**`、`scripts/**`、`backend/**`、`frontend/**`
-  或该 workflow 文件本身（`paths` 过滤 —— Windows 分钟约为 Linux 的 2×，不开 PR 触发）。
+- 自动（push）：push 到 `main` 且改动命中 `ops/**`、`scripts/**`、`backend/**`、`frontend/**`
+  或该 workflow 文件本身（`paths` 过滤）；
+- 自动（PR）：**`pull_request` 也跑，paths 与 push 完全一致** —— 目的是合并前就拦住
+  「启动脚本 / 后端启动链路」回归；不碰上述路径的 PR 不会触发。
+- **PR 成本**：Windows runner 约 **2–3 分钟/次**（约为 Linux 的 2×）。改 `backend/**` 的 PR
+  会同时多跑一次 `backend-ci`（Linux）+ 本 workflow（Windows）；`concurrency` 已按 `ref` 取消
+  旧运行，同一 PR 连续推送只保留最新一次。
 
 **跑什么（8 步）**
 

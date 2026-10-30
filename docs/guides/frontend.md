@@ -357,9 +357,10 @@ npm run test:coverage # 覆盖率报告（v8；text + json-summary，输出到 f
 
 - provider `v8`，`reporter: ['text', 'json-summary']`；`include: src/**`、排除 views/生成物/样式（见 `vitest.config.ts`）。
 - **阈值棘轮（只许上调）**：`vitest.config.ts` 的 `coverage.thresholds` 当前为
-  `{ lines: 36, branches: 78, functions: 63, statements: 36 }`
-  （2026-10-30 Phase8 实测 37.44 / 79.0 / 64.04 / 37.44，各留约 1 个百分点余量防抖动；
-  上调历史：`{12,65,40,12}`（Phase5）→ `{20,72,52,20}`（Phase6）→ `{31,76,59,31}`（Phase7）→ 当前）。
+  `{ lines: 40, branches: 79, functions: 64, statements: 40 }`
+  （2026-10-30 Phase9 实测 41.54 / 80.46 / 65.86 / 41.54，各留约 1 个百分点余量防抖动；
+  上调历史：`{12,65,40,12}`（Phase5）→ `{20,72,52,20}`（Phase6）→ `{31,76,59,31}`（Phase7）
+  → `{36,78,63,36}`（Phase8）→ 当前）。
   `npm run test:coverage` 与 CI 的 `Coverage (threshold ratchet)` 步骤**都会因此失败**，即覆盖率回退会直接卡住合并。
 - **测试并发**：`test.maxWorkers: 2`。jsdom + `@vue/test-utils` 组件测试内存占用高，默认按 CPU 核数并发在多文件（18+）时会 OOM（本机 16 核曾 `FATAL ERROR: Zone Allocation failed`）；显式限并发使本地与 2 核 CI runner 行为一致。
 - **规则**：阈值只允许上调；若因重构/删测试需要下调，**必须在 `CHANGELOG.md` 说明理由**并经评审，不允许静默调低。
