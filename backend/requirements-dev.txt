@@ -10,12 +10,12 @@
 # ============================================================
 -r requirements.txt
 
-pytest==8.3.3
+pytest==9.2.0
 ruff==0.6.2
 
 # 覆盖率（Phase5 测试质量基建）：pytest-cov 5.0.0 是支持 pytest 8.3 的稳定版，
 # coverage 7.17.0 为其解析出的实际版本，两者都 pin 住避免 CI/本机漂移。
 # 本地与 CI 同一条命令：
 #   pytest tests -q --cov=app --cov-report=term-missing
-pytest-cov==5.0.0
+pytest-cov==7.1.0
 coverage==7.17.0
