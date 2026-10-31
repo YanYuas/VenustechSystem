@@ -175,6 +175,58 @@ class TestAuthEndpoints:
         assert data["valid"] is False
         assert data["reason"] == "API Key 无效或无权限（HTTP 401/403）"
 
+    # ---------- Phase13 D-50：PATCH /auth/me 文本字段输入约束 ----------
+    def test_patch_me_rejects_empty_nickname(self, client, user_state):
+        r = client.patch("/api/v1/auth/me", json={"nickname": ""})
+
+        assert r.status_code == 400
+        body = r.json()
+        assert body["code"] == 1001
+        assert body["message"].startswith("参数错误")
+
+    @pytest.mark.parametrize(
+        "field,value",
+        [("avatar", "a" * 501), ("theme", "t" * 21)],
+    )
+    def test_patch_me_rejects_oversized_text_fields(self, client, user_state, field, value):
+        r = client.patch("/api/v1/auth/me", json={field: value})
+
+        assert r.status_code == 400
+        assert r.json()["code"] == 1001
+
+    def test_patch_me_accepts_avatar_at_max_length(self, client, user_state):
+        avatar = "a" * 500
+        data = _api_data(client.patch("/api/v1/auth/me", json={"avatar": avatar}))
+
+        assert data["avatar"] == avatar
+        assert len(data["avatar"]) == 500
+
+    # ---------- Phase13 D-51：verify-api 空 Key 不调用 provider ----------
+    @pytest.mark.parametrize("api_key", ["", "   ", "\t\n"])
+    def test_verify_api_rejects_blank_key_without_calling_provider(
+        self, client, monkeypatch, api_key
+    ):
+        calls: list[str] = []
+
+        class _SpyVerifyService:
+            def __init__(self, db, user):
+                pass
+
+            async def verify_api(self, key):
+                from app.schemas.auth import ApiVerifyResult
+
+                calls.append(key)
+                return ApiVerifyResult(valid=True)
+
+        monkeypatch.setattr("app.api.auth.AIService", _SpyVerifyService)
+        r = client.post("/api/v1/auth/verify-api", json={"api_key": api_key})
+
+        assert r.status_code == 400
+        body = r.json()
+        assert body["code"] == 1001
+        assert body["message"] == "API Key 不能为空"
+        assert calls == []          # 先校验后调用：provider 零调用
+
 
 # ================================================================
 # 二、avatar：5 个此前未测的只读/配置端点

@@ -120,7 +120,16 @@ function onMouseMove(e: MouseEvent) {
   }
 }
 function onMouseUp() {
-  dragging = null
+  // D-54：拖拽结束时清零该节点速度，否则力场在拖拽期间累积的 vx/vy 会在松手后
+  // 变成一次性惯性冲量（节点被"甩"出去）。位置保留，只清速度。
+  if (dragging) {
+    const node = nodeMap.value.get(dragging)
+    if (node) {
+      node.vx = 0
+      node.vy = 0
+    }
+    dragging = null
+  }
 }
 function onNodeClick(id: string) {
   emit('open-doc', id)
@@ -140,13 +149,29 @@ async function loadGraph() {
     graphData.value = data
     if (data.nodes.length) {
       initSimulation(data)
-      rafId = requestAnimationFrame(tick)
+      // D-54：后台标签页不启动动画（hidden 时不消耗 CPU），切回前台再由 visibilitychange 重启
+      if (!document.hidden) rafId = requestAnimationFrame(tick)
     }
   } catch {
     toast.error('图谱加载失败')
   } finally {
     loading.value = false
   }
+}
+
+/** D-54：统一启停动画循环，保证 rafId 与实际帧状态一致 */
+function stopAnimation() {
+  if (rafId) {
+    cancelAnimationFrame(rafId)
+    rafId = 0
+  }
+}
+function startAnimation() {
+  if (!rafId && simNodes.value.length > 0) rafId = requestAnimationFrame(tick)
+}
+function onVisibilityChange() {
+  if (document.hidden) stopAnimation()
+  else startAnimation()
 }
 
 function resize() {
@@ -161,13 +186,15 @@ onMounted(() => {
   window.addEventListener('mousemove', onMouseMove)
   window.addEventListener('mouseup', onMouseUp)
   window.addEventListener('resize', resize)
+  document.addEventListener('visibilitychange', onVisibilityChange)
   loadGraph()
 })
 onUnmounted(() => {
-  cancelAnimationFrame(rafId)
+  stopAnimation()
   window.removeEventListener('mousemove', onMouseMove)
   window.removeEventListener('mouseup', onMouseUp)
   window.removeEventListener('resize', resize)
+  document.removeEventListener('visibilitychange', onVisibilityChange)
 })
 </script>
 

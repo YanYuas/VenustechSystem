@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
+from app.core.exceptions import ValidationException
 from app.core.response import success
 from app.core.security import encrypt_secret
 from app.schemas.auth import (
@@ -94,5 +95,8 @@ def update_me(data: UpdateConfigRequest, user: User = Depends(get_current_user),
 @router.post("/auth/verify-api")
 async def verify_api(data: VerifyApiRequest, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     api_key = data.api_key.strip()
+    # D-51：空/纯空白 Key 直接 400/1001，不建 client 打 provider（避免无意义网络请求）
+    if not api_key:
+        raise ValidationException("API Key 不能为空")
     result: ApiVerifyResult = await AIService(db, user).verify_api(api_key)
     return success(result)

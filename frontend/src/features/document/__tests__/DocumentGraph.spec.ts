@@ -47,6 +47,24 @@ function makeGraph(patch: Partial<GraphData> = {}): GraphData {
   } as unknown as GraphData
 }
 
+/** D-54：可控 document.hidden（jsdom 默认 false） */
+function setHidden(hidden: boolean) {
+  Object.defineProperty(document, 'hidden', { configurable: true, get: () => hidden })
+}
+
+/** 执行 n 帧（每帧都消费当前排队的 rAF 回调） */
+function runFrames(n: number) {
+  for (let i = 0; i < n; i++) runOneFrame()
+}
+
+/** 读取节点 translate 坐标 */
+function nodeXY(wrapper: ReturnType<typeof mountGraph>, index = 0): [number, number] {
+  const transform = wrapper.findAll('.doc-graph__node')[index].attributes('transform') ?? ''
+  const m = /translate\(([-\d.]+),\s*([-\d.]+)\)/.exec(transform)
+  if (!m) throw new Error(`无法解析 transform: ${transform}`)
+  return [Number(m[1]), Number(m[2])]
+}
+
 /** 可控 rAF：只在测试里手动执行帧回调，避免真实动画循环 */
 let rafCallbacks: FrameRequestCallback[] = []
 const rafMock = vi.fn((cb: FrameRequestCallback) => {
@@ -80,6 +98,7 @@ beforeEach(() => {
 
 afterEach(() => {
   mounted.splice(0).forEach((w) => w.unmount())
+  delete (document as unknown as Record<string, unknown>).hidden
   vi.unstubAllGlobals()
 })
 
@@ -239,8 +258,9 @@ describe('DocumentGraph：模拟与生命周期', () => {
     expect(wrapper.findAll('.doc-graph__edge')).toHaveLength(1)
   })
 
-  it('卸载时取消动画帧并移除 window 监听', async () => {
+  it('卸载时取消动画帧并移除 window / document 监听', async () => {
     const removeSpy = vi.spyOn(window, 'removeEventListener')
+    const docRemoveSpy = vi.spyOn(document, 'removeEventListener')
     const wrapper = mountGraph()
     await flushPromises()
 
@@ -251,5 +271,85 @@ describe('DocumentGraph：模拟与生命周期', () => {
     expect(removeSpy.mock.calls.map((c) => c[0])).toEqual(
       expect.arrayContaining(['mousemove', 'mouseup', 'resize']),
     )
+    expect(docRemoveSpy.mock.calls.map((c) => c[0])).toContain('visibilitychange')
+  })
+
+  it('页面隐藏时取消 rAF，切回前台后重启（D-54）', async () => {
+    const wrapper = mountGraph()
+    await flushPromises()
+    const callsWhileVisible = rafMock.mock.calls.length
+
+    setHidden(true)
+    document.dispatchEvent(new Event('visibilitychange'))
+    expect(cancelRafMock).toHaveBeenCalledTimes(1)
+
+    // 隐藏期间不再有新帧入队
+    setHidden(false)
+    document.dispatchEvent(new Event('visibilitychange'))
+    expect(rafMock.mock.calls.length).toBeGreaterThan(callsWhileVisible)
+    void wrapper
+  })
+
+  it('加载完成时页面处于隐藏态则不启动动画，visible 后再启动（D-54）', async () => {
+    setHidden(true)
+    const wrapper = mountGraph()
+    await flushPromises()
+
+    expect(rafMock).not.toHaveBeenCalled()
+    expect(wrapper.findAll('.doc-graph__node')).toHaveLength(2)
+
+    setHidden(false)
+    document.dispatchEvent(new Event('visibilitychange'))
+    expect(rafMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('空图时 visible 也不会启动动画循环（D-54）', async () => {
+    graphApi.mockResolvedValue(makeGraph({ nodes: [], edges: [] }))
+    setHidden(true)
+    mountGraph()
+    await flushPromises()
+
+    setHidden(false)
+    document.dispatchEvent(new Event('visibilitychange'))
+
+    expect(rafMock).not.toHaveBeenCalled()
+  })
+
+  it('拖拽松手会清零速度：释放后单帧位移很小（无惯性冲量，D-54）', async () => {
+    graphApi.mockResolvedValue(
+      makeGraph({ nodes: [node({ id: 'd1' })], edges: [] }) as unknown as GraphData,
+    )
+    const wrapper = mountGraph()
+    await flushPromises()
+    const svg = wrapper.find('svg').element
+    svg.getBoundingClientRect = () => ({ left: 0, top: 0 }) as DOMRect
+
+    // 拖到远离中心的位置（中心 400,250）；tick 的力阶段对 dragging 节点照常累加
+    // vx/vy，只有"清速度"才能阻止松手后的惯性冲量
+    const [startX, startY] = nodeXY(wrapper)
+    await wrapper.findAll('.doc-graph__node')[0].trigger('mousedown', {
+      clientX: startX,
+      clientY: startY,
+    })
+    window.dispatchEvent(new MouseEvent('mousemove', { clientX: 30, clientY: 250 }))
+    await wrapper.vm.$nextTick()
+
+    // ⚠️ DOM 渲染是异步的：每轮 tick 后必须 nextTick 再读坐标，否则读到的是旧 transform
+    runFrames(60)
+    await wrapper.vm.$nextTick()
+
+    window.dispatchEvent(new MouseEvent('mouseup'))
+    const [beforeX] = nodeXY(wrapper)
+    runFrames(1)
+    await wrapper.vm.$nextTick()
+    const [afterX] = nodeXY(wrapper)
+
+    // 若未清零速度，60 帧累积的 vx 会让首帧位移达到 ~90px
+    expect(Math.abs(afterX - beforeX)).toBeLessThan(5)
+
+    runFrames(3)
+    await wrapper.vm.$nextTick()
+    const [finalX] = nodeXY(wrapper)
+    expect(Math.abs(finalX - beforeX)).toBeLessThan(20)
   })
 })

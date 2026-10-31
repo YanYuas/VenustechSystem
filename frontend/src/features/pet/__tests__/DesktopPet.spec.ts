@@ -261,7 +261,7 @@ describe('DesktopPet：右键菜单与互动', () => {
     expect(api.updateStats).not.toHaveBeenCalled()
   })
 
-  it('玩耍：精力 <20 时转为睡觉动作，不提交增量（自定义提示会被随机气泡覆盖，见报告记录）', async () => {
+  it('玩耍：精力 <20 时转为睡觉并显示自定义关怀提示，不提交增量（D-53）', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0)
     api.getStats.mockResolvedValue(stats({ energy: 10 }))
     const wrapper = mountPet()
@@ -271,10 +271,14 @@ describe('DesktopPet：右键菜单与互动', () => {
     await menuItem(wrapper, '玩耍').trigger('click')
     await flush(wrapper)
 
-    // setAction('sleep') 内部的随机气泡覆盖了「好累哦...想休息一下...」（random=0 → 'Zzz...'）
-    expect(wrapper.find('.pet__bubble').text()).toBe('Zzz...')
+    // 先 setAction('sleep') 再写自定义提示 → 文案不再被随机气泡覆盖
+    expect(wrapper.find('.pet__bubble').text()).toBe('好累哦...想休息一下...')
     expect(wrapper.find('.pet').classes()).toContain('pet--sleep')
     expect(api.updateStats).not.toHaveBeenCalled()
+
+    // 2s 后气泡自动收起
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(wrapper.find('.pet__bubble').exists()).toBe(false)
   })
 
   it('玩耍：精力充足时 dance 并提交 mood/energy/intimacy 增量', async () => {
@@ -376,6 +380,31 @@ describe('DesktopPet：降级与状态展示', () => {
 
     expect(wrapper.find('.pet').classes()).toContain('pet--idle')
     expect(wrapper.find('.pet__bubble').exists()).toBe(false)
+  })
+
+  it('挂载后立即卸载：初始 1s 问候定时器被清理，推进 10s 无气泡且无残留定时器（D-52）', async () => {
+    const wrapper = mountPet()
+    await flush(wrapper)
+
+    wrapper.unmount()
+    mounted.splice(0)
+
+    // 关键断言：卸载瞬间所有定时器都应被清掉（含 1s 首条问候）
+    expect(vi.getTimerCount()).toBe(0)
+
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(vi.getTimerCount()).toBe(0)
+    expect(wrapper.find('.pet__bubble').exists()).toBe(false)
+  })
+
+  it('正常路径：未卸载时 1s 仍会自动冒泡（D-52 修复不误伤首条问候）', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0)
+    const wrapper = mountPet()
+    await flush(wrapper)
+
+    await vi.advanceTimersByTimeAsync(1000)
+
+    expect(wrapper.find('.pet__bubble').text()).toBe('今天也要加油哦~')
   })
 
   it('卸载后移除事件监听且清理定时器（不崩溃）', async () => {

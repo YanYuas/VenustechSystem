@@ -1,6 +1,6 @@
 # 启明星系统 · 开发规范
 
-> 最后更新：2026-09-27
+> 最后更新：2026-10-31
 
 ## 1. 分支策略
 
@@ -43,6 +43,27 @@ Remove-Item "C:\Users\21722\qimingxing-git-repo\*.lock" -Force
 - 描述用中文，简洁明了
 - 一次提交只做一件事
 - 涉及文件移动用 `git mv` 保持历史
+
+### 2.1 PR 流程与协作治理（模板 / CODEOWNERS / Dependabot）
+
+- **什么时候走 PR**：跨模块/多文件改动、依赖升级、外部贡献、需要留审查记录的改动。§1 的
+  「小改动可直接在 main 提交」仍适用于单点修复；但**改 CI、迁移、启动器、依赖**建议一律走 PR。
+- **PR 模板**：[`.github/pull_request_template.md`](../../.github/pull_request_template.md) —— 打开 PR 时自动带出，
+  必须如实填写「影响面 / **已验证项** / 回滚方案 / 关联 issue」。已验证项的「全绿」口径与 §8 一致：
+  `check_all --strict`（含 ruff / pytest / 架构守护 / 文档链接等）、前端
+  `lint + format:check + typecheck + test + build`；勾不了就写原因（如「本机无 Node，build 由 CI 覆盖」），
+  **不要空勾**。
+- **CODEOWNERS**：[`.github/CODEOWNERS`](../../.github/CODEOWNERS) 为 `* @YanYuas`（单人维护）——
+  所有 PR 自动请求维护者 review；强制力来自 main 分支保护里的 "Require review from Code Owners"
+  （仓库设置，不是本文件能决定的）。
+- **Dependabot**：[`.github/dependabot.yml`](../../.github/dependabot.yml) 每周一 09:00（Asia/Shanghai）
+  检查 4 处依赖：`backend/`（pip）、`frontend/`（npm）、`ops/server/`（npm）、GitHub Actions。
+  **分组策略**：同生态内按「一起升级更安全」分组（pytest 生态 / FastAPI 栈 / DB 栈 /
+  前端构建-测试-lint 工具链 / Capacitor），且只有 **minor + patch** 归组；**major 升级单独开 PR**，
+  强制人工评估破坏性变更。Dependabot PR 的合并口径同普通 PR：至少跑对应门禁
+  （后端 ruff + pytest，前端 lint + test + build，或直接 `check_all --strict`）。
+- **Issue 模板**：[`.github/ISSUE_TEMPLATE/`](../../.github/ISSUE_TEMPLATE) 含 bug / feature 两个模板
+  （自动带出复现步骤 / 环境 / 验收标准），新建 issue 时选择即可。
 
 ## 3. 后端规范（FastAPI + Python）
 

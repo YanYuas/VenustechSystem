@@ -358,9 +358,10 @@ npm run test:coverage # 覆盖率报告（v8；text + json-summary，输出到 f
 - provider `v8`，`reporter: ['text', 'json-summary']`；`include: src/**`、排除 views/生成物/样式（见 `vitest.config.ts`）。
 - **阈值棘轮（只许上调）**：`vitest.config.ts` 的 `coverage.thresholds` 当前为
   `{ lines: 81, branches: 88, functions: 48, statements: 81 }`
-  （2026-10-31 Phase12 实测 82.09 / 89.73 / 49.2 / 82.09，两轮复测一致；lines/branches 各留约 1pp，functions 实测 49.2 留约 1.2pp；
+  （2026-10-31 Phase13 实测 82.18 / 89.91 / 49.44 / 82.18，各留 1.1~1.9pp 余量，**本轮未调整阈值**；
+  Phase12 实测 82.09 / 89.73 / 49.2 曾据此把 functions 45→48。
   上调历史：`{12,65,40,12}`（Phase5）→ `{20,72,52,20}`（Phase6）→ `{31,76,59,31}`（Phase7）
-  → `{36,78,63,36}`（Phase8）→ `{40,79,64,40}`（Phase9）→ `{43,81,67,43}`（Phase10）→ `{81,88,45,81}`（Phase11）→ 当前）。
+  → `{36,78,63,36}`（Phase8）→ `{40,79,64,40}`（Phase9）→ `{43,81,67,43}`（Phase10）→ `{81,88,45,81}`（Phase11）→ `{81,88,48,81}`（Phase12）→ 当前）。
   `npm run test:coverage` 与 CI 的 `Coverage (threshold ratchet)` 步骤**都会因此失败**，即覆盖率回退会直接卡住合并。
 - **统计面变化时如何调整阈值（规则）**：覆盖率的百分比分母会随"测试真实 import 了哪些模块"变化，
   因此**每次调阈值必须同时记录「百分比」与「covered/total 绝对值」，用绝对值证明是上升而非回退**。
@@ -370,7 +371,8 @@ npm run test:coverage # 覆盖率报告（v8；text + json-summary，输出到 f
      并在 `vitest.config.ts` 注释与本文件写明"分母变化量 + covered 增量"，**不得**悄悄下调；
   3. 若 covered 变小 → 视为真实回退，禁止下调阈值，必须补测试；
   4. 百分比阈值仍按"实测留约 1pp"设置，绝对值变化记录在回信/CHANGELOG；
-  5. 百分比小幅波动（如 lines 82.42→82.09）需**连跑两次确认稳定**后再判定，避免把抖动当回退。
+  5. 百分比小幅波动（如 lines 82.42→82.09）需**连跑两次确认稳定**后再判定，避免把抖动当回退；
+  6. **不为"升"而抬阈值**：当实测已满足当前阈值且余量合理（≥1pp）时保持不动，避免把正常抖动变成门禁红。
   例 1（Phase11 task-46）：`router` 测试真实 `await` 24 个 view 模块后，
   lines 44.01%→82.4%（covered 3056→6092）、branches 82.36%→89.92%（832→1026）、
   functions 65.86%→46.36% 但 **covered 245→274 且分母 382→591**（新模块进入统计面）→
@@ -378,6 +380,13 @@ npm run test:coverage # 覆盖率报告（v8；text + json-summary，输出到 f
   例 2（Phase12 task-50）：补 DesktopPet/DocumentGraph/AppIcon 测试后，
   functions **分母 591→628、covered 274→309**（绝对值上升）→ functions 阈值 45→48；
   lines 82.42→82.09 连跑两次稳定，属测量波动，lines/branches 维持 81/88。
+  例 3（Phase13 task-52）：补 6 条回归后实测 82.18/89.91/49.44，均满足且余量 1.1~1.9pp → **阈值保持不动**。
+- **负向验证的有效性（测试区分力）**：负向验证（临时改坏实现 → 用例必红 → 还原）是判断测试是否有区分力的唯一手段；
+  若改坏实现后用例仍绿，说明**测试无效**，必须先修测试再认为修复完成。踩过的坑：
+  - 异步 DOM：Vue 组件状态更新后 DOM 是异步渲染的，手动执行多帧后**没有 `await nextTick()` 就读 DOM** 会读到旧值，
+    导致"改不改实现读数都一样"（Phase13 D-54 拖拽惯性用例即此因）。规则：任何基于 DOM 属性的帧间对比都必须先 `await nextTick()`。
+  - 不要断言未映射/不存在的东西（如未映射的 CSS class），否则断言与实现自相矛盾。
+  - 断言分辨率要够：区分阈值应显著大于正常波动（例：松手首帧位移有清零 ≈1.6px、无清零 ≈96px，取 `<5px` 才有区分力）。
 - **测试并发**：`test.maxWorkers: 2`。jsdom + `@vue/test-utils` 组件测试内存占用高，默认按 CPU 核数并发在多文件（18+）时会 OOM（本机 16 核曾 `FATAL ERROR: Zone Allocation failed`）；显式限并发使本地与 2 核 CI runner 行为一致。
 - **规则**：阈值只允许上调；若因重构/删测试需要下调，**必须在 `CHANGELOG.md` 说明理由**并经评审，不允许静默调低。
 - 口径提醒：`lines` 的分母是 `src/**/*.{ts,vue}` 全量实现文件（含大量未测 Vue 组件），且 views 按约定排除；

@@ -397,11 +397,12 @@ CI：`.github/workflows/{backend,frontend,repo-guard}.yml` + `android-build.yml`
 | D-47 | P3 | `.bak` 秒级时间戳同秒冲突（Windows 抛错 / POSIX 覆盖回滚副本） | `backup_service.py` | ✅ 已修（2026-10-31）：`YYYYmmdd_HHMMSS_mmm_<uuid6>`；同秒双恢复测试 |
 | D-48 | P2 | `event_bus` async handler 在无运行 loop 时 `get_event_loop()` 自动创建未运行 loop → `create_task` 排队永不执行，handler 静默丢失（`called` 仍 +1） | `app/core/event_bus.py` | ✅ 已修（2026-10-31）：改 `get_running_loop()`；无运行 loop 逐 handler `asyncio.run()` 兜底；排队 task 延迟失败/取消经 `add_done_callback` 写入 history/stats + 日志，不静默 |
 | D-49 | P3 | `task_service` 批量失败只 `failed += 1`，无日志/原因（排障无信息） | `app/services/task_service.py` | ✅ 已修（2026-10-31）：缺失/越权/异常分支均 `logger.warning("批量操作失败: task_id={} action={} reason={}")`；`BatchTaskResult` 契约不变 |
-| D-50 | P3 | `PATCH /auth/me` 的 `nickname` 无 `min_length`（`POST /auth/init` 要求 ≥1）→ 允许把昵称置空，前端显示空白名字 | `app/schemas/auth.py:32` | Phase 13 |
-| D-51 | P3 | `POST /auth/verify-api` 对空 Key 只 `.strip()` 不校验非空 → 空字符串会真实请求 provider（浪费一次网络/延迟后才映射 401 文案） | `app/api/auth.py:96` | Phase 13 |
-| D-52 | P3 | `DesktopPet.vue:141` 初始 1s 定时器未保存句柄/未纳入卸载清理 → 1s 内卸载仍执行一次 `randomMessage()` 并遗留 3s 气泡定时器 | `features/pet/components/DesktopPet.vue` | Phase 13 |
-| D-53 | P3 | `DesktopPet` 低精力玩耍的自定义提示语被 `setAction('sleep')` 内部随机气泡覆盖（与 feed/rest 的文案顺序不一致）；且 `petClass` 未映射 dance/read/run/wave 等动作类 | 同上 `:286-293` | Phase 13 |
-| D-54 | P3 | `DocumentGraph` 的力导向 `requestAnimationFrame` tick 无 `document.hidden` 暂停/无节流 → 后台标签页持续耗电；拖拽结束存在惯性冲量 | `features/document/components/DocumentGraph.vue` | Phase 13 |
+| D-50 | P3 | `PATCH /auth/me` 的 nickname 无 `min_length` → 可置空昵称 | `schemas/auth.py` | ✅ 已修（2026-10-31）：nickname `min_length=1`；avatar/theme 按 DB 列长加 `max_length`（500/20，不做白名单并说明理由） |
+| D-51 | P3 | `verify-api` 空 Key 真实请求 provider | `api/auth.py` | ✅ 已修（2026-10-31）：strip 后为空先 `ValidationException`（400/1001），不构造 AIService；spy 断言三种空白零调用 |
+| D-52 | P3 | `DesktopPet` 初始 1s 定时器未保存句柄/未卸载清理 | `DesktopPet.vue` | ✅ 已修（2026-10-31）：`initialMessageTimer` + onUnmounted clearTimeout；卸载瞬间 `getTimerCount()===0` 测试 |
+| D-53 | P3 | 低精力玩耍自定义提示被 `setAction` 随机气泡覆盖；petClass 未映射部分动作 | 同上 | ✅ 已修（2026-10-31）：先 setAction 再写提示（与 feed/rest 一致）；petClass 注释说明只映射有样式的动作，不补死类 |
+| D-54 | P3 | `DocumentGraph` 力导向 tick 无 `document.hidden` 暂停/拖拽惯性 | `DocumentGraph.vue` | ✅ 已修（2026-10-31）：visibilitychange hidden 停/visible 重启 + 卸载移除；mouseup 清零 vx/vy；测试区分度 1.6px vs 96px |
+| D-55 | P3 | `DesktopPet` 的 feed/play/rest 里"2~3s 自动收起气泡"用未保存句柄的匿名 setTimeout → 定时器触发前卸载会残留（与 D-52 同类，影响更小） | `features/pet/components/DesktopPet.vue` | Phase 14 |
 
 > 原则：**先修 P0/P1 的"正确性"，再谈结构搬迁**。在事务边界、迁移基线、备份导入还有问题时做领域分包，只是把混乱打包进更漂亮的新目录。
 
@@ -424,6 +425,7 @@ CI：`.github/workflows/{backend,frontend,repo-guard}.yml` + `android-build.yml`
 | **Phase 10** | 修剩余 P2/P3 + 组件测试 + 备份恢复安全测试 | D-39~D-45 修复（提醒 TTL/容量、BaseSelect/BaseModal、main.py fail-open 一致性+多用户备份、多行 %-style 扫描）；后端 1841 passed、覆盖率 96.68%（main.py 100%）；前端 403 passed、lines 44.01%（阈值 {43,81,67,43}）；新增 `test_backup_import_subprocess.py`（10 条，子进程隔离真实恢复/拒绝坏包）；新登记 D-46/D-47 | ✅ 本轮完成（2026-10-30） |
 | **Phase 11** | 数据安全修复 + 路由/壳层测试 + 覆盖率审计 | D-46/D-47 修复（备份恢复原子替换+自动回滚、.bak 命名冲突）；后端 1897 passed、覆盖率 **96.68%→97.9%**（CI 阈值 96→97）；前端 457 passed、lines **44.01%→82.42%**（阈值改 {81,88,45,81}，新增「统计面变化」的棘轮规则）；app/router 懒加载路径全部真实 import 防失效；新登记 D-48/D-49 | ✅ 本轮完成（2026-10-31） |
 | **Phase 12** | 事件总线修复 + API 端点补测 + 大型组件测试 | D-48/D-49 修复（异步 handler 静默丢失、批量失败可观测性）；后端 1927 passed、覆盖率 **97.98%→98.33%**（CI 阈值保持 97）；前端 504 passed / 34 files、lines 82.09%（阈值 {81,88,48,81}）；A 类 API 端点（auth/avatar/conversation/asset/pet）未覆盖行清零；新登记 D-50~D-54 | ✅ 本轮完成（2026-10-31） |
+| **Phase 13** | 输入校验/前端行为收尾 + 仓库治理 | D-50~D-54 修复（昵称/verify-api 校验、桌宠定时器与文案顺序、文档图后台暂停/惯性）；后端 1965 passed、覆盖率 **98.33%→98.95%**（CI 阈值 97→98）；前端 510 passed、lines 82.18%（阈值 {81,88,48,81} 保持）；GitHub 治理落地（Dependabot 4 生态分组 / PR 模板 / Issue 模板 / CODEOWNERS / development.md §2.1）；新登记 D-55 | ✅ 本轮完成（2026-10-31） |
 
 **明确不做（以及为什么）**：
 

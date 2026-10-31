@@ -1,0 +1,181 @@
+# ============================================================
+# Dependabot：依赖升级 PR 自动化（GitHub 原生，无需额外服务）
+#
+# 覆盖仓库里**所有带 lockfile 的依赖来源**（4 处）：
+#   - pip            /backend        requirements.txt + requirements-dev.txt（运行时 + 测试/lint）
+#   - npm            /frontend       package-lock.json（Vue/Vite 主前端）
+#   - npm            /ops/server     package-lock.json（统一 Web 服务，仅 http-proxy）
+#   - github-actions /              各 workflow 里的 actions/* 版本
+#
+# 防 PR 爆炸（groups）的策略：
+#   1) 同生态内按「一起升级更安全 / 更省事」分组（如 pytest 与 pytest-cov 必须同步）；
+#   2) 兜底组只收 **minor + patch**；**major 升级不归组**，各自单独开 PR 强制人工评估
+#      （破坏性变更要看 CHANGELOG 并跑全量门禁）；
+#   3) 每个生态都有 open-pull-requests-limit 上限。
+# 官方语法：https://docs.github.com/code-security/dependabot/dependabot-options-reference
+#
+# 合并口径与普通 PR 相同：见 docs/guides/development.md §2.1 与 PR 模板的「已验证项」。
+# ============================================================
+version: 2
+
+updates:
+  # ==================== 后端 Python（pip）====================
+  - package-ecosystem: pip
+    directory: "/backend"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: "Asia/Shanghai"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      # pytest 8.x 与 pytest-cov 是成对兼容的（插件按 pytest 次版本校验），必须同 PR
+      python-test-toolchain:
+        patterns:
+          - "pytest*"
+          - "coverage*"
+      # FastAPI 与 uvicorn / pydantic / multipart 一起升，避免只升一半导致启动失败
+      python-fastapi-stack:
+        patterns:
+          - "fastapi"
+          - "uvicorn*"
+          - "pydantic*"
+          - "python-multipart"
+      # ORM 与迁移工具同步（alembic 依赖 SQLAlchemy 版本）
+      python-db-stack:
+        patterns:
+          - "sqlalchemy*"
+          - "alembic*"
+      # 兜底：其余 minor+patch 合成一个 PR；major 不进组（单独开，需人工评估）
+      python-other:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # ==================== 前端（npm）====================
+  - package-ecosystem: npm
+    directory: "/frontend"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: "Asia/Shanghai"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      # 构建链：vite 与插件/TS/vue-tsc 版本互相约束，分开升容易得到「build 能过但 typecheck 崩」
+      frontend-build-toolchain:
+        patterns:
+          - "vite"
+          - "@vitejs/*"
+          - "typescript"
+          - "vue-tsc"
+          - "sass"
+          - "unplugin-*"
+          - "@types/node"
+        update-types:
+          - "minor"
+          - "patch"
+      # 测试链：vitest 与 jsdom/@vitest/* 版本兼容性强绑
+      frontend-test-toolchain:
+        patterns:
+          - "vitest"
+          - "@vitest/*"
+          - "jsdom"
+          - "@vue/test-utils"
+        update-types:
+          - "minor"
+          - "patch"
+      # Lint/格式化：eslint 9 flat config 与 typescript-eslint / prettier 联动
+      frontend-lint-format:
+        patterns:
+          - "eslint"
+          - "eslint-*"
+          - "@eslint/*"
+          - "typescript-eslint"
+          - "vue-eslint-parser"
+          - "prettier"
+        update-types:
+          - "minor"
+          - "patch"
+      # 运行时框架：Vue 生态一起升（element-plus 对 vue 版本敏感）
+      frontend-runtime:
+        patterns:
+          - "vue"
+          - "vue-router"
+          - "pinia"
+          - "element-plus"
+          - "@element-plus/*"
+          - "dayjs"
+          - "marked"
+          - "dompurify"
+          - "jszip"
+        update-types:
+          - "minor"
+          - "patch"
+      # Capacitor 全家桶：Android 壳与前端必须同大版本
+      capacitor-stack:
+        patterns:
+          - "@capacitor/*"
+          - "@capacitor-community/*"
+        update-types:
+          - "minor"
+          - "patch"
+      # 兜底：其余 minor+patch；major 单独开 PR
+      frontend-other:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # ==================== 统一 Web 服务（npm，ops/server）====================
+  - package-ecosystem: npm
+    directory: "/ops/server"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: "Asia/Shanghai"
+    open-pull-requests-limit: 3
+    labels:
+      - "dependencies"
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      # 只有一个运行时依赖（http-proxy），仍归组以保持「minor+patch 一个 PR」的统一口径
+      ops-server-deps:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # ==================== GitHub Actions ====================
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: "Asia/Shanghai"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "ci"
+    commit-message:
+      prefix: "chore(ci-deps)"
+    groups:
+      # actions/* 全量同 PR：改动集中在 workflow 文件，一次跑完 5 个 workflow 即可验证
+      github-actions:
+        patterns:
+          - "*"

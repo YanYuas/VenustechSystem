@@ -7,6 +7,27 @@
 
 ## [Unreleased]
 
+### Changed — Phase 13：输入校验/前端行为收尾 + 仓库治理（2026-10-31）
+
+**D-50~D-54 修复**
+- **D-50（P3）** `PATCH /auth/me` 的 `nickname` 补 `min_length=1`（此前可置空）；`avatar`/`theme` 按 DB 列长加 `max_length`（500/20，不做白名单：avatar 是路径非枚举、theme 在前端 localStorage 且白名单会误拒历史值）。
+- **D-51（P3）** `POST /auth/verify-api` 空 Key 先校验（400/1001），**不再构造 client 打网络**；spy 断言空白 key 零调用、非空调用一次且已 strip。
+- **D-52** `DesktopPet` 初始 1s 问候定时器保存句柄并在卸载时清理（1s 内卸载不再触发 randomMessage / 遗留气泡 timer）。
+- **D-53** `DesktopPet` 低精力玩耍改为先 `setAction('sleep')` 再写自定义提示（不再被随机气泡覆盖）；`petClass` 注释说明只映射有样式的动作类，不补无样式死类。
+- **D-54** `DocumentGraph` 监听 `visibilitychange`（hidden 取消 rAF / visible 重启 / 卸载移除），hidden 时不启动动画；拖拽 `mouseup` 清零 vx/vy 消除惯性冲量。
+
+**测试与覆盖率**
+- 后端：**1965 passed**（1927 → +38）；覆盖率 **98.33% → 98.95%**（missed 169→106）；新增小仓库语义/document 边界/对话 AI 失败降级/dashboard 排序与项目降级/工具与加密/仓库过滤/deps 并发兜底等 37 条；CI 阈值 97→**98%**。
+- 前端：**510 passed / 34 files**（504 → +6）；lines 82.18%、branches 89.91%、functions 49.44%；阈值保持 **{81,88,48,81}**（按新规则"不为升而抬阈值，余量≥1pp 保持不动"）。
+- **负向验证有效性**成为固定规则：D-54 首次篡改没有变红 → 查明是测试读过期 DOM transform（同步 runFrames 后未 `await nextTick()`），修正后区分度 1.6px vs 96px；已写入 `docs/guides/frontend.md §九`。
+
+**仓库治理（GitHub）**
+- 新增 `.github/dependabot.yml`（pip `/backend`、npm `/frontend`、npm `/ops/server`、github-actions，weekly + 分组防 PR 爆炸；兜底组只收 minor/patch，major 单独 PR）、`.github/pull_request_template.md`（含已验证项清单/影响面/回滚）、`.github/ISSUE_TEMPLATE/{bug_report,feature_request}.md`、`.github/CODEOWNERS`。
+- `docs/guides/development.md` 新增 §2.1「PR 流程与协作治理」；根 `CONTRIBUTING.md` 补链接。
+
+**新登记 1 个问题（D-55，未修）**
+- D-55（P3）`DesktopPet` feed/play/rest 的"2~3s 自动收起气泡"用未保存句柄的匿名 setTimeout，卸载会残留（与 D-52 同类，影响更小）。
+
 ### Changed — Phase 12：事件总线修复 + A 类 API 补测 + 大型组件测试（2026-10-31）
 
 **D-48/D-49 修复**

@@ -126,6 +126,8 @@ function onDragEnd() {
 }
 
 let idleTimer: ReturnType<typeof setInterval> | null = null
+/** D-52：挂载 1s 后的首条问候气泡定时器（必须存句柄，卸载时清理） */
+let initialMessageTimer: ReturnType<typeof setTimeout> | null = null
 
 /** 监听业务事件：任务完成→celebrate、设为焦点→happy 等 */
 function onPetAction(e: Event) {
@@ -138,13 +140,20 @@ onMounted(() => {
   idleTimer = setInterval(() => {
     if (action.value === 'idle' && Math.random() > 0.7) randomMessage()
   }, 8000)
-  setTimeout(() => randomMessage(), 1000)
+  initialMessageTimer = setTimeout(() => {
+    initialMessageTimer = null
+    randomMessage()
+  }, 1000)
   window.addEventListener(PET_ACTION_EVENT, onPetAction)
   startDecay()
 })
 
 onUnmounted(() => {
   if (idleTimer) clearInterval(idleTimer)
+  if (initialMessageTimer) {
+    clearTimeout(initialMessageTimer)
+    initialMessageTimer = null
+  }
   if (messageTimer) clearTimeout(messageTimer)
   if (actionTimer) clearTimeout(actionTimer)
   window.removeEventListener(PET_ACTION_EVENT, onPetAction)
@@ -284,12 +293,14 @@ function feed() {
 }
 function play() {
   if (stats.value.energy < 20) {
+    // D-53：先 setAction（内部会随机冒泡）再写自定义提示，否则自定义文案会被随机气泡覆盖；
+    // 与 feed()/rest() 的"自定义文案在后"顺序保持一致。
+    setAction('sleep', 2000)
     message.value = '好累哦...想休息一下...'
     showMessage.value = true
     setTimeout(() => {
       showMessage.value = false
     }, 2000)
-    setAction('sleep', 2000)
     return
   }
   setAction('dance', 2500)
@@ -377,6 +388,12 @@ defineExpose({
   rest,
 })
 
+/**
+ * D-53 备注：这里只映射**有专属动画/样式规则**的动作类（idle/happy/thinking/
+ * working/celebrate/sleep）。dance/read/run/wave/shy/surprised 目前只有气泡文案、
+ * CSS 中没有对应 `pet--<action>` 规则，因此刻意不补类名 —— 补了也是无样式的死类，
+ * 反而让"动作有视觉效果"的语义失真。若未来给这些动作加了动画，请同步在此映射。
+ */
 const petClass = computed(() => ({
   'pet--idle': action.value === 'idle',
   'pet--happy': action.value === 'happy',

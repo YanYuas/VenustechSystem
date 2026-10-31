@@ -29,9 +29,15 @@ class InitRequest(BaseModel):
 
 
 class UpdateConfigRequest(BaseModel):
-    nickname: str | None = Field(default=None, max_length=50)
-    avatar: str | None = None
-    theme: str | None = None
+    # D-50：与 InitRequest 对齐，PATCH 不允许把昵称置空（前端会显示空白）
+    nickname: str | None = Field(default=None, min_length=1, max_length=50)
+    # avatar 是头像路径/URL（DB String(500)），不是枚举值；只加长度上限防截断，
+    # 资源是否存在由头像资源层负责校验（避免把后端绑死在前端资源目录上）。
+    avatar: str | None = Field(default=None, max_length=500)
+    # theme 主题包在**前端**应用（cream/guofeng/abyss/epic 存 localStorage），
+    # 后端只负责回传该字段；白名单会误拒历史值（purple/dark）并耦合前端主题目录，
+    # 因此只按 DB String(20) 加长度上限。
+    theme: str | None = Field(default=None, max_length=20)
     automation_level: str | None = None
     pet_position: PetPosition | None = None
     pet_topmost: bool | None = None
