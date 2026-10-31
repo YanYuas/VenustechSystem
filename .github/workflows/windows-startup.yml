@@ -60,10 +60,10 @@ jobs:
       PYTHONIOENCODING: utf-8
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Python 3.11
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.11"
           cache: pip
@@ -72,7 +72,7 @@ jobs:
             backend/requirements-dev.txt
 
       - name: Set up Node 24
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: "24"
           cache: npm
@@ -102,7 +102,7 @@ jobs:
       # 只在失败时上传：成功时 var/logs 里是被杀掉的子进程日志，没有留存价值
       - name: Upload launcher logs on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: windows-startup-logs
           path: var/logs/**

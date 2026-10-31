@@ -50,13 +50,13 @@ jobs:
       CI: "true"
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # Node 24：jsdom 30 的 engines 要求 ^22.22.2 || ^24.15.0 || >=26（Node 20 上
       # vitest 会因 undici/webidl 不兼容直接崩：webidl.util.markAsUncloneable is not a function）。
       # 与开发机保持一致（本机 Node 24.20）。
       - name: Set up Node 24
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: "24"
           # 复用 npm 缓存；键里包含 lockfile，lock 变了缓存自然失效
@@ -65,7 +65,7 @@ jobs:
 
       # audit-tokens.py 是 check_all.py 第 5 项，属 Python 标准库脚本，故本 job 也装 Python
       - name: Set up Python 3.11 (for scripts/audit-tokens.py)
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.11"
 
@@ -104,7 +104,7 @@ jobs:
       - name: Upload frontend coverage report
         if: always()
         continue-on-error: true
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: frontend-coverage
           path: frontend/coverage/
