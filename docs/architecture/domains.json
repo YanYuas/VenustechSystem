@@ -1,7 +1,7 @@
 {
   "$comment": "启明星系统 · 领域地图（机器可读）。这是 ARCHITECTURE.md §5 的唯一权威来源：新增模块必须先登记到这里，scripts/audit_architecture.py 会强制校验。规则：① 领域之间互不重叠（MECE）；② 每个业务模块必须恰好属于一个领域；③ 跨领域调用只能通过对方 service 的公开方法（后端）/ feature 的 index.ts（前端，规划中）。",
   "schema_version": 1,
-  "updated": "2026-10-26",
+  "updated": "2026-11-01",
   "domains": {
     "platform": {
       "title": "平台底座",
@@ -147,6 +147,7 @@
       "ARCHITECTURE.md",
       "CHANGELOG.md",
       "CONTRIBUTING.md",
+      "LICENSE",
       "README.md",
       "VERSION",
       "setup.bat",

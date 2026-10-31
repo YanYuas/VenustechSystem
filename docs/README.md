@@ -7,6 +7,8 @@
 
 | 我要… | 去哪 | 备注 |
 |---|---|---|
+| 我是第一次接触这个项目 / 想 5 分钟跑起来 | [仓库根 README](../README.md) | 展示页：定位、功能、快速开始、徽章、路线图 |
+| 看首发版本说明 / 我该不该升级 | [RELEASE_NOTES v1.0.0](RELEASE_NOTES_v1.0.0.md) | v1.0.0 亮点、升级说明；版本变化见 [CHANGELOG](../CHANGELOG.md) |
 | 了解系统分层、模块边界、关键架构决策 | [1. 架构与决策](#1-架构与决策architecture) | 现行架构 + 旧架构存档（archived） |
 | 知道产品现在做什么、验收标准是什么 | [2. 产品与需求](#2-产品与需求product) → `product/prd/v2-current/` | **现行**以 v2-current + M01–M09 为准 |
 | 查 UI 规范、交互规则、主题效果 | [2 → UI 设计与交互](#ui-设计与交互) | 规范在 `product/ui/`，HTML 主题画廊在 `design/` |
@@ -30,7 +32,7 @@
 |---|---|---|
 | [ARCHITECTURE.md](../ARCHITECTURE.md) | 现行 | **架构唯一入口**（位于仓库根）：分层、模块边界、依赖规则、§12 决策记录索引 |
 | [domains.json](architecture/domains.json) | 现行 | 领域 / 模块划分的机器可读描述（脚本与 CI 消费） |
-| `ADR/`（架构决策记录） | 现行 | [ADR 目录](architecture/ADR/)：0001 分层模块化单体 / 0002 core 最底层 / 0003 架构即代码 / 0004 运行期数据与密钥 / 0005 版本与依赖单一来源 / 0006 文档 IA（本索引的依据）/ **0007 前端 kernel/shared/features 分层（pet 试点已完成）** |
+| `ADR/`（架构决策记录） | 现行 | [ADR 目录](architecture/ADR/)：0001 分层模块化单体 / 0002 core 最底层 / 0003 架构即代码 / 0004 运行期数据与密钥 / 0005 版本与依赖单一来源 / 0006 文档 IA（本索引的依据）/ **0007 前端 kernel/shared/features 分层（pet 试点已完成）** / **0008 请求体 null 语义** |
 | [legacy/02-技术架构.md](architecture/legacy/02-技术架构.md) | 🗄️ archived | v1.0 技术架构草案（Electron / asyncpg 等方案已推翻） |
 | [legacy/02-技术架构-v2.0.md](architecture/legacy/02-技术架构-v2.0.md) | 🗄️ archived | 2026-08-27 技术架构 v2.0（已被 ARCHITECTURE.md 取代） |
 | [legacy/PROJECT_STRUCTURE.md](architecture/legacy/PROJECT_STRUCTURE.md) | 🗄️ archived | 九大业务板块结构快照（数量数字已过时） |

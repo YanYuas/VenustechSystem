@@ -305,3 +305,44 @@ A: 在 `frontend/src/styles/` 中新增主题变量文件，在 `data-theme` 中
 
 ### Q: 数据存在哪里？
 A: 运行期数据统一存仓库根 `var/`（SQLite）：真实库 `var/data/app.db`、演示库 `var/demo/`、历史副本 `var/legacy/`，全部已被 `.gitignore` 排除；切换分支不会覆盖本地数据库。旧的 `backend/data*` 已迁走并改名保留在 `backend/.legacy-data-2026-10-27/`。
+
+## 10. 发布流程（Release）
+
+**版本规则（SemVer）**：`MAJOR.MINOR.PATCH` —— MAJOR 不兼容变更（数据/接口/启动方式）、MINOR 向后兼容的新功能、PATCH 向后兼容的修复。事实来源**唯一**是仓库根 `VERSION`，其它位置一律由脚本同步，**禁止手改**。
+
+**tag 命名**：只允许 annotated tag `vX.Y.Z`（如 `v1.0.0`）。不用 `v1.0`、`1.0.0`、`release-1.0` 等形式；已发布 tag **不可移动/删除**（要改内容就发新的 PATCH 版本）。
+
+**发布清单（按序）**：
+
+```powershell
+# 1) 版本 bump：只改 VERSION，再同步（--sync 幂等，可重复跑）
+#    自动同步：backend/app/config.py、backend/pyproject.toml、frontend/package.json、
+#              ops/server/package.json、frontend/android/app/build.gradle 的 versionName
+#    需手工同步（脚本不覆盖）：frontend/package-lock.json 的两个根 version 字段、
+#              文档中的「当前版本」引用（README / ARCHITECTURE 头部；历史文档与 CHANGELOG 历史段不改）
+python scripts/check_versions.py --sync
+python scripts/check_versions.py          # 必须 exit 0
+
+# 2) 全量门禁（不绿不发布）
+python scripts/check_all.py --strict      # 16 项
+# 并确认 main 上 5 个 workflow 全绿：backend / frontend / repo-guard / android / windows-startup
+
+# 3) CHANGELOG：把 [Unreleased] 归入 ## [X.Y.Z] - YYYY-MM-DD（Keep a Changelog 格式，不丢历史），
+#    补 docs/RELEASE_NOTES_v1.0.0.md 这类按版本命名的发布说明
+
+# 4) 提交 + tag + 推送（维护者执行；本仓库 .git 是目录联接，须在有权限的会话操作）
+git add -A
+git commit -m "release: v1.0.0"
+git tag -a v1.0.0 -m "Qimingxing v1.0.0"
+git push origin main
+git push origin v1.0.0
+
+# 5) GitHub Release：基于 tag v1.0.0 创建，正文取自发布说明
+gh release create v1.0.0 --title "v1.0.0" --notes-file docs/RELEASE_NOTES_v1.0.0.md
+```
+
+**规则**：
+- 发布后 `[Unreleased]` 留空占位，后续改动继续写在 Unreleased；
+- Android：`versionName` 随版本同步，`versionCode` 是**整数发布序号**，每次对外发 APK 必须人工 +1（`check_versions.py` 只提示、不代改）；
+- 依赖升级（Dependabot）不单独发版：随下一个版本发布并在 CHANGELOG 记录；
+- 发布前确认 `LICENSE`、备份/恢复 runbook、安全说明就绪（v1.0.0 首发已具备：根目录 MIT `LICENSE`）。

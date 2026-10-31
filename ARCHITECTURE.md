@@ -3,7 +3,7 @@
 > **本文是全项目架构的唯一权威描述（Single Source of Truth）。**
 > 代码与文档冲突时以本文 + `docs/architecture/domains.json` + `scripts/audit_architecture.py` 为准。
 >
-> - 版本：对应应用 `VERSION` = 0.7.0 ｜ 最后更新：2026-10-26
+> - 版本：对应应用 `VERSION` = 1.0.0 ｜ 最后更新：2026-11-01
 > - 维护规则：**改架构必须同时改本文**；结构规则由机器守护（§9），不是靠自觉。
 > - 读者：接手这个项目的你 / 未来的你。建议按 §0 → §3 → §4 顺序读，15 分钟能建立完整心智模型。
 
@@ -429,6 +429,7 @@ CI：`.github/workflows/{backend,frontend,repo-guard}.yml` + `android-build.yml`
 | **Phase 12** | 事件总线修复 + API 端点补测 + 大型组件测试 | D-48/D-49 修复（异步 handler 静默丢失、批量失败可观测性）；后端 1927 passed、覆盖率 **97.98%→98.33%**（CI 阈值保持 97）；前端 504 passed / 34 files、lines 82.09%（阈值 {81,88,48,81}）；A 类 API 端点（auth/avatar/conversation/asset/pet）未覆盖行清零；新登记 D-50~D-54 | ✅ 本轮完成（2026-10-31） |
 | **Phase 13** | 输入校验/前端行为收尾 + 仓库治理 | D-50~D-54 修复（昵称/verify-api 校验、桌宠定时器与文案顺序、文档图后台暂停/惯性）；后端 1965 passed、覆盖率 **98.33%→98.95%**（CI 阈值 97→98）；前端 510 passed、lines 82.18%（阈值 {81,88,48,81} 保持）；GitHub 治理落地（Dependabot 4 生态分组 / PR 模板 / Issue 模板 / CODEOWNERS / development.md §2.1）；新登记 D-55 | ✅ 本轮完成（2026-10-31） |
 | **Phase 14** | 依赖治理 + 定时器收尾 | D-55 修复（桌宠气泡定时器统一句柄/集中清理）；**7 个 Dependabot PR 合并**（pytest/coverage、sass、Actions×5、jsdom、FastAPI 栈、前端运行时、ruff+cryptography），#9 vite major + #6 SQLAlchemy 2.1 经评估后关闭并 ignore（登记 D-56/D-57）；main 5 workflow 全绿；本地依赖对齐（ruff 0.17.3 / pytest 9.2.0 / npm ci）；后端 1965 passed / 98.94%、前端 515 passed / 82.2% | ✅ 本轮完成（2026-10-31） |
+| **Phase 15** | 首个可发行版本 v1.0.0 | 版本 0.7.0→**1.0.0** 全量同步（`check_versions.py --sync` 幂等，含 frontend/package-lock.json 根版本）；根 `LICENSE`（MIT）；`docs/RELEASE_NOTES_v1.0.0.md`（亮点/架构摘要/质量数据/快速开始/已知限制/升级说明）；CHANGELOG 归入 `[1.0.0] - 2026-11-01`（历史不丢）；发布流程文档（`docs/guides/development.md` §10，SemVer + `vX.Y.Z` tag 规范） | ✅ 本轮完成（2026-11-01，本地校验通过；tag / GitHub Release 待维护者执行） |
 
 **明确不做（以及为什么）**：
 

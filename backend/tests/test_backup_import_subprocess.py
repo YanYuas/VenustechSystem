@@ -586,7 +586,9 @@ class TestImportSuccessSubprocess:
         imported = result["imported"]
         assert imported["success"] is True
         assert result["restart_required"] is True
-        assert imported["manifest_version"] == "0.7.0"
+        # 不硬编码当前版本：manifest 的 app_version 取自 settings.version（VERSION 同步），
+        # 否则每次发版都要改测试（1.0.0 bump 时这里就红过）。
+        assert imported["manifest_version"] == get_settings().version
 
         # 数据回滚：备份之后的 marker 必须消失，备份时刻的数据必须回来
         assert result["marker_after"] is None
