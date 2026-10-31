@@ -9,7 +9,7 @@ loguru==0.7.3
 httpx==0.28.1
 python-multipart==0.0.32
 # 保险箱（三期 D）：Fernet 对称加密 —— 凭据库的硬依赖，缺它保险箱不可用
-cryptography==50.0.1
+cryptography==50.0.2
 
 # 开发/测试（可选，本机未装，按需安装）
 # pytest==8.3.3
