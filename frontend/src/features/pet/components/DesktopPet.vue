@@ -56,6 +56,24 @@ const MESSAGES: Record<PetAction, string[]> = {
 
 let messageTimer: ReturnType<typeof setTimeout> | null = null
 let actionTimer: ReturnType<typeof setTimeout> | null = null
+/** D-55：自定义气泡（feed/play/rest）的收起定时器句柄 */
+let customMessageTimer: ReturnType<typeof setTimeout> | null = null
+
+/**
+ * D-55：统一的自定义气泡入口 —— 所有"显示 X 秒后收起"的气泡都必须走这里，
+ * 由本 helper 保存句柄，onUnmounted 的 clearAllTimers() 才能统一清理。
+ * 注：随机气泡（randomMessage）保持独立的 messageTimer，语义与改造前一致：
+ * 随机气泡只覆盖随机气泡自己的定时器，不会提前掐掉自定义气泡的时长。
+ */
+function showMessageFor(text: string, ms: number) {
+  message.value = text
+  showMessage.value = true
+  if (customMessageTimer) clearTimeout(customMessageTimer)
+  customMessageTimer = setTimeout(() => {
+    customMessageTimer = null
+    showMessage.value = false
+  }, ms)
+}
 
 function randomMessage() {
   const msgs = MESSAGES[action.value]
@@ -63,6 +81,7 @@ function randomMessage() {
   showMessage.value = true
   if (messageTimer) clearTimeout(messageTimer)
   messageTimer = setTimeout(() => {
+    messageTimer = null
     showMessage.value = false
   }, 3000)
 }
@@ -149,22 +168,61 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  if (idleTimer) clearInterval(idleTimer)
+  clearAllTimers()
+  window.removeEventListener(PET_ACTION_EVENT, onPetAction)
+})
+
+/**
+ * D-55：集中清理**所有**定时器（气泡/首问候/动作回 idle/轮询/衰减/形态切换）。
+ * 新增定时器时务必同时登记句柄并在此清理，避免"卸载后仍触发一次"的泄漏重现。
+ */
+function clearAllTimers() {
+  if (idleTimer) {
+    clearInterval(idleTimer)
+    idleTimer = null
+  }
   if (initialMessageTimer) {
     clearTimeout(initialMessageTimer)
     initialMessageTimer = null
   }
-  if (messageTimer) clearTimeout(messageTimer)
-  if (actionTimer) clearTimeout(actionTimer)
-  window.removeEventListener(PET_ACTION_EVENT, onPetAction)
-  if (decayTimer) clearInterval(decayTimer)
-})
+  if (messageTimer) {
+    clearTimeout(messageTimer)
+    messageTimer = null
+  }
+  if (customMessageTimer) {
+    clearTimeout(customMessageTimer)
+    customMessageTimer = null
+  }
+  if (actionTimer) {
+    clearTimeout(actionTimer)
+    actionTimer = null
+  }
+  if (decayTimer) {
+    clearInterval(decayTimer)
+    decayTimer = null
+  }
+  if (formSwitchTimer) {
+    clearTimeout(formSwitchTimer)
+    formSwitchTimer = null
+  }
+  if (formSwitchingTimer) {
+    clearTimeout(formSwitchingTimer)
+    formSwitchingTimer = null
+  }
+  if (rafId) {
+    cancelAnimationFrame(rafId)
+    rafId = 0
+  }
+}
 
 // ---------- 形态切换（桌宠/人形） ----------
 type PetForm = 'pet' | 'human'
 const form = ref<PetForm>('pet')
 const switching = ref(false)
 const FORM_KEY = 'venustech_pet_form'
+/** D-55：形态切换两级延迟定时器（300ms 切形态 + 300ms 收尾），同样纳入统一清理 */
+let formSwitchTimer: ReturnType<typeof setTimeout> | null = null
+let formSwitchingTimer: ReturnType<typeof setTimeout> | null = null
 
 function loadForm() {
   try {
@@ -176,7 +234,9 @@ function loadForm() {
 }
 function toggleForm() {
   switching.value = true
-  setTimeout(() => {
+  if (formSwitchTimer) clearTimeout(formSwitchTimer)
+  formSwitchTimer = setTimeout(() => {
+    formSwitchTimer = null
     form.value = form.value === 'pet' ? 'human' : 'pet'
     try {
       localStorage.setItem(FORM_KEY, form.value)
@@ -184,7 +244,9 @@ function toggleForm() {
       /* ignore */
     }
     setAction('wave', 1500)
-    setTimeout(() => {
+    if (formSwitchingTimer) clearTimeout(formSwitchingTimer)
+    formSwitchingTimer = setTimeout(() => {
+      formSwitchingTimer = null
       switching.value = false
     }, 300)
   }, 300)
@@ -276,19 +338,11 @@ function pet() {
 }
 function feed() {
   if (stats.value.satiety >= 95) {
-    message.value = '人家吃饱啦~'
-    showMessage.value = true
-    setTimeout(() => {
-      showMessage.value = false
-    }, 2000)
+    showMessageFor('人家吃饱啦~', 2000)
     return
   }
   setAction('happy', 2000)
-  message.value = '好好吃~ 谢谢你！'
-  showMessage.value = true
-  setTimeout(() => {
-    showMessage.value = false
-  }, 2500)
+  showMessageFor('好好吃~ 谢谢你！', 2500)
   void applyStats({ satiety: 25, mood: 5 })
 }
 function play() {
@@ -296,11 +350,7 @@ function play() {
     // D-53：先 setAction（内部会随机冒泡）再写自定义提示，否则自定义文案会被随机气泡覆盖；
     // 与 feed()/rest() 的"自定义文案在后"顺序保持一致。
     setAction('sleep', 2000)
-    message.value = '好累哦...想休息一下...'
-    showMessage.value = true
-    setTimeout(() => {
-      showMessage.value = false
-    }, 2000)
+    showMessageFor('好累哦...想休息一下...', 2000)
     return
   }
   setAction('dance', 2500)
@@ -308,11 +358,7 @@ function play() {
 }
 function rest() {
   setAction('sleep', 3000)
-  message.value = 'Zzz... 休息一下~'
-  showMessage.value = true
-  setTimeout(() => {
-    showMessage.value = false
-  }, 3000)
+  showMessageFor('Zzz... 休息一下~', 3000)
   void applyStats({ energy: 30, mood: 5 })
 }
 

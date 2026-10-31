@@ -310,6 +310,41 @@ describe('DesktopPet：右键菜单与互动', () => {
     expect(api.updateStats).toHaveBeenCalledWith({ energy: 30, mood: 5 })
   })
 
+  it('喂食气泡按时出现，并在 2.5s 后自动收起（D-55 保持可见行为）', async () => {
+    const wrapper = mountPet()
+    await flush(wrapper)
+    await vi.advanceTimersByTimeAsync(1000) // 先消化首条问候，避免其覆盖本用例气泡
+    await openMenu(wrapper)
+
+    await menuItem(wrapper, '喂食').trigger('click')
+    await flush(wrapper)
+
+    expect(wrapper.find('.pet__bubble').text()).toBe('好好吃~ 谢谢你！')
+    await vi.advanceTimersByTimeAsync(2499)
+    expect(wrapper.find('.pet__bubble').exists()).toBe(true)
+
+    await vi.advanceTimersByTimeAsync(1)
+    expect(wrapper.find('.pet__bubble').exists()).toBe(false)
+  })
+
+  it('玩耍气泡按时出现，并在 3s 后自动收起（D-55 保持可见行为）', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0)
+    const wrapper = mountPet()
+    await flush(wrapper)
+    await vi.advanceTimersByTimeAsync(1000)
+    await openMenu(wrapper)
+
+    await menuItem(wrapper, '玩耍').trigger('click')
+    await flush(wrapper)
+
+    expect(wrapper.find('.pet__bubble').text()).toBe('一起跳舞吧~')
+    await vi.advanceTimersByTimeAsync(2999)
+    expect(wrapper.find('.pet__bubble').exists()).toBe(true)
+
+    await vi.advanceTimersByTimeAsync(1)
+    expect(wrapper.find('.pet__bubble').exists()).toBe(false)
+  })
+
   it('双击抚摸（exposed pet）：happy + 亲密度/心情增量', async () => {
     const wrapper = mountPet()
     await flush(wrapper)
@@ -395,6 +430,69 @@ describe('DesktopPet：降级与状态展示', () => {
     await vi.advanceTimersByTimeAsync(10_000)
     expect(vi.getTimerCount()).toBe(0)
     expect(wrapper.find('.pet__bubble').exists()).toBe(false)
+  })
+
+  it('喂食后气泡未到期即卸载：统一清理全部定时器（D-55）', async () => {
+    const wrapper = mountPet()
+    await flush(wrapper)
+    await openMenu(wrapper)
+    await menuItem(wrapper, '喂食').trigger('click')
+    await flush(wrapper)
+    const bubbleEl = wrapper.find('.pet__bubble').element
+    expect(bubbleEl.isConnected).toBe(true)
+
+    wrapper.unmount()
+    mounted.splice(0)
+
+    // VTU 的 wrapper.find() 卸载后仍会查询分离的旧 DOM 树，因此用 document 级断言判断气泡已随组件移除
+    expect(document.body.contains(bubbleEl)).toBe(false)
+    expect(vi.getTimerCount()).toBe(0)
+
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(vi.getTimerCount()).toBe(0)
+    expect(document.querySelector('.pet__bubble')).toBeNull()
+  })
+
+  it('玩耍后气泡未到期即卸载：统一清理全部定时器（D-55）', async () => {
+    const wrapper = mountPet()
+    await flush(wrapper)
+    await openMenu(wrapper)
+    await menuItem(wrapper, '玩耍').trigger('click')
+    await flush(wrapper)
+    const bubbleEl = wrapper.find('.pet__bubble').element
+    expect(bubbleEl.isConnected).toBe(true)
+
+    wrapper.unmount()
+    mounted.splice(0)
+
+    // VTU 的 wrapper.find() 卸载后仍会查询分离的旧 DOM 树，因此用 document 级断言判断气泡已随组件移除
+    expect(document.body.contains(bubbleEl)).toBe(false)
+    expect(vi.getTimerCount()).toBe(0)
+
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(vi.getTimerCount()).toBe(0)
+    expect(document.querySelector('.pet__bubble')).toBeNull()
+  })
+
+  it('休息后气泡未到期即卸载：统一清理全部定时器（D-55）', async () => {
+    const wrapper = mountPet()
+    await flush(wrapper)
+    await openMenu(wrapper)
+    await menuItem(wrapper, '休息').trigger('click')
+    await flush(wrapper)
+    const bubbleEl = wrapper.find('.pet__bubble').element
+    expect(bubbleEl.isConnected).toBe(true)
+
+    wrapper.unmount()
+    mounted.splice(0)
+
+    // VTU 的 wrapper.find() 卸载后仍会查询分离的旧 DOM 树，因此用 document 级断言判断气泡已随组件移除
+    expect(document.body.contains(bubbleEl)).toBe(false)
+    expect(vi.getTimerCount()).toBe(0)
+
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(vi.getTimerCount()).toBe(0)
+    expect(document.querySelector('.pet__bubble')).toBeNull()
   })
 
   it('正常路径：未卸载时 1s 仍会自动冒泡（D-52 修复不误伤首条问候）', async () => {

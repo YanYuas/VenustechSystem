@@ -402,7 +402,9 @@ CI：`.github/workflows/{backend,frontend,repo-guard}.yml` + `android-build.yml`
 | D-52 | P3 | `DesktopPet` 初始 1s 定时器未保存句柄/未卸载清理 | `DesktopPet.vue` | ✅ 已修（2026-10-31）：`initialMessageTimer` + onUnmounted clearTimeout；卸载瞬间 `getTimerCount()===0` 测试 |
 | D-53 | P3 | 低精力玩耍自定义提示被 `setAction` 随机气泡覆盖；petClass 未映射部分动作 | 同上 | ✅ 已修（2026-10-31）：先 setAction 再写提示（与 feed/rest 一致）；petClass 注释说明只映射有样式的动作，不补死类 |
 | D-54 | P3 | `DocumentGraph` 力导向 tick 无 `document.hidden` 暂停/拖拽惯性 | `DocumentGraph.vue` | ✅ 已修（2026-10-31）：visibilitychange hidden 停/visible 重启 + 卸载移除；mouseup 清零 vx/vy；测试区分度 1.6px vs 96px |
-| D-55 | P3 | `DesktopPet` 的 feed/play/rest 里"2~3s 自动收起气泡"用未保存句柄的匿名 setTimeout → 定时器触发前卸载会残留（与 D-52 同类，影响更小） | `features/pet/components/DesktopPet.vue` | Phase 14 |
+| D-55 | P3 | `DesktopPet` feed/play/rest 的"2~3s 自动收气泡"用未保存句柄的匿名 setTimeout → 卸载会残留 | `DesktopPet.vue` | ✅ 已修（2026-10-31）：`showMessageFor(text, ms)` 统一句柄 + `clearAllTimers()` 集中清理（含 toggleForm 两级定时器）；+5 用例 |
+| D-56 | P3 | SQLAlchemy 2.1 升级被迁移完整性门禁拦下：隐式 `float` 注解映射由 `Float` 变 `Double`，5 个未显式标注类型的列（`pet_configs.opacity/tts_rate/tts_pitch/tts_volume`、`workspace.mtime`）与冻结迁移 DDL 漂移 | `app/models/pet.py`、`app/models/workspace.py` | Phase 15（先给 5 列显式 `Float` 再升 2.1；短期已 `@dependabot ignore this minor version`，PR #6 已关） |
+| D-57 | P3 | vite 5→8 是 major（Node 版本/插件兼容/构建产物需回归） | `frontend/` | Phase 15（已关闭 PR #9 + `@dependabot ignore this major version`；需专门迁移任务） |
 
 > 原则：**先修 P0/P1 的"正确性"，再谈结构搬迁**。在事务边界、迁移基线、备份导入还有问题时做领域分包，只是把混乱打包进更漂亮的新目录。
 
@@ -426,6 +428,7 @@ CI：`.github/workflows/{backend,frontend,repo-guard}.yml` + `android-build.yml`
 | **Phase 11** | 数据安全修复 + 路由/壳层测试 + 覆盖率审计 | D-46/D-47 修复（备份恢复原子替换+自动回滚、.bak 命名冲突）；后端 1897 passed、覆盖率 **96.68%→97.9%**（CI 阈值 96→97）；前端 457 passed、lines **44.01%→82.42%**（阈值改 {81,88,45,81}，新增「统计面变化」的棘轮规则）；app/router 懒加载路径全部真实 import 防失效；新登记 D-48/D-49 | ✅ 本轮完成（2026-10-31） |
 | **Phase 12** | 事件总线修复 + API 端点补测 + 大型组件测试 | D-48/D-49 修复（异步 handler 静默丢失、批量失败可观测性）；后端 1927 passed、覆盖率 **97.98%→98.33%**（CI 阈值保持 97）；前端 504 passed / 34 files、lines 82.09%（阈值 {81,88,48,81}）；A 类 API 端点（auth/avatar/conversation/asset/pet）未覆盖行清零；新登记 D-50~D-54 | ✅ 本轮完成（2026-10-31） |
 | **Phase 13** | 输入校验/前端行为收尾 + 仓库治理 | D-50~D-54 修复（昵称/verify-api 校验、桌宠定时器与文案顺序、文档图后台暂停/惯性）；后端 1965 passed、覆盖率 **98.33%→98.95%**（CI 阈值 97→98）；前端 510 passed、lines 82.18%（阈值 {81,88,48,81} 保持）；GitHub 治理落地（Dependabot 4 生态分组 / PR 模板 / Issue 模板 / CODEOWNERS / development.md §2.1）；新登记 D-55 | ✅ 本轮完成（2026-10-31） |
+| **Phase 14** | 依赖治理 + 定时器收尾 | D-55 修复（桌宠气泡定时器统一句柄/集中清理）；**7 个 Dependabot PR 合并**（pytest/coverage、sass、Actions×5、jsdom、FastAPI 栈、前端运行时、ruff+cryptography），#9 vite major + #6 SQLAlchemy 2.1 经评估后关闭并 ignore（登记 D-56/D-57）；main 5 workflow 全绿；本地依赖对齐（ruff 0.17.3 / pytest 9.2.0 / npm ci）；后端 1965 passed / 98.94%、前端 515 passed / 82.2% | ✅ 本轮完成（2026-10-31） |
 
 **明确不做（以及为什么）**：
 

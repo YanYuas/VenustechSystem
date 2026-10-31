@@ -7,6 +7,22 @@
 
 ## [Unreleased]
 
+### Changed — Phase 14：依赖治理 + 桌宠定时器收尾（2026-10-31）
+
+**D-55 修复**
+- `DesktopPet` 的气泡定时器全部收口：新增 `showMessageFor(text, ms)` 统一保存 `customMessageTimer`（feed/play/rest 4 处匿名 `setTimeout` 消除），新增 `clearAllTimers()` 集中清理 idle/initial/message/custom/action/decay/表单切换/两级 toggleForm/rAF，`onUnmounted` 只调它；全文件已无匿名定时器。+5 用例（气泡边界 2499/2500、2999/3000 + feed/play/rest 未到期卸载的 `getTimerCount()===0` 与 document 级断言）。
+
+**依赖治理（Dependabot 首次批量处置）**
+- **合并 7 个绿色分组 PR**（逐个确认 checks 后 squash merge）：pytest/coverage 工具链、sass、GitHub Actions ×5、jsdom、FastAPI 栈、前端运行时 ×5、ruff+cryptography；其中 #8 因前序 pip 合并需 rebase，`@dependabot rebase` 后重跑绿再合。
+- **vite 5→8（major）**：评估后关闭 PR #9 并 `ignore this major version`（需单独迁移：Node 版本/插件兼容/构建产物回归）→ 登记 **D-57**。
+- **SQLAlchemy 2.1（#6）**：诊断出确定性行为变更——隐式 `float` 注解映射由 `Float` 改 `Double`，5 个未显式标注类型的列与冻结迁移 DDL 漂移，被 `test_migration_integrity` 正确拦下；关闭 PR 并 `ignore this minor version`（2.0.x 保持），登记 **D-56**（后续给列显式 `Float` 再升 2.1）。
+- 创建 `dependencies`/`ci` labels；本地依赖对齐（`pip install -r requirements*.txt` → ruff 0.17.3 / pytest 9.2.0；`npm ci`）。
+- 依赖更新后全量回归：后端 1965 passed / 98.94%（阈值 98）；前端 515 passed / 82.2%（阈值 {81,88,48,81}）；ruff 0.17 / build / lint 全绿。
+
+**新登记 2 个问题（D-56/D-57，未修）**
+- D-56（P3）SQLAlchemy 2.1 升级路径（显式 `Float` + 迁移完整性回归）；
+- D-57（P3）vite 8 major 迁移。
+
 ### Changed — Phase 13：输入校验/前端行为收尾 + 仓库治理（2026-10-31）
 
 **D-50~D-54 修复**
