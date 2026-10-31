@@ -8,8 +8,12 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import os
+import shutil
 import zipfile
 from datetime import datetime
+from pathlib import Path
+from uuid import uuid4
 
 from sqlalchemy.orm import Session
 
@@ -35,6 +39,72 @@ MANIFEST_NAME = "MANIFEST.json"
 BACKUP_AUTO_KEY = "backup.auto_enabled"
 BACKUP_INTERVAL_KEY = "backup.interval_hours"
 BACKUP_KEEP_KEY = "backup.keep"
+
+
+def _rollback_failed_import(
+    current_db: Path, backup_path: Path, tmp_path: Path, renamed: bool
+) -> None:
+    """D-46 导入失败后的自动回滚：清理 tmp；活动库缺失时从 `.bak` 恢复内容。
+
+    用 copy 而不是 rename：保留 `.bak` 作为人工回滚点（rename 会把它消费掉）。
+    回滚本身再失败时不掩盖原始异常——只记录「请手工恢复」的诊断日志。
+    """
+    try:
+        if tmp_path.exists():
+            tmp_path.unlink()
+    except OSError:
+        logger.warning("导入失败：临时文件清理失败（可手工删除）: {}", tmp_path)
+    if renamed and not current_db.exists() and backup_path.exists():
+        try:
+            shutil.copy2(backup_path, current_db)
+            logger.warning("导入失败，已自动从回滚副本恢复原库: {}", current_db)
+        except OSError:
+            logger.exception(
+                "导入失败且自动回滚失败，请手工将 {} 改回 {}",
+                backup_path,
+                current_db,
+            )
+
+
+def _warn_version_mismatch(info: dict, current_version: str) -> None:
+    """主版本不一致只告警、不阻断导入（与既有实现语义一致）。"""
+    logger.warning(
+        "备份版本 {} 与当前版本 {} 主版本号不同，可能存在兼容性问题",
+        info["app_version"],
+        current_version,
+    )
+
+
+def _cleanup_wal_files(current_db: Path) -> None:
+    """清理旧连接残留的 WAL/SHM（活动库文件已被原子替换）。"""
+    for suffix in (".db-wal", ".db-shm"):
+        wal_file = current_db.with_suffix(suffix)
+        if wal_file.exists():
+            wal_file.unlink()
+
+
+def _atomic_write_replace(
+    current_db: Path,
+    db_bytes: bytes,
+    backup_path: Path,
+    tmp_path: Path,
+    renamed: bool,
+) -> None:
+    """D-46：写临时文件 → fsync → `os.replace()` 原子替换活动库。
+
+    任一步失败都先走自动回滚（活动库可能已被改名为 `.bak`），再把原异常向上抛，
+    保证 API 层的异常类型/失败语义不变。拆成独立函数便于进程内单测失败分支
+    （子进程测试之外，父进程 coverage 也能覆盖成功/失败两条路径）。
+    """
+    try:
+        with open(tmp_path, "wb") as fh:
+            fh.write(db_bytes)
+            fh.flush()
+            os.fsync(fh.fileno())  # 尽量刷盘，缩小「崩溃留下半截库」窗口
+        os.replace(tmp_path, current_db)  # 同目录同文件系统 → 原子替换
+    except Exception:
+        _rollback_failed_import(current_db, backup_path, tmp_path, renamed)
+        raise
 
 
 class BackupService:
@@ -199,10 +269,7 @@ class BackupService:
             db_bytes = zf.read("app.db")
         manifest = {"app_version": info["app_version"], "user_id": info["user_id"]}
         if info["version_mismatch"]:
-            logger.warning(
-                "备份版本 {} 与当前版本 {} 主版本号不同，可能存在兼容性问题",
-                info["app_version"], self.settings.version,
-            )
+            _warn_version_mismatch(info, self.settings.version)
 
         # 1. 先 checkpoint，确保当前 WAL 落盘
         self.backup_repo.checkpoint_wal()
@@ -213,24 +280,33 @@ class BackupService:
         engine.dispose()
 
         # 3. 备份当前数据库
+        # D-47：时间戳带毫秒 + 短 uuid —— 同秒内连续两次恢复不会因 `.bak` 同名
+        # 在 Windows 上 FileExistsError，也不会在 POSIX 上覆盖上一个回滚点。
         current_db = self.settings.db_path
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        backup_path = current_db.with_suffix(f".db.bak.{timestamp}")
+        stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:19]
+        backup_path = current_db.with_suffix(f".db.bak.{stamp}_{uuid4().hex[:6]}")
+        renamed = False
         if current_db.exists():
             current_db.rename(backup_path)
+            renamed = True
 
-        # 4. 写入备份数据库
-        current_db.write_bytes(db_bytes)
+        # 4. D-46：写临时文件 + os.replace 原子替换。
+        #    临时文件与活动库同目录（同文件系统），os.replace 才是原子的：
+        #    不会出现「活动库缺失 / 半截文件」的中间态；崩溃时最多留一个 .tmp，
+        #    原库仍完整躺在 .bak 里；失败自动回滚（见 _atomic_write_replace）。
+        tmp_path = current_db.with_suffix(
+            f".db.import-{os.getpid()}-{uuid4().hex[:8]}.tmp"
+        )
+        _atomic_write_replace(current_db, db_bytes, backup_path, tmp_path, renamed)
 
         # 5. 清理 WAL/SHM 文件（旧连接的残留）
-        for suffix in (".db-wal", ".db-shm"):
-            wal_file = current_db.with_suffix(suffix)
-            if wal_file.exists():
-                wal_file.unlink()
+        _cleanup_wal_files(current_db)
 
         logger.warning(
-            f"数据库已从备份恢复: {filename}，版本={manifest.get('app_version')}，"
-            f"原库备份={backup_path.name}，需重启应用生效"
+            "数据库已从备份恢复: {}，版本={}，原库备份={}，需重启应用生效",
+            filename,
+            manifest.get("app_version"),
+            backup_path.name,
         )
         return {
             "success": True,

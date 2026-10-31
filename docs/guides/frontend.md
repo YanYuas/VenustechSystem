@@ -357,11 +357,23 @@ npm run test:coverage # 覆盖率报告（v8；text + json-summary，输出到 f
 
 - provider `v8`，`reporter: ['text', 'json-summary']`；`include: src/**`、排除 views/生成物/样式（见 `vitest.config.ts`）。
 - **阈值棘轮（只许上调）**：`vitest.config.ts` 的 `coverage.thresholds` 当前为
-  `{ lines: 43, branches: 81, functions: 67, statements: 43 }`
-  （2026-10-30 Phase10 实测 44.01 / 82.36 / 68.06 / 44.01，各留约 1 个百分点余量防抖动；
+  `{ lines: 81, branches: 88, functions: 45, statements: 81 }`
+  （2026-10-31 Phase11 实测 82.4 / 89.92 / 46.36 / 82.4，各留约 1 个百分点余量防抖动；
   上调历史：`{12,65,40,12}`（Phase5）→ `{20,72,52,20}`（Phase6）→ `{31,76,59,31}`（Phase7）
-  → `{36,78,63,36}`（Phase8）→ `{40,79,64,40}`（Phase9）→ 当前）。
+  → `{36,78,63,36}`（Phase8）→ `{40,79,64,40}`（Phase9）→ `{43,81,67,43}`（Phase10）→ 当前）。
   `npm run test:coverage` 与 CI 的 `Coverage (threshold ratchet)` 步骤**都会因此失败**，即覆盖率回退会直接卡住合并。
+- **统计面变化时如何调整阈值（规则）**：覆盖率的百分比分母会随"测试真实 import 了哪些模块"变化，
+  因此**每次调阈值必须同时记录「百分比」与「covered/total 绝对值」，用绝对值证明是上升而非回退**。
+  调整流程：
+  1. 对比 `coverage-summary.json` 的 `total`（statements/branches/functions/lines 的 covered 与 total）；
+  2. 若 total 变大（测试引入了更多模块）而 covered 也变大 → 属**统计面扩大**，可按新口径重算阈值，
+     并在 `vitest.config.ts` 注释与本文件写明"分母变化量 + covered 增量"，**不得**悄悄下调；
+  3. 若 covered 变小 → 视为真实回退，禁止下调阈值，必须补测试；
+  4. 百分比阈值仍按"实测留约 1pp"设置，绝对值变化记录在回信/CHANGELOG。
+  例（Phase11 task-46）：`router` 测试真实 `await` 24 个 view 模块后，
+  lines 44.01%→82.4%（covered 3056→6092）、branches 82.36%→89.92%（832→1026）、
+  functions 65.86%→46.36% 但 **covered 245→274 且分母 382→591**（新模块进入统计面）→
+  functions 阈值按新口径重算为 45，其余按 81/88/81 上调。
 - **测试并发**：`test.maxWorkers: 2`。jsdom + `@vue/test-utils` 组件测试内存占用高，默认按 CPU 核数并发在多文件（18+）时会 OOM（本机 16 核曾 `FATAL ERROR: Zone Allocation failed`）；显式限并发使本地与 2 核 CI runner 行为一致。
 - **规则**：阈值只允许上调；若因重构/删测试需要下调，**必须在 `CHANGELOG.md` 说明理由**并经评审，不允许静默调低。
 - 口径提醒：`lines` 的分母是 `src/**/*.{ts,vue}` 全量实现文件（含大量未测 Vue 组件），且 views 按约定排除；

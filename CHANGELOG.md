@@ -7,6 +7,23 @@
 
 ## [Unreleased]
 
+### Changed — Phase 11：备份恢复数据安全 + 路由/壳层测试 + 覆盖率审计（2026-10-31）
+
+**D-46/D-47 修复（数据安全，P2/P3）**
+- **D-46（P2）** `BackupService.import_` 由「rename 旧库 → `write_bytes` 新库」改为**临时文件 + `fsync` + `os.replace()` 原子替换**；替换失败自动从 `.bak` `copy2` 恢复（既恢复活动库又保留人工回滚点），copy 也失败时给出明确手工回滚日志，不掩盖原异常；API 契约/返回结构不变。
+- **D-47（P3）** `.bak` 命名改 `YYYYmmdd_HHMMSS_mmm_<uuid6>`（毫秒+短 uuid），同秒连续恢复不再冲突/覆盖回滚点。
+- 抽出 `_atomic_write_replace` / `_rollback_failed_import` / `_warn_version_mismatch` / `_cleanup_wal_files` 纯函数，便于进程内安全单测。
+- **备份子进程测试 flake 加固**：`_run_child` 仅对瞬时错误（`database is locked` / `disk I/O error`）重试最多 2 次且每次换新临时目录，永久错误不重试；不再硬编码源码行号（改锚点动态解析）。
+
+**测试与覆盖率**
+- 后端：**1897 passed**（1844 → +53：备份恢复 10→22、防御分支审计 41）；覆盖率 **96.68% → 97.98%**；`backup_service` 99.4%；CI 阈值 96→**97%**。
+- 防御分支审计分类：D 类（`import_` 破坏性路径）由子进程测试覆盖；B 类给出不可达证据（49 张表全含 `deleted_at`、monthly 日期钳制、`HAS_CRYPTO=False` 环境）；C 类为迁移回调专属；剩余 A 类约 50 行已列下一轮优先级。
+- 前端：**457 passed / 31 files**（403 → +54：router 20 / TopNav 19 / LeftInfoPanel 15）；覆盖率 **lines 44.01% → 82.42%**、branches 90.0%；函数百分比下降是**统计面扩大**（router 测试真实 `await` 24 个 lazy view，分母 382→591、covered 245→274 上升）而非回退；阈值 **{43,81,67,43} → {81,88,45,81}**，并新增「**统计面变化时如何调整阈值**」规则（百分比 + covered/total 双记录、covered 下降禁止下调）。
+
+**新登记 2 个问题（D-48/D-49，未修）**
+- **D-48（P2）** `core/event_bus.py` async handler 在无运行 loop 时 `get_event_loop()` 自动创建未运行 loop → `create_task()` 排队永不执行，**handler 静默丢失**（`called` 仍 +1、无日志）；
+- **D-49（P3）** `task_service` 批量操作失败只计数、无日志/原因（可观测性缺口）。
+
 ### Changed — Phase 10：修剩余 P2/P3 + 组件测试 + 备份恢复安全测试（2026-10-30）
 
 **D-39~D-45 修复（均带回归测试 + 负向验证）**

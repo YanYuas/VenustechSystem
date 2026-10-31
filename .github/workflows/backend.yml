@@ -120,19 +120,19 @@ jobs:
         run: python -m pytest tests -q -p no:cacheprovider --tb=short
 
       # Phase6 测试质量基建：覆盖率**阈值棘轮**（只升不降）。
-      # 当前实测 96.63% statements；阈值 96（留约 0.6pp 余量防抖动），
+      # 当前实测 97.98% statements；阈值 97（留约 1pp 余量防抖动），
       # 后续补测后应同步上调（下调必须在 CHANGELOG 说明理由）。
-      # 与本地同一条命令：pytest tests -q --cov=app --cov-report=term-missing --cov-fail-under=96
+      # 与本地同一条命令：pytest tests -q --cov=app --cov-report=term-missing --cov-fail-under=97
       # 另出 XML 报告（coverage.xml → artifact backend-coverage，供趋势/排障；不影响退出码）。
       # 不再 continue-on-error：覆盖率回退要能拦住合并。
-      - name: "Coverage (threshold ratchet: 96%)"
+      - name: "Coverage (threshold ratchet: 97%)"
         if: always()
         working-directory: backend
         timeout-minutes: 20
         run: |
           python -m pytest tests -q -p no:cacheprovider --tb=short \
             --cov=app --cov-report=term-missing --cov-report=xml:coverage.xml \
-            --cov-fail-under=96
+            --cov-fail-under=97
 
       # 覆盖率报告进 artifact：if: always() 保证「测试/阈值失败」时也有报告可看；
       # continue-on-error 保证「上传动作自身失败」（网络/artifact 服务抖动）**不会把 job 判红** ——

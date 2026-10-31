@@ -20,7 +20,14 @@
 #   · version_mismatch   —— 主版本不一致：warning 但仍成功（按实现语义）；
 #   · tampered_checksum  —— 篡改 app.db 字节 → 校验和不符 → ValidationException 且库未动；
 #   · corrupt_zip        —— 截断 ZIP → BadZipFile→ValidationException 且库未动；
-#   · other_user         —— 备份属于他人 → 拒绝且库未动。
+#   · other_user         —— 备份属于他人 → 拒绝且库未动；
+#   · write_failure_rollback —— tmp 写入失败 → D-46 自动回滚：活动库内容不变、
+#                              .bak 保留、无 tmp 残留、异常照常上抛；
+#   · double_restore     —— 同秒（冻结时间）连续两次恢复 → 两个 .bak 不冲突（D-47）。
+#
+# flake 加固：Windows 上偶发子进程 run_migrations() 报 `database is locked` /
+# `disk I/O error`（文件句柄/杀软扫描窗口，非业务缺陷）。`_run_child` 只对这两类
+# **瞬时**错误最多重试 2 次，每次用全新临时目录；其它永久错误绝不重试，避免掩盖回归。
 #
 # 覆盖率说明：父进程 `--cov=app` **不会统计子进程**（隔离的必然代价）。因此
 # success / version_mismatch 两个模式在子进程内用 coverage 单独测量 import_ 的
@@ -30,21 +37,84 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
+import uuid
 from pathlib import Path
 
 import pytest
 
+from app.config import get_settings
+from app.services.backup_service import (
+    _atomic_write_replace,
+    _cleanup_wal_files,
+    _rollback_failed_import,
+    _warn_version_mismatch,
+)
+
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 CHILD_TIMEOUT = 120  # 秒；迁移 + 导出 + 替换在冷启动下约 2-4s，留足余量
 
-# import_ 的「关键执行行」（backup_service.py 当前行号）：
-#   197 verify / 199 读包内 db / 208 checkpoint / 209 commit / 213 dispose /
-#   220 改名旧库 / 223 写入恢复库 / 226-228 WAL 扫描 / 231 恢复日志 / 235-239 返回值
-#   注：240 是 dict 收尾的 `}`（无语句），coverage 不会记录；205 同理是调用收尾括号。
-_IMPORT_CORE_LINES = {197, 199, 208, 209, 213, 220, 223, 226, 228, 231, 235, 236, 237, 238, 239}
-_IMPORT_VERSION_WARNING_LINES = {201, 202, 203, 204}
+# import_ 的「关键执行行」：按源码锚点动态解析（避免改实现后硬编码行号漂移，
+# Phase11 之前测试就因行号过期而误报）。
+_BACKUP_SERVICE_SRC = BACKEND_DIR / "app" / "services" / "backup_service.py"
+
+
+def _import_def_line() -> int:
+    lines = _BACKUP_SERVICE_SRC.read_text(encoding="utf-8").splitlines()
+    return next(i for i, line in enumerate(lines) if "def import_(" in line)
+
+
+def _import_anchors(*needles: str) -> set[int]:
+    """返回 import_ 内每个唯一锚点所在的 1-based 行号集合。"""
+    lines = _BACKUP_SERVICE_SRC.read_text(encoding="utf-8").splitlines()
+    start = _import_def_line()
+    found: set[int] = set()
+    for needle in needles:
+        hits = [i for i in range(start, len(lines)) if needle in lines[i]]
+        assert len(hits) == 1, f"import_ 锚点应唯一: {needle!r} -> {hits}"
+        found.add(hits[0] + 1)
+    return found
+
+
+_IMPORT_CORE_LINES = _import_anchors(
+    "info = self.verify(file_bytes, filename)",
+    'db_bytes = zf.read("app.db")',
+    "self.backup_repo.checkpoint_wal()",
+    "engine.dispose()",
+    "current_db.rename(backup_path)",
+    "renamed = True",
+    "tmp_path = current_db.with_suffix(",
+    "_atomic_write_replace(current_db, db_bytes, backup_path, tmp_path, renamed)",
+    "_cleanup_wal_files(current_db)",
+    '"restart_required": True',
+)
+# 原子替换/回滚的「实现行」在 import_ 之外（独立函数），由父进程的 helper 单测覆盖；
+# 子进程仍用 executed_lines 证明这些函数真的被调用（见 _ATOMIC_HELPER_ANCHORS）。
+_ATOMIC_HELPER_ANCHORS = {
+    "with open(tmp_path, \"wb\") as fh",
+    "os.fsync(fh.fileno())",
+    "os.replace(tmp_path, current_db)",
+    "_rollback_failed_import(current_db, backup_path, tmp_path, renamed)",
+}
+
+
+def _import_version_warning_lines() -> set[int]:
+    """版本不一致分支的两条已执行语句行（if 行 + logger.warning 调用行）。"""
+    lines = _BACKUP_SERVICE_SRC.read_text(encoding="utf-8").splitlines()
+    start = _import_def_line()
+    if_line = next(
+        i for i in range(start, len(lines)) if 'if info["version_mismatch"]:' in lines[i]
+    )
+    call_line = next(
+        i for i in range(if_line + 1, len(lines))
+        if "_warn_version_mismatch(info, self.settings.version)" in lines[i]
+    )
+    return {if_line + 1, call_line + 1}
+
+
+_IMPORT_VERSION_WARNING_LINES = _import_version_warning_lines()
 
 
 # ================================================================
@@ -135,6 +205,81 @@ def main():
         "backup_zip_exists": backup_path.exists(),
         "package_app_db_size": len(package_db_bytes),
     }
+
+    if MODE == "write_failure_rollback":
+        # D-46：让「写 tmp」失败（模拟磁盘满/权限问题），验证自动回滚：
+        # 活动库内容必须仍是导入前的原库（marker 在）、.bak 保留、无 tmp 残留。
+        db_bytes_before = Path(settings.db_path).read_bytes()
+        import builtins
+
+        real_open = builtins.open
+
+        def _failing_open(path, *args, **kwargs):
+            if str(path).endswith(".tmp"):
+                raise OSError("disk full (simulated tmp write failure)")
+            return real_open(path, *args, **kwargs)
+
+        builtins.open = _failing_open
+        error = None
+        try:
+            svc.import_(package_bytes, "backup.zip")
+        except Exception as exc:  # noqa: BLE001 - 类型/信息交父进程断言
+            error = {"type": type(exc).__name__, "message": str(exc),
+                     "traceback_tail": traceback.format_exc().splitlines()[-3:]}
+        finally:
+            builtins.open = real_open
+
+        check = SessionLocal()
+        try:
+            repo = SettingRepository(check)
+            marker_after = repo.get_by_key(user.id, "subproc.after")
+        finally:
+            check.close()
+        payload.update({
+            "error": error,
+            "db_bytes_unchanged": (
+                Path(settings.db_path).read_bytes() == db_bytes_before),
+            "baks": sorted(
+                p.name for p in Path(settings.data_dir).glob("app.db.bak.*")),
+            "tmp_files": sorted(
+                p.name for p in Path(settings.data_dir).glob("app.db.import-*.tmp")),
+            "marker_after": marker_after.value if marker_after is not None else None,
+        })
+        emit(payload)
+        return
+
+    if MODE == "double_restore":
+        # D-47：把时间冻结在同一秒（毫秒字段固定），连续两次恢复。
+        # 旧实现秒级时间戳 → 两个 .bak 同名（Windows FileExistsError / POSIX 覆盖）；
+        # 新实现毫秒+短 uuid → 两个 .bak 必须不同且都存在。
+        import datetime as _dt
+
+        import app.services.backup_service as _bs
+
+        class _FrozenDatetime(_dt.datetime):
+            @classmethod
+            def now(cls, tz=None):
+                return _dt.datetime(2026, 1, 1, 0, 0, 0, 123000)
+
+        _bs.datetime = _FrozenDatetime
+        first = svc.import_(package_bytes, "backup.zip")
+        db2 = SessionLocal()
+        try:
+            second = BackupService(db2, user.id).import_(package_bytes, "backup.zip")
+        finally:
+            db2.close()
+        baks = sorted(
+            p.name for p in Path(settings.data_dir).glob("app.db.bak.*"))
+        payload.update({
+            "first": first,
+            "second": second,
+            "baks": baks,
+            "baks_distinct": len(baks) == len(set(baks)),
+            "current_bytes_eq_package": (
+                Path(settings.db_path).read_bytes() == package_db_bytes),
+        })
+        emit(payload)
+        return
 
     if MODE in ("success", "version_mismatch", "legacy_package"):
         if MODE == "version_mismatch":
@@ -315,10 +460,21 @@ def _child_env(data_dir: Path, cov_data: Path | None = None) -> dict[str, str]:
     return env
 
 
-def _run_child(mode: str, data_dir: Path, cov_data: Path | None = None) -> dict:
+# 只重试「环境型瞬时错误」：Windows 文件锁 / 杀软扫描窗口会让子进程在建库
+# （run_migrations）时偶发 sqlite3.OperationalError；单跑通过、全量偶发。这不是
+# 业务缺陷，重试 + 全新临时目录即可。**永久错误（断言失败/校验失败/代码异常）
+# 绝不重试**，否则会掩盖真实回归。
+_TRANSIENT_CHILD_PATTERNS = ("database is locked", "disk I/O error")
+_MAX_CHILD_ATTEMPTS = 3          # 首次 + 最多 2 次重试
+
+
+def _attempt_child(
+    mode: str, data_dir: Path, cov_data: Path | None = None
+) -> subprocess.CompletedProcess:
+    """单次子进程尝试（不做断言，交给 _run_child 判定是否瞬时错误）。"""
     script = _CHILD_SCRIPT_TEMPLATE.replace("__MODE__", repr(mode))
     try:
-        proc = subprocess.run(
+        return subprocess.run(
             [sys.executable, "-c", script],
             cwd=str(BACKEND_DIR),
             env=_child_env(data_dir, cov_data),
@@ -331,6 +487,31 @@ def _run_child(mode: str, data_dir: Path, cov_data: Path | None = None) -> dict:
     except subprocess.TimeoutExpired as exc:  # pragma: no cover - 防御性
         raise AssertionError(f"子进程超时（>{CHILD_TIMEOUT}s）: mode={mode}\n{exc}") from exc
 
+
+def _run_child(mode: str, data_dir: Path, cov_data: Path | None = None) -> dict:
+    attempt_data_dir = data_dir
+    attempt_cov_data = cov_data
+    proc: subprocess.CompletedProcess | None = None
+    for attempt in range(_MAX_CHILD_ATTEMPTS):
+        proc = _attempt_child(mode, attempt_data_dir, attempt_cov_data)
+        combined = f"{proc.stdout}\n{proc.stderr}"
+        transient = proc.returncode != 0 and any(
+            pattern in combined for pattern in _TRANSIENT_CHILD_PATTERNS
+        )
+        if transient and attempt < _MAX_CHILD_ATTEMPTS - 1:
+            # 重试使用**全新临时目录**：避免上一次失败留下的半截 db/WAL 影响判断
+            attempt_data_dir = data_dir.parent / f"{data_dir.name}-retry{attempt + 1}"
+            shutil.rmtree(attempt_data_dir, ignore_errors=True)
+            attempt_data_dir.mkdir(parents=True, exist_ok=True)
+            if cov_data is not None:
+                attempt_cov_data = cov_data.with_name(
+                    f"{cov_data.name}-retry{attempt + 1}")
+            print(f"[flake-retry] mode={mode} 第 {attempt + 1} 次命中瞬时错误，"
+                  f"换新目录重试: {attempt_data_dir.name}")
+            continue
+        break
+
+    assert proc is not None
     output_lines = [line for line in proc.stdout.splitlines() if line.strip()]
     last = output_lines[-1] if output_lines else ""
     try:
@@ -390,8 +571,12 @@ class TestImportSuccessSubprocess:
             cov_data=isolated_data_dir.parent / "child-cov-success",
         )
 
-        # 隔离前提：子进程真的在用独立目录、且库是新建的（不是仓库真实库）
-        assert Path(result["data_dir"]).resolve() == isolated_data_dir.resolve()
+        # 隔离前提：子进程真的在用独立目录、且库是新建的（不是仓库真实库）。
+        # 若命中过瞬时错误重试，实际目录是 <原目录>-retryN（仍在本用例 tmp 父目录下）。
+        actual_dir = Path(result["data_dir"]).resolve()
+        assert actual_dir.parent == isolated_data_dir.resolve().parent
+        assert actual_dir.name.startswith(isolated_data_dir.name)
+        assert actual_dir != (Path(__file__).resolve().parents[2] / "var" / "data").resolve()
         assert result["db_preexisting"] is False
         assert result["export_ok"] is True
         assert result["backup_zip_exists"] is True
@@ -560,3 +745,248 @@ class TestImportRejectsBadPackageSubprocess:
         assert result["db_bytes_unchanged"] is True
         assert result["baks"] == []
         assert result["marker_after"] == "must-disappear"
+
+
+# ================================================================
+# 五、D-46 原子替换 + 失败自动回滚
+# ================================================================
+class TestImportWriteFailureRollbackSubprocess:
+    def test_write_failure_rolls_back_original_db(self, isolated_data_dir):
+        """tmp 写入失败 → 自动回滚：原库内容不变、.bak 保留、无 tmp 残留、异常上抛。"""
+        result = _run_child("write_failure_rollback", isolated_data_dir)
+
+        error = result["error"]
+        assert error is not None
+        assert error["type"] == "OSError"
+        assert "disk full" in error["message"]
+
+        # 原库仍是导入前的内容（包含「备份后写入」的 marker）
+        assert result["db_bytes_unchanged"] is True
+        assert result["marker_after"] == "must-disappear"
+        # 回滚副本保留、临时文件清理干净
+        baks = [n for n in result["baks"] if n.startswith("app.db.bak.")]
+        assert len(baks) == 1
+        assert result["tmp_files"] == []
+
+
+def _helper_dir() -> Path:
+    d = Path(get_settings().data_dir) / f"t45-helper-{uuid.uuid4().hex[:8]}"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+class TestAtomicWriteReplaceInProcess:
+    """进程内单测（纯文件操作，不碰真实 DB/engine）——覆盖成功与失败两分支。"""
+
+    def test_success_writes_and_atomically_replaces(self):
+        d = _helper_dir()
+        current = d / "app.db"
+        current.write_bytes(b"old-db")
+        tmp_path = d / "app.db.import-1.tmp"
+        backup = d / "app.db.bak.x"
+
+        _atomic_write_replace(current, b"new-db", backup, tmp_path, renamed=False)
+
+        assert current.read_bytes() == b"new-db"
+        assert not tmp_path.exists()
+
+    def test_write_failure_rolls_back_old_db_and_keeps_bak(self):
+        d = _helper_dir()
+        current = d / "app.db"        # 等价于「旧库已改名为 .bak、活动库缺失」
+        backup = d / "app.db.bak.x"
+        backup.write_bytes(b"old-db")
+        tmp_path = d / "app.db.import-2.tmp"
+
+        import builtins
+
+        real_open = builtins.open
+
+        def _failing_open(path, *args, **kwargs):
+            if str(path).endswith(".tmp"):
+                raise OSError("disk full (simulated)")
+            return real_open(path, *args, **kwargs)
+
+        builtins.open = _failing_open
+        try:
+            with pytest.raises(OSError, match="disk full"):
+                _atomic_write_replace(current, b"new-db", backup, tmp_path, renamed=True)
+        finally:
+            builtins.open = real_open
+
+        assert current.read_bytes() == b"old-db"   # 自动回滚成功
+        assert backup.exists()                     # 回滚点保留
+        assert not tmp_path.exists()               # 无 tmp 残留
+
+    def test_replace_failure_rolls_back(self, monkeypatch):
+        d = _helper_dir()
+        current = d / "app.db"
+        backup = d / "app.db.bak.x"
+        backup.write_bytes(b"old-db")
+        tmp_path = d / "app.db.import-3.tmp"
+
+        def _boom(_src, _dst):
+            raise OSError("replace failed (simulated)")
+
+        monkeypatch.setattr("app.services.backup_service.os.replace", _boom)
+        with pytest.raises(OSError, match="replace failed"):
+            _atomic_write_replace(current, b"new-db", backup, tmp_path, renamed=True)
+
+        assert current.read_bytes() == b"old-db"
+        assert backup.exists()
+        assert not tmp_path.exists()
+
+
+class TestRollbackHelperInProcess:
+    """回滚工具函数的边界分支（copy 失败 / tmp 清理失败）。"""
+
+    def test_tmp_cleanup_failure_is_logged_but_restore_still_runs(
+        self, monkeypatch, caplog
+    ):
+        import logging as _logging
+
+        d = _helper_dir()
+        current = d / "app.db"
+        backup = d / "app.db.bak.x"
+        backup.write_bytes(b"old-db")
+        tmp_path = d / "app.db.import-4.tmp"
+        tmp_path.write_bytes(b"partial")
+
+        def _boom_unlink(_self, *args, **kwargs):
+            raise OSError("unlink failed (simulated)")
+
+        monkeypatch.setattr(Path, "unlink", _boom_unlink)
+        with caplog.at_level(_logging.WARNING, logger="backup"):
+            _rollback_failed_import(current, backup, tmp_path, renamed=True)
+
+        assert "临时文件清理失败" in caplog.text
+        assert current.read_bytes() == b"old-db"
+
+    def test_copy_failure_keeps_backup_and_logs_manual_hint(self, monkeypatch, caplog):
+        import logging as _logging
+
+        d = _helper_dir()
+        current = d / "app.db"
+        backup = d / "app.db.bak.x"
+        backup.write_bytes(b"old-db")
+        tmp_path = d / "app.db.import-5.tmp"
+
+        def _boom_copy(_src, _dst):
+            raise OSError("copy failed (simulated)")
+
+        monkeypatch.setattr("app.services.backup_service.shutil.copy2", _boom_copy)
+        with caplog.at_level(_logging.WARNING, logger="backup"):
+            _rollback_failed_import(current, backup, tmp_path, renamed=True)
+
+        assert not current.exists()
+        assert backup.exists()
+        assert "请手工将" in caplog.text
+
+
+# ================================================================
+# 六、D-47 同秒二次恢复：两个 .bak 不冲突
+# ================================================================
+class TestSameSecondDoubleRestoreSubprocess:
+    def test_two_restores_in_same_second_keep_distinct_baks(self, isolated_data_dir):
+        """时间冻结在同一秒（毫秒固定）连续恢复两次：旧实现会 .bak 同名冲突。"""
+        result = _run_child("double_restore", isolated_data_dir)
+
+        assert result["first"]["success"] is True
+        assert result["second"]["success"] is True
+        baks = [n for n in result["baks"] if n.startswith("app.db.bak.")]
+        assert len(baks) == 2
+        assert result["baks_distinct"] is True
+        assert result["current_bytes_eq_package"] is True
+
+
+# ================================================================
+# 七、flake 加固：仅对瞬时 SQLite 错误重试（新目录、最多 2 次）
+# ================================================================
+class TestChildFlakeRetryPolicy:
+    def _proc(self, rc, stdout="", stderr=""):
+        return subprocess.CompletedProcess(
+            args=["child"], returncode=rc, stdout=stdout, stderr=stderr
+        )
+
+    def test_transient_error_retries_with_fresh_dir(self, isolated_data_dir, monkeypatch):
+        calls: list[Path] = []
+
+        def fake_attempt(mode, data_dir, cov_data=None):
+            calls.append(Path(data_dir))
+            if len(calls) == 1:
+                return self._proc(
+                    1,
+                    stdout='{"fatal": "sqlite3.OperationalError: disk I/O error"}',
+                    stderr="sqlite3.OperationalError: disk I/O error",
+                )
+            return self._proc(
+                0, stdout=json.dumps({"mode": mode, "data_dir": str(data_dir)})
+            )
+
+        import sys as _sys
+
+        monkeypatch.setattr(_sys.modules[__name__], "_attempt_child", fake_attempt)
+        result = _run_child("success", isolated_data_dir)
+
+        assert len(calls) == 2
+        assert calls[0] == isolated_data_dir
+        assert calls[1] != isolated_data_dir
+        assert calls[1].name.endswith("-retry1")
+        assert result["data_dir"] == str(calls[1])
+
+    def test_permanent_error_is_not_retried(self, isolated_data_dir, monkeypatch):
+        calls: list[Path] = []
+
+        def fake_attempt(mode, data_dir, cov_data=None):
+            calls.append(Path(data_dir))
+            return self._proc(
+                1,
+                stdout='{"fatal": "AssertionError: real regression"}',
+                stderr="AssertionError: real regression",
+            )
+
+        import sys as _sys
+
+        monkeypatch.setattr(_sys.modules[__name__], "_attempt_child", fake_attempt)
+        with pytest.raises(AssertionError, match="real regression"):
+            _run_child("success", isolated_data_dir)
+        assert len(calls) == 1       # 永久错误绝不重试
+
+    def test_retries_are_capped_at_two(self, isolated_data_dir, monkeypatch):
+        calls: list[Path] = []
+
+        def fake_attempt(mode, data_dir, cov_data=None):
+            calls.append(Path(data_dir))
+            return self._proc(
+                1, stderr="sqlite3.OperationalError: database is locked"
+            )
+
+        import sys as _sys
+
+        monkeypatch.setattr(_sys.modules[__name__], "_attempt_child", fake_attempt)
+        with pytest.raises(AssertionError):
+            _run_child("success", isolated_data_dir)
+        assert len(calls) == 3       # 首次 + 2 次重试
+        assert len(set(calls)) == 3  # 每次都是全新目录
+
+
+class TestMaintenanceHelpersInProcess:
+    """版本告警 / WAL 清理两个小工具的进程内单测（覆盖 import_ 之外的实现行）。"""
+
+    def test_version_mismatch_warns_with_versions(self, caplog):
+        import logging as _logging
+
+        with caplog.at_level(_logging.WARNING):
+            _warn_version_mismatch({"app_version": "9.9.9"}, "0.7.0")
+        assert "备份版本 9.9.9" in caplog.text
+        assert "0.7.0" in caplog.text
+
+    def test_cleanup_wal_removes_both_sidecars(self):
+        d = _helper_dir()
+        current = d / "app.db"
+        (d / "app.db-wal").write_bytes(b"wal")
+        (d / "app.db-shm").write_bytes(b"shm")
+
+        _cleanup_wal_files(current)
+
+        assert not (d / "app.db-wal").exists()
+        assert not (d / "app.db-shm").exists()
