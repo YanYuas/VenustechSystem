@@ -59,10 +59,10 @@ jobs:
       PYTHONIOENCODING: utf-8
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Python 3.11
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.11"
           # 依赖文件未变则复用 pip 缓存
@@ -140,7 +140,7 @@ jobs:
       - name: Upload backend coverage report
         if: always()
         continue-on-error: true
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: backend-coverage
           path: backend/coverage.xml
