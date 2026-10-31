@@ -137,16 +137,22 @@ class EventBus:
                 failed_handlers.append(getattr(handler, "__name__", repr(handler)))
                 logger.exception("事件处理失败: {} (handler={})", event, handler.__name__)
 
-        # 异步事件放入事件循环
+        # 异步事件：有运行中的 loop → 排队；**没有运行中的 loop**（脚本/同步线程）
+        # → 逐个 handler 用 asyncio.run() 兜底执行。
+        # D-48：原实现用 asyncio.get_event_loop()，在无运行 loop 时会「创建但永不
+        # 运行」一个 loop —— create_task 排队后永远不执行、handler 静默丢失，却仍
+        # 把 called 加一。改用 get_running_loop() 后，无运行循环走同步兜底。
+        # called 语义（明确决策）：**成功排队**（或同步兜底执行成功）都计入 called；
+        # 排队 task 的延迟异常由 done_callback 记入 failed_handlers + 日志 +
+        # 统计（success→failed），不会静默丢失。
         async_handlers = cls._async_handlers.get(event, [])
+        deferred: list[tuple[Callable, asyncio.Task]] = []
         if async_handlers:
             try:
-                loop = asyncio.get_event_loop()
-                for handler in async_handlers:
-                    loop.create_task(handler(**kwargs))
-                    called += 1
+                running_loop = asyncio.get_running_loop()
             except RuntimeError:
-                # 没有事件循环时，用 asyncio.run 执行
+                running_loop = None
+            if running_loop is None:
                 for handler in async_handlers:
                     try:
                         asyncio.run(handler(**kwargs))
@@ -155,9 +161,14 @@ class EventBus:
                         success = False
                         failed_handlers.append(getattr(handler, "__name__", repr(handler)))
                         logger.exception("异步事件处理失败: {}", event)
+            else:
+                for handler in async_handlers:
+                    deferred.append((handler, running_loop.create_task(handler(**kwargs))))
+                    called += 1
 
         # 记录历史和统计（F1.2：逐 handler 失败定位）
-        cls._history.append(EventRecord(event, kwargs, called, success, failed_handlers))
+        record = EventRecord(event, kwargs, called, success, failed_handlers)
+        cls._history.append(record)
         stat = cls._stats.setdefault(
             event, {"count": 0, "success": 0, "failed": 0,
                     "failed_handlers": [], "consecutive_failures": 0}
@@ -185,6 +196,47 @@ class EventBus:
             )
         elif rate is not None and rate > cls.FAILURE_RATE_ALERT and stat["failed"] > 0:
             logger.warning("事件 {} 近 1 分钟失败率 {:.0f}%，超过阈值", event, rate * 100)
+
+        # D-48：排队 task 的完成/失败/取消在 loop 稍后执行 —— 必须挂回调，
+        # 把延迟失败写进 history/statistics 并打日志，避免静默丢失。
+        for handler, task in deferred:
+            task.add_done_callback(
+                lambda done, _handler=handler: cls._on_async_task_done(
+                    event, done, _handler, record
+                )
+            )
+
+    @classmethod
+    def _on_async_task_done(
+        cls, event: str, task: asyncio.Task, handler: Callable, record: EventRecord
+    ) -> None:
+        """D-48：排队异步 handler 的延迟失败/取消 → 日志 + 历史/统计可观测。"""
+        name = getattr(handler, "__name__", repr(handler))
+        try:
+            task.result()
+        except asyncio.CancelledError:
+            logger.warning("异步事件处理被取消: {} (handler={})", event, name)
+            cls._mark_deferred_failure(event, name, record)
+        except Exception:
+            logger.exception("异步事件处理失败（延迟）: {} (handler={})", event, name)
+            cls._mark_deferred_failure(event, name, record)
+
+    @classmethod
+    def _mark_deferred_failure(
+        cls, event: str, handler_name: str, record: EventRecord
+    ) -> None:
+        """把排队 task 的失败反映到历史记录与统计（success→failed）。"""
+        if handler_name not in record.failed_handlers:
+            record.failed_handlers.append(handler_name)
+        record.success = False
+        stat = cls._stats.get(event)
+        if stat is not None:
+            stat["success"] = max(0, int(stat.get("success", 0)) - 1)
+            stat["failed"] = int(stat.get("failed", 0)) + 1
+            known = stat.setdefault("failed_handlers", [])
+            if handler_name not in known:
+                known.append(handler_name)
+            stat["consecutive_failures"] = int(stat.get("consecutive_failures", 0)) + 1
 
     @classmethod
     def get_history(cls, event: str | None = None, limit: int = 50) -> list[dict]:

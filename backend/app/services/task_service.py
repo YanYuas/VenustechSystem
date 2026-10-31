@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.core.event_bus import EVENT_TASK_COMPLETED, EVENT_TASK_CREATED, event_bus
 from app.core.exceptions import NotFoundException, TaskStateException, ValidationException
+from app.core.logger import get_logger
 from app.models.base import utcnow
 from app.models.task import FocusSession, Task
 from app.repositories import (
@@ -36,6 +37,8 @@ from app.schemas.task import (
 )
 
 # 状态流转白名单（PRD §8.4）：key=当前状态 → 允许到达的状态
+logger = get_logger("task")
+
 STATUS_TRANSITIONS: dict[str, set[str]] = {
     "pending": {"in_progress", "waiting", "completed"},
     "in_progress": {"completed", "waiting", "pending"},
@@ -354,6 +357,11 @@ class TaskService:
                 task = self.repo.get(task_id)
                 if task is None or task.user_id != user_id:
                     failed += 1
+                    # D-49：批量失败要可观测（响应契约仍只有 affected/failed）
+                    logger.warning(
+                        "批量操作失败: task_id={} action={} reason={}",
+                        task_id, data.action, "任务不存在或无权访问",
+                    )
                     continue
                 if data.action == "complete":
                     self._ensure_project_active(task)
@@ -369,8 +377,13 @@ class TaskService:
                         raise TaskStateException(f"无效优先级: {data.priority}")
                     task.priority = data.priority
                 affected += 1
-            except Exception:
+            except Exception as exc:
                 failed += 1
+                # D-49：记录失败任务与原因（loguru `{}` 惰性占位），别只留计数
+                logger.warning(
+                    "批量操作失败: task_id={} action={} reason={}",
+                    task_id, data.action, exc,
+                )
         self.db.commit()
         return BatchTaskResult(affected=affected, failed=failed)
 

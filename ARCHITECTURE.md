@@ -395,8 +395,13 @@ CI：`.github/workflows/{backend,frontend,repo-guard}.yml` + `android-build.yml`
 
 | D-46 | P2 | `import_` 在「改名旧库→写新库」间无自动回滚（写失败/崩溃会留缺失或半截 DB） | `backup_service.py` | ✅ 已修（2026-10-31）：临时文件 + `fsync` + `os.replace()` 原子替换；失败自动从 `.bak` copy2 恢复（保留回滚点）+ 诊断日志 |
 | D-47 | P3 | `.bak` 秒级时间戳同秒冲突（Windows 抛错 / POSIX 覆盖回滚副本） | `backup_service.py` | ✅ 已修（2026-10-31）：`YYYYmmdd_HHMMSS_mmm_<uuid6>`；同秒双恢复测试 |
-| D-48 | P2 | `core/event_bus.py` async handler 在 Python 3.13 主线程无运行 loop 时 `get_event_loop()` 自动创建未运行的 loop → `create_task()` 排队永不执行，handler 静默丢失（`called` 仍 +1、无日志） | `app/core/event_bus.py:143-147` | Phase 12 |
-| D-49 | P3 | `task_service` 批量操作 `except Exception: failed += 1` 无日志/无原因（用户只看到失败条数，排障无信息） | `app/services/task_service.py:372-373` | Phase 12 |
+| D-48 | P2 | `event_bus` async handler 在无运行 loop 时 `get_event_loop()` 自动创建未运行 loop → `create_task` 排队永不执行，handler 静默丢失（`called` 仍 +1） | `app/core/event_bus.py` | ✅ 已修（2026-10-31）：改 `get_running_loop()`；无运行 loop 逐 handler `asyncio.run()` 兜底；排队 task 延迟失败/取消经 `add_done_callback` 写入 history/stats + 日志，不静默 |
+| D-49 | P3 | `task_service` 批量失败只 `failed += 1`，无日志/原因（排障无信息） | `app/services/task_service.py` | ✅ 已修（2026-10-31）：缺失/越权/异常分支均 `logger.warning("批量操作失败: task_id={} action={} reason={}")`；`BatchTaskResult` 契约不变 |
+| D-50 | P3 | `PATCH /auth/me` 的 `nickname` 无 `min_length`（`POST /auth/init` 要求 ≥1）→ 允许把昵称置空，前端显示空白名字 | `app/schemas/auth.py:32` | Phase 13 |
+| D-51 | P3 | `POST /auth/verify-api` 对空 Key 只 `.strip()` 不校验非空 → 空字符串会真实请求 provider（浪费一次网络/延迟后才映射 401 文案） | `app/api/auth.py:96` | Phase 13 |
+| D-52 | P3 | `DesktopPet.vue:141` 初始 1s 定时器未保存句柄/未纳入卸载清理 → 1s 内卸载仍执行一次 `randomMessage()` 并遗留 3s 气泡定时器 | `features/pet/components/DesktopPet.vue` | Phase 13 |
+| D-53 | P3 | `DesktopPet` 低精力玩耍的自定义提示语被 `setAction('sleep')` 内部随机气泡覆盖（与 feed/rest 的文案顺序不一致）；且 `petClass` 未映射 dance/read/run/wave 等动作类 | 同上 `:286-293` | Phase 13 |
+| D-54 | P3 | `DocumentGraph` 的力导向 `requestAnimationFrame` tick 无 `document.hidden` 暂停/无节流 → 后台标签页持续耗电；拖拽结束存在惯性冲量 | `features/document/components/DocumentGraph.vue` | Phase 13 |
 
 > 原则：**先修 P0/P1 的"正确性"，再谈结构搬迁**。在事务边界、迁移基线、备份导入还有问题时做领域分包，只是把混乱打包进更漂亮的新目录。
 
@@ -418,6 +423,7 @@ CI：`.github/workflows/{backend,frontend,repo-guard}.yml` + `android-build.yml`
 | **Phase 9** | 修剩余 P2/P3 + 生命周期测试 + CI 增强 | D-36~D-38 修复（健康检查 baseURL、同步错误兜底、提醒去重上限）；后端 1823 passed、覆盖率 96.63%（main.py/bootstrap 100%）；前端 344 passed、lines 41.54%（阈值 {40,79,64,40}）；windows-startup 支持 PR 触发 + 前后端覆盖率 artifact；backend 覆盖率阈值对齐 95→96；新登记 D-39~D-44 | ✅ 本轮完成（2026-10-30） |
 | **Phase 10** | 修剩余 P2/P3 + 组件测试 + 备份恢复安全测试 | D-39~D-45 修复（提醒 TTL/容量、BaseSelect/BaseModal、main.py fail-open 一致性+多用户备份、多行 %-style 扫描）；后端 1841 passed、覆盖率 96.68%（main.py 100%）；前端 403 passed、lines 44.01%（阈值 {43,81,67,43}）；新增 `test_backup_import_subprocess.py`（10 条，子进程隔离真实恢复/拒绝坏包）；新登记 D-46/D-47 | ✅ 本轮完成（2026-10-30） |
 | **Phase 11** | 数据安全修复 + 路由/壳层测试 + 覆盖率审计 | D-46/D-47 修复（备份恢复原子替换+自动回滚、.bak 命名冲突）；后端 1897 passed、覆盖率 **96.68%→97.9%**（CI 阈值 96→97）；前端 457 passed、lines **44.01%→82.42%**（阈值改 {81,88,45,81}，新增「统计面变化」的棘轮规则）；app/router 懒加载路径全部真实 import 防失效；新登记 D-48/D-49 | ✅ 本轮完成（2026-10-31） |
+| **Phase 12** | 事件总线修复 + API 端点补测 + 大型组件测试 | D-48/D-49 修复（异步 handler 静默丢失、批量失败可观测性）；后端 1927 passed、覆盖率 **97.98%→98.33%**（CI 阈值保持 97）；前端 504 passed / 34 files、lines 82.09%（阈值 {81,88,48,81}）；A 类 API 端点（auth/avatar/conversation/asset/pet）未覆盖行清零；新登记 D-50~D-54 | ✅ 本轮完成（2026-10-31） |
 
 **明确不做（以及为什么）**：
 

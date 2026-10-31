@@ -7,6 +7,23 @@
 
 ## [Unreleased]
 
+### Changed — Phase 12：事件总线修复 + A 类 API 补测 + 大型组件测试（2026-10-31）
+
+**D-48/D-49 修复**
+- **D-48（P2）** `event_bus` 异步 handler 在无运行事件循环时会**静默丢失**（`get_event_loop()` 自动建未运行 loop → `create_task` 排队永不执行、`called` 仍 +1）：改为 `get_running_loop()` try/except，无运行循环逐 handler `asyncio.run()` 同步兜底；有循环时正常排队，并给 task 加 `add_done_callback` 把延迟失败/取消写入 history/stats + 日志（`called` 语义 = 成功排队即计，注释+测试固定）。
+- **D-49（P3）** `task_service` 批量操作失败从"只计数"改为逐条 `logger.warning("批量操作失败: task_id={} action={} reason={}")`（缺失/越权/异常三类原因），`BatchTaskResult` 契约不变。
+
+**测试与覆盖率**
+- 后端：**1927 passed**（1897 → +30：event_bus 异步投递 6 / 批量可观测 2 / A 类 API 端点 23 / 防御分支更新）；覆盖率 **97.98% → 98.33%**；`api/auth.py`、`api/avatar.py`、`api/conversation.py`、`service/asset_service.py`、`service/pet_service.py` **未覆盖行全部清零**；CI 阈值保持 97%。
+- 前端：**504 passed / 34 files**（457 → +47：DesktopPet 24 / DocumentGraph 13 / AppIcon 10）；lines 82.09%、branches 89.73%、functions **49.2%**（分母 591→628、covered 274→309）；阈值 `{81,88,45,81}` → **`{81,88,48,81}`**；`docs/guides/frontend.md §九` 阈值规则补"波动需连跑两次确认稳定"与 Phase12 示例。
+
+**新登记 5 个问题（D-50~D-54，未修）**
+- D-50（P3）`PATCH /auth/me` 的 nickname 缺 `min_length`（init 要求 ≥1）→ 允许置空昵称；
+- D-51（P3）`POST /auth/verify-api` 空 Key 会真实请求 provider（应先校验非空）；
+- D-52（P3）`DesktopPet` 初始 1s 定时器未纳入卸载清理；
+- D-53（P3）`DesktopPet` 低精力玩耍提示被随机气泡覆盖；`petClass` 未映射部分动作类；
+- D-54（P3）`DocumentGraph` 力导向 tick 无 `document.hidden` 暂停/节流。
+
 ### Changed — Phase 11：备份恢复数据安全 + 路由/壳层测试 + 覆盖率审计（2026-10-31）
 
 **D-46/D-47 修复（数据安全，P2/P3）**

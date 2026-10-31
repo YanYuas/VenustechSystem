@@ -396,7 +396,11 @@ def _raise_no_loop():
 class TestEventBusAsyncBranches:
     def _fake_loopless_asyncio(self):
         # 只替换 event_bus 模块内的 asyncio 引用，避免影响 pytest 自身
-        return types.SimpleNamespace(get_event_loop=_raise_no_loop, run=asyncio.run)
+        return types.SimpleNamespace(
+            get_event_loop=_raise_no_loop,
+            get_running_loop=_raise_no_loop,
+            run=asyncio.run,
+        )
 
     def _cleanup(self, event: str) -> None:
         EventBus._async_handlers.pop(event, None)
