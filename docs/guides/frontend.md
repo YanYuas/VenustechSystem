@@ -1,6 +1,6 @@
 # 启明星系统 · 前端开发说明
 
-> 版本：v1.0 | 更新日期：2026-08-29 | 技术栈：Vue 3 + TypeScript + Vite + Element Plus
+> 版本：v1.5 | 更新日期：2026-11-01 | 技术栈：Vue 3 + TypeScript 5 + Vite 8 + Vitest 5 + Pinia + Element Plus
 
 ## 一、项目架构
 
@@ -118,9 +118,9 @@ frontend/
 |------|------|------|
 | 框架 | Vue 3 + Composition API | `<script setup>` 语法 |
 | 语言 | TypeScript 5.x | 严格模式 |
-| 构建 | Vite 5.x | 极速热更新 |
+| 构建 | Vite 8.x（8.3.5，Rolldown/oxc） | 极速热更新；插件 @vitejs/plugin-vue 6 |
 | UI 库 | Element Plus | 按需引入，自定义主题覆盖 |
-| 路由 | Vue Router 4 | Hash 模式（Electron 兼容） |
+| 路由 | Vue Router 4 | Hash 模式（Web / Capacitor 壳通用） |
 | HTTP | Fetch API 原生封装 | 重试/超时/SSE 流式 |
 | 日期 | dayjs | 轻量级日期处理 |
 
@@ -128,10 +128,11 @@ frontend/
 
 ### 2.1 主题系统（useTheme）
 
-三套内置主题包 × 明暗模式：
+四套内置主题包 × 明暗模式：
 - **奶油糖果**（cream）：温暖柔和，日常使用
 - **国风雅集**（guofeng）：古典雅致，文人气息
 - **深渊档案**（abyss）：深邃神秘，专注沉浸
+- **史诗典藏**（epic）：金琥珀传说，史诗质感
 
 主题通过 `data-theme` 属性切换，CSS 变量驱动：
 ```ts
@@ -219,7 +220,7 @@ const { tasks, loading, fetchTasks } = useTask()
 ### 4.1 开发命令
 
 ```bash
-npm install       # 安装依赖
+npm ci            # 按 package-lock.json 精确安装（有 lock 一律用 ci）
 npm run dev       # 启动开发服务器（端口 5173）
 npm run build     # 生产构建
 npm run preview   # 预览构建结果
@@ -228,13 +229,16 @@ npm run test      # 单元测试（vitest run，单次）
 npm run test:watch# 单元测试（监听模式）
 ```
 
+> 环境：Node 24 LTS（CI 固定 24；vitest 5 / jsdom 30 要求 ≥22.22）。只有改依赖时才用 `npm install`，
+> 提交前用 `npm ci` 验证 `package-lock.json` 与 `package.json` 一致。
+
 ### 4.1.1 单元测试（vitest + jsdom，2026-10-11 起）
 
 - 配置文件：`vitest.config.ts`（**独立于** `vite.config.ts` —— 后者挂了
   AutoImport / Components，会改写 `src/*.d.ts`，单元测试不需要）
-- 全局前置：`src/test/setup.ts`（补 jsdom 缺失的 `window.matchMedia`，可切换 `matches`）
+- 全局前置：`src/shared/test/setup.ts`（补 jsdom 缺失的 `window.matchMedia`，可切换 `matches`）
 - 用例位置：`src/**/__tests__/**/*.spec.ts`
-- 已纳入一键入口：仓库根 `python scripts/check_all.py` 第 12 项
+- 已纳入一键入口：仓库根 `python scripts/check_all.py` 第 **12/16** 项
 
 写法约定：
 
@@ -309,6 +313,7 @@ interface ApiResponse<T> {
 | v1.3 | 2026-10-27 | 目录分层重构：`kernel/`（http/ui/offline/device/async）+ `shared/`（设计系统/主题/常量/指令）+ `features/<domain>/`（27 个领域，唯一所有权落点），旧按类型目录已删除；引入 ESLint 9 flat + Prettier 并纳入 CI，其中 ESLint 用 `no-restricted-imports` 强制 ADR-0007 分层边界 |
 | v1.2 | 2026-10-11 | 引入单元测试体系（vitest + jsdom）并修 3 处缺陷：①`vitest.config.ts` + `src/test/setup.ts`，4 个 spec / **75 条用例**，纳入 `check_all.py` 第 12 项（11 项 → 12 项）②**修 `useTheme` 的 `isDark` 不响应系统明暗**（computed 依赖里只有 `config`，系统切换时 `data-theme` 变了但 `isDark` 不重算）③**修 `THEME_PACKS` 漏 `epic`**（常量 3 套 vs 类型/useTheme/设置页 4 套）④**修 `useQueryAction` 处理器抛错变成未捕获 Promise rejection**（改为捕获 + 记日志 + 保留 action 参数以便重试） |
 | v1.4 | 2026-10-28 | 测试质量基建（D-13 后续）：接入 `@vitest/coverage-v8` + `npm run test:coverage`（v8 provider，先观测不设阈值），新增 kernel/http、kernel/offline、shared 与 features composable 的一批行为测试；CI 增加覆盖率步骤（`continue-on-error`，只观测） |
+| v1.5 | 2026-11-01 | Vite 8 迁移（D-57）：vite 8.3.5 + `@vitejs/plugin-vue` 6 + vitest 5 + `@vitest/coverage-v8` 5（Rolldown/oxc）；构建产物体积 −0.76%，578 tests 全绿；覆盖率 remapper 换代 → 显式启用「覆盖率口径 v2」并重校准阈值（详见 §九，不视为回退）；依赖安装统一 `npm ci`（有 `package-lock.json`） |
 
 ## 八、Lint 与格式化（D-13）
 

@@ -205,7 +205,7 @@ VenustechSystem/
 │   │   ├── migrate.py          启动迁移；seed.py 演示数据
 │   │   └── migration_helpers.py
 │   ├── migrations/             Alembic（0001 冻结基线 + 0002–0022；见 §10 D-05）
-│   ├── tests/                  1284 条测试（api/production/repository_contract/sync/architecture）
+│   ├── tests/                  2047 条测试（api/production/repository_contract/sync/architecture）
 │   ├── scripts/                后端专用：冒烟/探针/种子/演示数据
 │   ├── requirements.txt        ★ 运行时依赖唯一来源
 │   ├── requirements-dev.txt    测试/工具依赖
@@ -319,7 +319,7 @@ VenustechSystem/
 | 守护 | 命令 | 守什么 |
 |---|---|---|
 | 架构 | `scripts/audit_architecture.py` | 分层方向、core 隔离、领域归属、路由/模型注册、根目录契约、**事务边界(R11)**、**迁移基线(R12)**、**service 零直连 ORM(R13)**、**前端 kernel/shared/features 分层(R14)**；R1/R2/R13/R14 均有负向测试证明会变红 |
-| 后端测试 | `pytest backend/tests` | 1284 条：API 形状 + 生产行为 + 仓储契约 + 同步引擎 + 数据库基础设施 |
+| 后端测试 | `pytest backend/tests` | 2047 条：API 形状 + 生产行为 + 仓储契约 + 同步引擎 + 数据库基础设施 |
 | 后端 lint | `cd backend && python -m ruff check app tests` | ruff 0.6.2 只启正确性规则 `E4,E7,E9,F`：未定义名 / 未使用导入与变量 / 重定义 / 语法错误；**不跑 `ruff format`**（避免纯风格 diff），口径见 `backend/pyproject.toml` |
 | 后端冒烟 | `backend/scripts/smoke_backend.py` | 真实启动 + 迁移 + 端到端断言 |
 | 版本一致 | `scripts/check_versions.py` | 5 处版本 == `VERSION` |
@@ -446,6 +446,7 @@ CI：`.github/workflows/{backend,frontend,repo-guard}.yml` + `android-build.yml`
 | **Phase 17** | P2 加密原子性 + 小债清零 + 补丁发行 | **D-58~D-63 全部修复**（加密轮换原子回滚/日期适配/weekly 日志/toast 上限去重/快捷键守卫/Modal 二次关闭），并借 Vite 8 spike 附带修掉 **D-64**（DocumentGraph 样式失效）与 **D-65**（项目时间线/导出复盘 500，P2）；后端 2026 passed、覆盖率 **99.41%→99.75%**；前端 578 passed、lines 84.79%（阈值 {83,89,51,83}）；发 **v1.0.1**；D-57 结论转「可升级、单独立项」；新登记 D-66 | ✅ 本轮完成（2026-11-01） |
 | **Phase 18** | Vite 8 迁移（D-57） | vite 8.3.5 + plugin-vue 6 + vitest 5 + coverage-v8 5 + @types/node 24 + 显式 esbuild；rolldown `codeSplitting.groups` / `minify:'oxc'` / `strictPort:true`；构建 −0.76%、578 tests 全绿；覆盖率口径 v2 重校准 {70,64,49,69}（双口径记录）；CI/启动链路配套（esbuild 显式依赖、Node 24 确认、windows dev 观察点）；发 **v1.1.0** | ✅ 本轮完成（2026-11-01） |
 | **Phase 19** | 快照优化（不迭代版本号） | **D-66 闭环**（主密钥 salt 历史、不落 key 明文、换 master 语义钉住）；删除 review `_list_item` 死代码；覆盖率 **99.76%→99.82%**（2047 passed，剩余 18 全为 B/C/D 分类）；Dependabot 新增 major 联升组（vite/vitest/@vitejs/@vitest/@types/node）；仓库卫生 **.arch-audit 1.09GB→18MB**；**保持 VERSION=1.1.0，不发版** | ✅ 快照已合入（2026-11-01） |
+| **Phase 20** | 本地卫生 + 启动脚本/注释文档刷新 | 清理本地垃圾 **≈386MB**（`.arch-audit` 1.1GB→0.3MB、213 个 `__pycache__`、旧 pytest 副本/日志/缓存）；`ops/start.ps1` 修复重复 `.PARAMETER` 注释 + `#Requires` 移到 help 后（Get-Help 可渲染）；`ops/setup.ps1` 统一「有 lock → `npm ci`」；`#Requires`/Node 要求（`^20.19 \|\| >=22.12`，推荐 24）/strictPort 描述对齐 Vite 8；`ops/backup-git.ps1` 补 BOM 并把 BOM 守卫扩到 `ops/*.ps1`；README/CONTRIBUTING/frontend.md/测试 ROADMAP/check_all 注释去陈旧（98%→99%、ruff 0.17.3、Vite 8、1219→2047）；**不迭代版本号** | ✅ 快照已合入（2026-11-01） |
 
 **明确不做（以及为什么）**：
 

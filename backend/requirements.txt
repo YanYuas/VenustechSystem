@@ -12,6 +12,6 @@ python-multipart==0.0.32
 cryptography==50.0.2
 
 # 开发/测试（可选，本机未装，按需安装）
-# pytest==8.3.3
-# ruff==0.6.2
+# pytest==9.2.0（仅 requirements-dev.txt；生产不装）
+# ruff==0.17.3（仅 requirements-dev.txt；生产不装）
 # pywin32==306            # Windows DPAPI 加密（API Key 加密用，缺省时安全降级）

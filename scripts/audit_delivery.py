@@ -186,6 +186,16 @@ def _check_start_ps1() -> None:
             f"按 ANSI 读取，中文提示与注释会乱码"
         )
 
+    # --- B2. ops/ 下所有 PowerShell 脚本都必须带 UTF-8 BOM ---
+    # 2026-11-01：ops/backup-git.ps1 曾因无 BOM 在 PowerShell 5.1 下产生 7 处解析错误
+    # （BOM 检查此前只覆盖 start/setup/dev 入口，未覆盖 ops/ 其余脚本）。
+    for ps1 in sorted((ROOT / "ops").glob("*.ps1")):
+        if not _has_utf8_bom(ps1):
+            problems.append(
+                f"[B] ops/{ps1.name}: 缺少 UTF-8 BOM —— Windows PowerShell 5.1 会把无 BOM 的 "
+                f"UTF-8 按 ANSI 读取，中文提示与注释会乱码甚至解析失败"
+            )
+
     # --- C. 不得 git add -A ---
     for i, line in _code_lines(lines):
         if GIT_ADD_ALL.search(line):

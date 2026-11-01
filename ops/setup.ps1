@@ -1,4 +1,4 @@
-﻿#Requires -Version 5.1
+﻿
 <#
 .SYNOPSIS
   启明星系统 · 环境初始化（唯一安装实现，D-11）
@@ -10,11 +10,13 @@
   `git add -A` + `git commit`）。
 
   步骤：
-    1/5 工具检查（Python 3.11+ / Node.js 18+；uv 可选，装了就用它加速）
+    1/5 工具检查（Python 3.11+；Node.js ^20.19.0 || >=22.12.0 —— Vite 8 engines，
+        推荐 24 与 CI 一致；uv 可选，装了就用它加速）
     2/5 创建后端 venv（backend\.venv）
     3/5 安装后端依赖（requirements-dev.txt，它 -r 了 requirements.txt；
         与 ADR-0005「新机器 setup 装得全、pytest 不再是幽灵依赖」一致）
-    4/5 安装前端依赖（npm install）
+    4/5 安装前端依赖（有 frontend\package-lock.json 时用 npm ci：可重复安装、
+        与 CI 一致；无 lock 时回退 npm install）
     5/5 完成提示
 
 .PARAMETER WhatIf
@@ -25,6 +27,9 @@
 .EXAMPLE
   setup.bat -WhatIf
 #>
+
+#Requires -Version 5.1
+
 param(
     [switch]$WhatIf
 )
@@ -89,7 +94,7 @@ if ($null -eq $pythonCmd) {
 }
 $nodeCmd = Get-Command node -ErrorAction SilentlyContinue
 if ($null -eq $nodeCmd) {
-    Fail 'node not found. Install Node.js 18+ first.'
+    Fail 'node not found. Install Node.js 20.19+ or 22.12+ (24 recommended, CI parity) first.'
 }
 $uvExe = (Get-Command uv -ErrorAction SilentlyContinue).Source
 if ($null -ne $uvExe) {
@@ -159,19 +164,24 @@ if ($script:IsWhatIf) {
 }
 
 # --- 4/5 frontend deps ---
+# 有 lockfile 用 npm ci（严格按 lock 安装、可重复、与 CI 一致）；没有 lock 才回退
+# npm install（会生成 lock）。CI 的 frontend.yml 固定用 npm ci，本地与 CI 对齐可避免
+# "本机能跑、CI 装出另一套依赖"。
 Write-Step '4/5'
-Write-Info 'installing frontend dependencies (npm install) ...'
+$frontendLock = Join-Path $Frontend 'package-lock.json'
+$npmAction = if (Test-Path -LiteralPath $frontendLock) { 'ci' } else { 'install' }
+Write-Info "installing frontend dependencies (npm $npmAction) ..."
 if ($script:IsWhatIf) {
-    Write-CommandPlan 'npm.cmd' @('install') $Frontend
+    Write-CommandPlan 'npm.cmd' @($npmAction) $Frontend
 } else {
     Push-Location $Frontend
     try {
-        & npm.cmd install
+        & npm.cmd $npmAction
         $npmRc = $LASTEXITCODE
     } finally {
         Pop-Location
     }
-    if ($npmRc -ne 0) { Fail 'npm install failed. See output above.' }
+    if ($npmRc -ne 0) { Fail "npm $npmAction failed. See output above." }
     Write-Ok 'frontend deps OK'
 }
 

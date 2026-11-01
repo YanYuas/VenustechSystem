@@ -39,7 +39,7 @@ python scripts/check_all.py --strict     # 16 项全绿（CI 同款）
 python scripts/audit_architecture.py          # 架构守护
 python scripts/audit_workspace_hygiene.py     # 目录卫生（tracked 泄漏/ignore 契约/root·var 白名单）
 python scripts/audit_workspace_hygiene.py --fix-local  # 清理本地垃圾（不碰 data/demo/legacy/backups）
-cd backend && python -m ruff check app tests  # 后端 lint（ruff 0.6.2，正确性规则 E4/E7/E9/F）
+cd backend && python -m ruff check app tests  # 后端 lint（ruff 0.17.3，正确性规则 E4/E7/E9/F）
 cd backend && python -m pytest tests -q  # 后端测试（pytest 在 requirements-dev.txt）
 cd frontend && npm run lint && npm run format:check && npm run typecheck && npm test
 ```
@@ -75,7 +75,7 @@ def upgrade() -> None:
 ```
 
 `alembic revision --autogenerate` 产出的 `create_table`/`create_index` 需**手动包守卫**。
-背景与待修债务见 [ARCHITECTURE.md §10 D-05](ARCHITECTURE.md)。
+背景见 [ARCHITECTURE.md §10 D-05](ARCHITECTURE.md)（已修，基线已冻结）。
 
 ## 5. 提交规范（Conventional Commits）
 
@@ -99,8 +99,8 @@ chore(scope): 描述       # 杂项/清理
 
 > 真实库 `var/data/app.db` 曾于 2026-09-15 移出版本控制（此前切分支会连数据库一起切）；2026-10-27 起运行期数据统一在 `var/`。
 > **请勿再把它加回仓库**；全新库靠「迁移 + 种子数据」重建。
-> ⚠️ 已知历史问题：旧分支 `origin/feature/phase2-development` 里仍残留该库，
-> 处置方案见 [ARCHITECTURE.md §10 D-02](ARCHITECTURE.md)。
+> ⚠️ 历史问题（已处置）：旧分支 `origin/feature/phase2-development` 曾残留该库，
+> 已通过历史清洗 + 仓库重建彻底清除，见 [ARCHITECTURE.md §10 D-02](ARCHITECTURE.md)。
 
 ## 7. 设计令牌
 

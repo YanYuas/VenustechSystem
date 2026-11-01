@@ -9,7 +9,13 @@
 > `scripts/probe_backend_live.py`（65 项断言，打真实 uvicorn + 真实 SQLite）。
 > 所有数字均来自本次实际 `pytest` / 探针输出，非估算。
 
-## 当前状态（2026-10-11 实测：**52 文件 / 1219 用例**，全量 0 failed）
+> **本文是 2026-10-11 的测试体系推进记录（历史快照）**：下面的文件/用例清单与数字保留当时的真实性，
+> 用于理解测试体系如何演进。**现役规模与门禁以 [README.md 质量与验证](../../README.md) 和
+> [ARCHITECTURE.md §9](../../ARCHITECTURE.md) 为准**：2026-11 实测 **97 个 `backend/tests/*.py`
+> （含 conftest/factories）/ 2047 passed / 覆盖率 99.82% / `check_all.py` 16 项**
+> （下文「52 文件 / 1219 用例」是 2026-10-11 的历史数字）。
+
+## 历史快照（2026-10-11 实测：**52 文件 / 1219 用例**，全量 0 failed；现役规模见文首）
 
 ### 基础设施与守护
 
@@ -129,8 +135,8 @@
 
 | 入口 | 是否需要起服务 | 守什么 |
 |------|----------------|--------|
-| `backend/tests/`（pytest, 1219 条） | 否（进程内 TestClient） | 业务规则、边界、越权、契约 |
-| `backend/scripts/smoke_backend.py`（32 断言） | 否（TestClient） | 启动链路、迁移、种子 |
+| `backend/tests/`（pytest, 2047 条） | 否（进程内 TestClient） | 业务规则、边界、越权、契约 |
+| `backend/scripts/smoke_backend.py`（约 236 断言） | 否（TestClient） | 启动链路、迁移、种子 |
 | `backend/scripts/probe_backend_live.py`（65 断言） | **是**（真实 uvicorn + 真实 HTTP） | **用户路径**：全新库 → 全部迁移 → 种子 → 接口真可用 |
 
 > 第三个入口正是为「铁律：完成 = 双击 → 服务真的起来 → 关键接口非空」而建：
@@ -138,6 +144,9 @@
 > （必须指向临时数据目录，勿拿真实库跑）。
 
 ### 尚未覆盖
+
+> 以下为 2026-10-11 快照；后续多轮已补测 assistant / plugins / avatar / workspace / sync / events 等
+> （详见 `tests/` 目录与后端覆盖率），此表仅作历史记录。
 
 | 模块 | 备注 |
 |------|------|
@@ -367,7 +376,7 @@
 
 ```bash
 cd backend
-.\.venv\Scripts\python.exe -m pytest tests/ -v                       # 全量（1219 条）
+.\.venv\Scripts\python.exe -m pytest tests/ -v                       # 全量（2047 条）
 .\.venv\Scripts\python.exe -m pytest tests/test_pet_production.py -v  # 单模块
 .\.venv\Scripts\python.exe -m pytest tests/ -k "越权 or ownership"     # 关键词筛选
 .\.venv\Scripts\python.exe -m pytest tests/ --tb=short               # 简短报错
@@ -390,7 +399,7 @@ cd backend
 > 若仍只想在沙箱内核对结论（不绕钩子）：加 `-p no:cacheprovider` 并把输出重定向到
 > 文件，再统计进度行（`.` / `F` / `E`）—— 汇总行丢了但结论有效。本文档的数字即用此法核过。
 
-> 1219 条的主要耗时项是 vault 的 PBKDF2（200 000 轮）与 pet 的多次迁移建库 ——
+> 2047 条的主要耗时项是 vault 的 PBKDF2（200 000 轮）与 pet 的多次迁移建库 ——
 > 每次 `setup` / `unlock` / `change_master_password` 都要真实派生密钥。
 > 这是**刻意保留的真实性**：把它 mock 掉就等于不测加密路径。
 
@@ -406,6 +415,7 @@ VENUSTECH_DATA_DIR="C:/Users/<你>/AppData/Local/Temp/venustech_probe" ^
 cd backend && .venv\Scripts\python.exe scripts\probe_backend_live.py
 ```
 
-一键入口（架构守护 / pytest / 冒烟 / 版本 / 令牌 / 类型检查 / 离线队列 /
-连通性 / 交付物守护 / 测试质量审计 / 日志格式审计 / **前端单元测试(vitest)**，共 12 项）：
+一键入口（架构守护 / pytest / 冒烟 / 版本 / 设计引用 / 前端类型检查 / 离线队列 /
+连通性 / 交付物守护 / 测试质量审计 / 日志格式审计 / **前端单元测试(vitest)** /
+文档链接 / 敏感文件守护 / 后端 lint(ruff) / 工作区结构，共 16 项）：
 仓库根目录 `python scripts/check_all.py`
