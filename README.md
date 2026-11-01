@@ -8,15 +8,15 @@
 [![repo-guard](https://github.com/YanYuas/VenustechSystem/actions/workflows/repo-guard.yml/badge.svg?branch=main)](https://github.com/YanYuas/VenustechSystem/actions/workflows/repo-guard.yml)
 [![windows-startup](https://github.com/YanYuas/VenustechSystem/actions/workflows/windows-startup.yml/badge.svg?branch=main)](https://github.com/YanYuas/VenustechSystem/actions/workflows/windows-startup.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.0.1-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](CHANGELOG.md)
 [![backend](https://img.shields.io/badge/backend-2026%20tests%20%C2%B7%2099.75%25%20coverage-brightgreen.svg)](https://github.com/YanYuas/VenustechSystem/actions/workflows/backend.yml)
-[![frontend](https://img.shields.io/badge/frontend-578%20tests%20%C2%B7%2084.79%25%20coverage-brightgreen.svg)](https://github.com/YanYuas/VenustechSystem/actions/workflows/frontend.yml)
+[![frontend](https://img.shields.io/badge/frontend-578%20tests%20%C2%B7%2071.01%25%20coverage-brightgreen.svg)](https://github.com/YanYuas/VenustechSystem/actions/workflows/frontend.yml)
 
 ![启明星系统首页（奶油糖果主题）](docs/assets/screenshot-main.png)
 
 *奶油糖果主题 · 首页主面板（四套主题可切换，见下方[主题画廊](#主题画廊)）*
 
-**技术栈**：FastAPI + SQLAlchemy 2 + SQLite（WAL）+ Alembic ｜ Vue 3 + TypeScript + Vite + Pinia + Element Plus ｜ Node 统一边缘服务 ｜ Capacitor（Android）/ PWA
+**技术栈**：FastAPI + SQLAlchemy 2 + SQLite（WAL）+ Alembic ｜ Vue 3 + TypeScript + **Vite 8**（Rolldown + oxc）+ Pinia + Element Plus ｜ Node 统一边缘服务 ｜ Capacitor（Android）/ PWA
 
 ---
 
@@ -174,7 +174,7 @@ backend/app/models/*.py     SQLAlchemy → SQLite（WAL）
 | 后端覆盖率 | `cd backend && python -m pytest tests -q --cov=app --cov-report=term-missing --cov-fail-under=98` | **99.75%**（阈值 99） |
 | 后端 lint | `cd backend && python -m ruff check app tests` | 0（正确性规则 E4/E7/E9/F） |
 | 前端单测 | `cd frontend && npm test` | **578 passed** |
-| 前端覆盖率 | `cd frontend && npm run test:coverage` | lines **84.79%**（阈值 83/89/51/83 棘轮） |
+| 前端覆盖率 | `cd frontend && npm run test:coverage` | lines **71.01%**（口径 v2；阈值 70/64/49/69 棘轮，说明见 [frontend.md §九](docs/guides/frontend.md)） |
 | 前端质量 | `cd frontend && npm run lint && npm run typecheck && npm run format:check` | 0（ESLint 含 ADR-0007 分层边界） |
 | 启动自检 | `start-dev.bat -Verify` | 真启动 → 健康检查 → 自动停止 |
 
@@ -216,15 +216,16 @@ backend/app/models/*.py     SQLAlchemy → SQLite（WAL）
 | **Phase 15** | **发行治理（v1.0.0）** | 版本 0.7.0 → **1.0.0**、MIT License、Release Notes、发布流程、本展示页 |
 | Phase 16 | SQLAlchemy 2.1 升级 | D-56 闭环（5 列显式 Float + SQLAlchemy 2.1.6/alembic 1.20.1）；后端 1995 / 99.41%、前端 569 / 84.77% |
 | **Phase 17** | **P2 加密原子性 + v1.0.1** | D-58~D-65 修复（加密轮换回滚、时间线/导出 500、DocumentGraph 样式失效等）；后端 **2026 / 99.75%**、前端 **578 / 84.79%**；首发补丁 **v1.0.1** |
+| **Phase 18** | **Vite 8 迁移（v1.1.0）** | D-57：vite 8.3.5 + plugin-vue 6 + vitest 5 + 显式 esbuild；构建 −0.76%、578 tests 全绿；覆盖率口径 v2 重校准 {70,64,49,69}；**v1.1.0** |
 
 ### 已知限制与后续方向
 
 - ~~D-56 SQLAlchemy 2.1 升级暂缓~~ **已在 v1.0.1 完成**：5 列显式 `Float` + SQLAlchemy 2.1.6 / alembic 1.20.1，迁移完整性三方对账通过。
-- **D-57（P3）Vite 8 迁移**：已完成可行性 spike（vite 8.3.5 + plugin-vue 6 + vitest 5 副本内 build/typecheck/569 tests 全通过），但**覆盖率口径漂移需先重校准**，单独立项（Phase 18）。
+- ~~D-57 Vite 8 迁移~~ **已在 v1.1.0 完成**：vite 8.3.5 / plugin-vue 6 / vitest 5 / 显式 esbuild；覆盖率口径 v2 已按规则显式重校准并双口径记录。
 - **单用户模型**：无账号体系与多租户，认证是"本地信任 + 外部令牌"；不做云端同步（云适配器契约已冻结，留作后续）。
 - 其余债务与处置状态：**[ARCHITECTURE.md](ARCHITECTURE.md) §10（不假装健康，逐条列出已修/未修）**。
 
-**下一版本方向（v1.1）**：D-57 Vite 8 迁移（含覆盖率口径校准）、D-66 及剩余 P3 债务、发行后的用户反馈修复；不承诺未实现的功能。
+**下一版本方向（v1.2）**：D-66 与剩余 P3 债务、发行后用户反馈修复、浏览器视觉回归补齐；不承诺未实现的功能。
 
 ---
 
@@ -233,7 +234,7 @@ backend/app/models/*.py     SQLAlchemy → SQLite（WAL）
 | 我想… | 看这里 |
 |---|---|
 | 读懂整体架构、加一个模块 | [ARCHITECTURE.md](ARCHITECTURE.md)（唯一权威） |
-| 最新版本有什么 | [RELEASE_NOTES v1.0.1](docs/RELEASE_NOTES_v1.0.1.md) ｜ [v1.0.0](docs/RELEASE_NOTES_v1.0.0.md)（首发） |
+| 最新版本有什么 | [RELEASE_NOTES v1.1.0](docs/RELEASE_NOTES_v1.1.0.md) ｜ [v1.0.1](docs/RELEASE_NOTES_v1.0.1.md) ｜ [v1.0.0](docs/RELEASE_NOTES_v1.0.0.md)（首发） |
 | 找某类文档 | [docs/README.md](docs/README.md)（文档总索引） |
 | 开发规范 / 启动 / 分支 | [docs/guides/development.md](docs/guides/development.md) |
 | 启动排障 / 备份恢复 | [startup runbook](docs/runbooks/startup.md) · [backup runbook](docs/runbooks/backup.md) |

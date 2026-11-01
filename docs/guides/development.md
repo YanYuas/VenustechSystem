@@ -132,6 +132,21 @@ python -m pytest tests -q --cov=app --cov-report=term-missing
 
 ## 4. 前端规范（Vue 3 + TypeScript）
 
+**技术栈（D-57 Vite 8 迁移后，2026-11）**：Vue 3.5 · **Vite 8.3**（构建内核换成 Rolldown + oxc + lightningcss）·
+**@vitejs/plugin-vue 6** · **Vitest 5**（+ `@vitest/coverage-v8` 5）· vue-tsc 2.x · TypeScript 5.9 · **Node 24**
+（CI 与开发机一致；vite 8 engines 要求 `^20.19 || >=22.12`）。`esbuild` 不再是 vite 的传递依赖，而是
+**显式 devDependency**：`scripts/test-*.ts` 两个行为测试（check_all 第 7/8 项、frontend-ci 同名步骤）仍用它转译。
+
+**依赖大版本升级后必须重建 `node_modules`**（本地；否则旧传递依赖残留会出现"本地能跑、CI 崩"或反之）：
+
+```bash
+cd frontend
+rm -rf node_modules && npm ci      # Windows PowerShell: Remove-Item -Recurse -Force node_modules; npm ci
+```
+
+`npm ci` 严格按 `package-lock.json` 安装 —— lock 变更后不要用 `npm install`（会改写 lock/tree），
+也不要用 `--legacy-peer-deps` 掩盖 peer 冲突（CI 用的是 `npm ci`，冲突应在本地暴露）。
+
 ### 4.1 目录结构
 
 ```

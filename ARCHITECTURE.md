@@ -3,7 +3,7 @@
 > **本文是全项目架构的唯一权威描述（Single Source of Truth）。**
 > 代码与文档冲突时以本文 + `docs/architecture/domains.json` + `scripts/audit_architecture.py` 为准。
 >
-> - 版本：对应应用 `VERSION` = 1.0.1 ｜ 最后更新：2026-11-01
+> - 版本：对应应用 `VERSION` = 1.1.0 ｜ 最后更新：2026-11-01
 > - 维护规则：**改架构必须同时改本文**；结构规则由机器守护（§9），不是靠自觉。
 > - 读者：接手这个项目的你 / 未来的你。建议按 §0 → §3 → §4 顺序读，15 分钟能建立完整心智模型。
 
@@ -404,7 +404,7 @@ CI：`.github/workflows/{backend,frontend,repo-guard}.yml` + `android-build.yml`
 | D-54 | P3 | `DocumentGraph` 力导向 tick 无 `document.hidden` 暂停/拖拽惯性 | `DocumentGraph.vue` | ✅ 已修（2026-10-31）：visibilitychange hidden 停/visible 重启 + 卸载移除；mouseup 清零 vx/vy；测试区分度 1.6px vs 96px |
 | D-55 | P3 | `DesktopPet` feed/play/rest 的"2~3s 自动收气泡"用未保存句柄的匿名 setTimeout → 卸载会残留 | `DesktopPet.vue` | ✅ 已修（2026-10-31）：`showMessageFor(text, ms)` 统一句柄 + `clearAllTimers()` 集中清理（含 toggleForm 两级定时器）；+5 用例 |
 | D-56 | P3 | SQLAlchemy 2.1 升级被迁移完整性门禁拦下：隐式 `float` 注解映射由 `Float` 变 `Double`，5 个未显式标注类型的列与冻结迁移 DDL 漂移 | `models/pet.py`、`models/workspace.py` | ✅ 已闭环（2026-11-01）：5 列显式 `Float`；升级 **SQLAlchemy 2.1.6 / alembic 1.20.1**；迁移完整性 6 passed（三方对账 FLOAT/FLOAT/FLOAT），全量 1995 passed；测试中 `Query.get()`→`Session.get()` 清 LegacyAPIWarning |
-| D-57 | P3 | vite 5→8 是 major（Node 版本/插件兼容/构建产物回归/覆盖率口径漂移） | `frontend/` | ⏳ 已评估（2026-11-01 spike，见 `.arch-audit/reports/vite8-spike.md`）：vite 8.3.5 + plugin-vue 6 + vitest 5 在副本内 **build/typecheck/eslint/569 tests 全通过**、体积 -0.8%；4 类阻塞均有明确修法（成套升级、rolldown codeSplitting、minify:'oxc'、`DocumentGraph` 补 `lang="scss"`）；**唯一未决是覆盖率口径漂移**（lines 分母 7453→3014，需逐文件重校准）→ 建议单独立项（Phase 18），不混入补丁版 |
+| D-57 | P3 | vite 5→8 是 major（Node/插件/构建产物/覆盖率口径） | `frontend/` | ✅ 已迁移（2026-11-01）：**vite 8.3.5 + @vitejs/plugin-vue 6.0.10 + vitest 5.0.5 + @vitest/coverage-v8 5.0.5 + @types/node 24 + 显式 esbuild ^0.28.2**；配置迁 rolldown `codeSplitting.groups` / `minify:'oxc'` / `strictPort:true`；构建产物 −0.76%、578 tests 全绿；coverage 层由 `v8-to-istanbul` 换 `ast-v8-to-istanbul`（口径 v2，已按规则显式重校准阈值 {70,64,49,69} 并记录双口径）；ES6/视觉回归未本地验证，靠 CI+windows dev 链路兜底 |
 | D-58 | P2 | `encryption.rotate_key` 半成功中间态（非 OSError 时新 key 已落盘/密钥环未写/内存旧 key） | `core/encryption.py` | ✅ 已修（2026-11-01）：三写入点改 tmp+fsync+`os.replace`；任一失败**逆序整体回滚**、内存保持旧值、原异常上抛；回滚失败仅 `logger.exception` 不覆盖原异常；12 条专项测试 |
 | D-59 | P3 | SQLite 默认 date adapter 弃用（Python 3.12+） | `app/database.py` | ✅ 已修（2026-11-01）：显式注册 date/datetime ISO adapter（格式与旧默认一致）；日期往返测试 + 弃用告警归零 |
 | D-60 | P3 | weekly 重复任务无匹配日静默跳过 | `task_service.py` | ✅ 已修（2026-11-01）：补 `logger.debug`（task_id/rule/base_date）；loguru sink 断言 |
@@ -443,6 +443,7 @@ CI：`.github/workflows/{backend,frontend,repo-guard}.yml` + `android-build.yml`
 | **Phase 15** | 首个可发行版本 v1.0.0 | 版本 0.7.0→**1.0.0** 全量同步（`check_versions.py --sync` 幂等，含 frontend/package-lock.json 根版本）；根 `LICENSE`（MIT）；`docs/RELEASE_NOTES_v1.0.0.md`（亮点/架构摘要/质量数据/快速开始/已知限制/升级说明）；CHANGELOG 归入 `[1.0.0] - 2026-11-01`（历史不丢）；发布流程文档（`docs/guides/development.md` §10，SemVer + `vX.Y.Z` tag 规范） | ✅ 本轮完成（2026-11-01，本地校验通过；tag / GitHub Release 待维护者执行） |
 | **Phase 16** | D-56 SQLAlchemy 2.1 升级 + 覆盖冲刺 | D-56 闭环：5 列显式 `Float` + 升级 **SQLAlchemy 2.1.6 / alembic 1.20.1**（迁移完整性 6 passed、三方类型一致）；后端 1995 passed、覆盖率 **98.94%→99.41%**（CI 阈值 98→99）；前端 569 passed、lines 82.2%→**84.77%**（阈值 {81,88,48,81}→{83,89,51,83}）；新登记 D-58~D-63 | ✅ 本轮完成（2026-11-01） |
 | **Phase 17** | P2 加密原子性 + 小债清零 + 补丁发行 | **D-58~D-63 全部修复**（加密轮换原子回滚/日期适配/weekly 日志/toast 上限去重/快捷键守卫/Modal 二次关闭），并借 Vite 8 spike 附带修掉 **D-64**（DocumentGraph 样式失效）与 **D-65**（项目时间线/导出复盘 500，P2）；后端 2026 passed、覆盖率 **99.41%→99.75%**；前端 578 passed、lines 84.79%（阈值 {83,89,51,83}）；发 **v1.0.1**；D-57 结论转「可升级、单独立项」；新登记 D-66 | ✅ 本轮完成（2026-11-01） |
+| **Phase 18** | Vite 8 迁移（D-57） | vite 8.3.5 + plugin-vue 6 + vitest 5 + coverage-v8 5 + @types/node 24 + 显式 esbuild；rolldown `codeSplitting.groups` / `minify:'oxc'` / `strictPort:true`；构建 −0.76%、578 tests 全绿；覆盖率口径 v2 重校准 {70,64,49,69}（双口径记录）；CI/启动链路配套（esbuild 显式依赖、Node 24 确认、windows dev 观察点）；发 **v1.1.0** | ✅ 本轮完成（2026-11-01） |
 
 **明确不做（以及为什么）**：
 

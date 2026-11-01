@@ -12,6 +12,9 @@
 #   12 前端单元测试        -> npm test（vitest run）
 #   7  离线队列行为测试    -> scripts/test-offline-queue.ts（esbuild 转译后 node 跑）
 #   8  HTTP 连通性测试     -> scripts/test-http-connectivity.ts（同上）
+#      ⚠ vite 8 起构建内核换 Rolldown/oxc/lightningcss，**不再随附 esbuild**；本仓库已在
+#        frontend/package.json 显式声明 `esbuild` devDependency（vite 8 peerOptional 接受
+#        ^0.27 || ^0.28）供这两步转译用，**不要删除该依赖**。
 #   5  设计令牌/图标存在性 -> frontend/scripts/audit-tokens.py（Python，标准库零依赖）
 # 构建产物：npm run build（vite build，仓库里不追产物，仅验证可构建）
 # ============================================================
@@ -69,8 +72,8 @@ jobs:
           python-version: "3.11"
 
       # 用 lockfile 精确安装（不是 npm install）：依赖漂移必须在这里暴露。
-      # 本机已用 `npm ci --dry-run` 验证 frontend/package-lock.json 与 package.json 一致
-      # （lockfileVersion 3，npm 10/Node 20 可读，无 peer 冲突）。
+      # lockfileVersion 3，npm 11 / Node 24 可读；vite 8 迁移后 peer 冲突必须在这里失败
+      # （不要用 --legacy-peer-deps 掩盖）。
       - name: Install dependencies (npm ci)
         timeout-minutes: 10
         run: npm ci --no-audit --no-fund

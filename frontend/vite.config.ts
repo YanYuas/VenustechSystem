@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+﻿import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import AutoImport from 'unplugin-auto-import/vite'
 import Components from 'unplugin-vue-components/vite'
@@ -36,7 +36,10 @@ export default defineConfig(({ mode }) => ({
   },
   server: {
     port: 5173,
-    strictPort: false,
+    // 显式占用端口：ops/start.ps1 -Mode dev -Verify 以 5173 为就绪判据，
+    // 若允许静默换端口（strictPort:false）会导致 -Verify 超时（windows-startup 门禁）。
+    // 冲突时直接失败，比"起来了但没人连得上"更易诊断。
+    strictPort: true,
     host: true,
     // 开发环境代理后端API，避免跨域
     proxy: {
@@ -60,27 +63,43 @@ export default defineConfig(({ mode }) => ({
     assetsDir: 'assets',
     // 生产环境关闭 sourcemap 减小体积
     sourcemap: mode !== 'production',
-    // 代码分割策略
-    rollupOptions: {
+    // vite 8 默认打包器换成 Rolldown：原 manualChunks(object) 迁移为
+    // output.codeSplitting.groups（对象写法在 rolldown 不支持，只有函数/分组两种）。
+    // 保留原三组分包意图：vue 生态 / element-plus / jszip。
+    rolldownOptions: {
       output: {
-        // 第三方依赖单独打包
-        manualChunks: {
-          'vue-vendor': ['vue', 'vue-router', 'pinia'],
-          'element-vendor': ['element-plus', '@element-plus/icons-vue'],
-          'editor-vendor': ['jszip'],
-          // dayjs 已被 element-plus 间接引用，无需单独分组
+        codeSplitting: {
+          groups: [
+            {
+              name: 'vue-vendor',
+              // 推荐用 [\\/] 匹配路径分隔符，避免 Windows 反斜杠问题（rolldown 文档）
+              test: /node_modules[\\/](?:vue|vue-router|pinia)[\\/]/,
+            },
+            {
+              name: 'element-vendor',
+              test: (id: string) => /node_modules[\\/](?:element-plus|@element-plus[\\/])/.test(id),
+            },
+            {
+              name: 'editor-vendor',
+              test: /node_modules[\\/]jszip[\\/]/,
+            },
+          ],
         },
         // 资源文件命名
         chunkFileNames: 'assets/js/[name]-[hash].js',
         entryFileNames: 'assets/js/[name]-[hash].js',
         assetFileNames: 'assets/[ext]/[name]-[hash].[ext]',
+        // vite 8 的 oxc 压缩：原 esbuild.drop 语义迁移到 rolldown output.minify.compress
+        minify: {
+          compress: {
+            dropConsole: mode === 'production',
+            dropDebugger: mode === 'production',
+          },
+        },
       },
     },
-    // 压缩配置（esbuild，无需额外依赖）
-    minify: 'esbuild',
-    esbuild: {
-      drop: mode === 'production' ? ['console', 'debugger'] : [],
-    },
+    // 压缩器换成 oxc（vite 8 默认；不再依赖 esbuild service）
+    minify: 'oxc',
     //  chunk 大小警告阈值
     chunkSizeWarningLimit: 1000,
   },

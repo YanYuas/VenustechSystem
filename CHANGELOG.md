@@ -2,6 +2,18 @@
 
 <!-- 下一版本占位：新改动从下一行开始追加；发布时整体归入 `## [X.Y.Z] - YYYY-MM-DD`。 -->
 
+## [1.1.0] - 2026-11-01
+
+**工程栈升级（D-57）**：Vite 5 → 8（Rolldown/oxc/lightningcss 构建内核），Vitest 3 → 5，`@vitejs/plugin-vue` 5 → 6，`@types/node` 20 → 24；无用户可见功能变更。
+
+### Changed
+- **依赖**：`vite ^8.3.5`、`@vitejs/plugin-vue ^6.0.10`、`vitest`/`@vitest/coverage-v8 ^5.0.5`、`@types/node ^24.19.2`；**新增显式 `esbuild ^0.28.2`**（vite 8 不再随附 esbuild，而 `frontend.yml` 两个行为测试步骤与 `scripts/check_all.py` 第 7/8 项直接调用其二进制）。
+- **构建配置**：`manualChunks(object)` → rolldown `output.codeSplitting.groups`（vue/element/editor 三组）；`minify:'esbuild'+esbuild.drop` → `minify:'oxc'` + `output.minify.compress.dropConsole/dropDebugger`；`server.strictPort: true`（配合 `ops/start.ps1 -Verify` 等 5173，端口占用时显式失败而非静默换端口）。
+- **覆盖率口径 v2**：coverage 层由 `v8-to-istanbul` 换为 `ast-v8-to-istanbul`（AST-aware），同测试同源码下分母/粒度不可逆变化（隔离实验：vite 6/7/8 组合分母完全相同；双 provider 互证；167 文件无增删）。双口径记录（v1 84.79/89.95/52.85/84.79 → v2 **71.01/65.38/49.95/70.41**），按版本化规则显式重校准阈值为 **`{lines:70, branches:64, functions:49, statements:69}`**；详见 `docs/guides/frontend.md §九`。
+- **验证**：`npm ci` 锁树精确恢复；578 tests / 39 files 全绿；`vite build` 90 文件 **1021.0 KB（−0.76%）**、CSS 239.9 KB（−1.0%）；vue-tsc/eslint/prettier 全绿；esbuild 行为门禁 15/15 + 16/16；`vite --strictPort` dev server 515ms ready + HTTP 200。视觉/浏览器回归未本地验证，由 CI + windows-startup 兜底。
+- **CI/启动链路**：Node 24 + `setup-node@v7` 已满足 vite 8 engines，无需功能性改动；`frontend.yml`/`windows-startup.yml` 注释更新（esbuild 显式依赖勿删、vite 8 dev 观察点）；dependabot 无文件级 vite ignore（PR #9 的服务端 ignore 需迁移合并后 `@dependabot unignore this major version`）。
+- **文档**：`docs/guides/development.md` 前端栈版本 + 升级后 `rm -rf node_modules && npm ci`；`docs/runbooks/startup.md` Vite 8 dev 注意；`docs/guides/frontend.md §九` 口径 v2 规则与双口径表。
+
 ## [1.0.1] - 2026-11-01
 
 **补丁版本**：P2 加密轮换原子性 + P3 债务清零 + D-64/D-65 两个真实缺陷；含 Phase 16（SQLAlchemy 2.1）与 Phase 17 变更。
