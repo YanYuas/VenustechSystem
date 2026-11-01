@@ -22,7 +22,7 @@
     "@capacitor/android": "^7.6.9",
     "@capacitor/browser": "^7.0.5",
     "@capacitor/cli": "^7.0.0",
-    "@capacitor/core": "^7.0.0",
+    "@capacitor/core": "^8.6.0",
     "@element-plus/icons-vue": "^2.3.1",
     "dayjs": "^1.11.11",
     "dompurify": "^3.4.17",
