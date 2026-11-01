@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, String, Integer, Index
+from sqlalchemy import DateTime, Float, ForeignKey, String, Integer, Index
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, SoftDeleteMixin, TimestampMixin, UUIDMixin, utcnow
@@ -23,7 +23,9 @@ class PetConfig(UUIDMixin, SoftDeleteMixin, Base):
     # 显示设置
     enabled: Mapped[bool] = mapped_column(default=True)
     size: Mapped[str] = mapped_column(String(10), default="medium")  # small/medium/large
-    opacity: Mapped[float] = mapped_column(default=1.0)  # 0.3-1.0
+    # D-56：显式 Float —— SQLAlchemy 2.1 起 `Mapped[float]` 隐式映射默认变 Double，
+    # 与冻结迁移 DDL（FLOAT）不一致；显式 Float 保持与历史库/迁移一致。
+    opacity: Mapped[float] = mapped_column(Float, default=1.0)  # 0.3-1.0
     always_on_top: Mapped[bool] = mapped_column(default=True)
     auto_start: Mapped[bool] = mapped_column(default=False)
     position_x: Mapped[int] = mapped_column(default=0)
@@ -42,9 +44,9 @@ class PetConfig(UUIDMixin, SoftDeleteMixin, Base):
     # 语音设置
     tts_enabled: Mapped[bool] = mapped_column(default=False)
     tts_voice: Mapped[str | None] = mapped_column(String(50), nullable=True)
-    tts_rate: Mapped[float] = mapped_column(default=1.0)  # 0.5-2.0
-    tts_pitch: Mapped[float] = mapped_column(default=1.0)  # 0.5-2.0
-    tts_volume: Mapped[float] = mapped_column(default=0.8)  # 0-1.0
+    tts_rate: Mapped[float] = mapped_column(Float, default=1.0)  # 0.5-2.0
+    tts_pitch: Mapped[float] = mapped_column(Float, default=1.0)  # 0.5-2.0
+    tts_volume: Mapped[float] = mapped_column(Float, default=0.8)  # 0-1.0
     speak_scene: Mapped[str] = mapped_column(String(20), default="remind")  # never/remind/interact/celebrate/always
     # ---------- S6-2 四维陪伴数值（自 localStorage 迁入）----------
     # 语义沿用交付物 A：亲密度 / 饱食度 / 心情 / 精力，取值 0-100。

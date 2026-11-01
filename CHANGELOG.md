@@ -7,6 +7,26 @@
 
 ## [Unreleased]
 
+### Changed — Phase 16：D-56 SQLAlchemy 2.1 升级 + 覆盖冲刺（2026-11-01）
+
+**D-56 闭环：SQLAlchemy 2.1.6 / Alembic 1.20.1**
+- 根因回顾：SQLAlchemy 2.1 把隐式 `Mapped[float]` 的默认类型映射从 `Float` 改为 `Double`，5 个未显式标注类型的列与冻结迁移 DDL 漂移，被 `test_migration_integrity` 正确拦下。
+- 修复：`pet_configs.opacity/tts_rate/tts_pitch/tts_volume` 与 `workspace_files.mtime` 显式 `mapped_column(Float, ...)`；升级 `SQLAlchemy==2.1.6`、`alembic==1.20.1`。
+- 验证：迁移完整性 **6 passed**（全新库升级/0011→head/部分升级/幂等）；**ORM 声明 vs 迁移 DDL vs PRAGMA 三方均 FLOAT**；全量 **1995 passed**；`pip check` 无破依赖；测试中 `Query.get()` → `Session.get()` 清除 LegacyAPIWarning。
+- 2.1 其余 breaking change 逐条评估：本仓库未使用 async engine / JSONB / PostgreSQL / 命名类型 / dataclass defaults 等，不适用；仅 SQLite 默认 date adapter 的 Python 3.12+ 弃用告警 1 次（非阻塞，登记 D-59）。
+
+**测试与覆盖率**
+- 后端：**1995 passed**（1965 → +30）；覆盖率 **98.94% → 99.41%**（missed 107→60）；CI 阈值 **98 → 99%**；新增 25 模块的仓库/服务/API 边界用例（剩余 59 missed 已分类：B 不可达 4、C 平台 4、D 损坏性 1、A 约 40 行列下一轮）。
+- 前端：**569 passed / 39 files**（515 → +54：toast store / useShortcuts / ToastItem / ModalItem / PetSection）；lines **82.2% → 84.77%**、branches 90.05%、functions 52.85%；阈值 **{83,89,51,83}**。
+- 负向验证：后端 2 条 + 前端 2 条均「改错断言→必红→还原」。
+
+**新登记 3 个问题（D-58~D-60，未修）**
+- **D-58（P2）** `encryption.rotate_key` 只捕获 `OSError`：密钥环写入抛非 OSError 时可能留下「新 key 已落盘、密钥环未写、内存仍旧 key」中间态（旧密文风险）；
+- D-59（P3）SQLite 默认 date adapter 弃用告警（Python 3.12+，非阻塞）；
+- D-60（P3）重复任务 weekly 模板无匹配星期时静默跳过（建议补 debug 日志）；
+- D-61（P3）toast store 无 TTL/上限/同 id 去重；D-62（P3）`useShortcuts` 输入框守卫与 shiftKey 校验不一致；
+  D-63（P3）`ModalItem`/`BaseModal` 同一实例二次关闭路径被 `isClosing` 吞掉（当前命令式层无可见影响）。
+
 <!-- 下一版本占位：新改动从下一行开始追加；发布时整体归入 `## [X.Y.Z] - YYYY-MM-DD`。 -->
 
 ## [1.0.0] - 2026-11-01

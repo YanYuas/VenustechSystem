@@ -357,11 +357,13 @@ npm run test:coverage # 覆盖率报告（v8；text + json-summary，输出到 f
 
 - provider `v8`，`reporter: ['text', 'json-summary']`；`include: src/**`、排除 views/生成物/样式（见 `vitest.config.ts`）。
 - **阈值棘轮（只许上调）**：`vitest.config.ts` 的 `coverage.thresholds` 当前为
-  `{ lines: 81, branches: 88, functions: 48, statements: 81 }`
-  （2026-10-31 Phase13 实测 82.18 / 89.91 / 49.44 / 82.18，各留 1.1~1.9pp 余量，**本轮未调整阈值**；
-  Phase12 实测 82.09 / 89.73 / 49.2 曾据此把 functions 45→48。
+  `{ lines: 83, branches: 89, functions: 51, statements: 83 }`
+  （2026-11-01 Phase16 实测 84.77 / 90.05 / 52.85 / 84.77，各留约 1.5pp 余量；
+  本次分母未变（lines 7453 / branches 1388 / functions 649），覆盖数纯新增：lines 6127→6318、branches 1155→1250、functions 314→343。
+  历史：Phase13 实测 82.18/89.91/49.44 时维持 `{81,88,48,81}` 未动；Phase12 实测 82.09/89.73/49.2 曾把 functions 45→48。
   上调历史：`{12,65,40,12}`（Phase5）→ `{20,72,52,20}`（Phase6）→ `{31,76,59,31}`（Phase7）
-  → `{36,78,63,36}`（Phase8）→ `{40,79,64,40}`（Phase9）→ `{43,81,67,43}`（Phase10）→ `{81,88,45,81}`（Phase11）→ `{81,88,48,81}`（Phase12）→ 当前）。
+  → `{36,78,63,36}`（Phase8）→ `{40,79,64,40}`（Phase9）→ `{43,81,67,43}`（Phase10）→ `{81,88,45,81}`（Phase11）
+  → `{81,88,48,81}`（Phase12/13）→ 当前）。
   `npm run test:coverage` 与 CI 的 `Coverage (threshold ratchet)` 步骤**都会因此失败**，即覆盖率回退会直接卡住合并。
 - **统计面变化时如何调整阈值（规则）**：覆盖率的百分比分母会随"测试真实 import 了哪些模块"变化，
   因此**每次调阈值必须同时记录「百分比」与「covered/total 绝对值」，用绝对值证明是上升而非回退**。
