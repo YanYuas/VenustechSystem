@@ -1,4 +1,4 @@
-﻿#Requires -Version 5.1
+﻿
 <#
 .SYNOPSIS
   启明星系统 · 唯一启动实现（D-11 启动器单一实现）
@@ -9,10 +9,14 @@
   端口检查 / 令牌生成 / 数据目录逻辑。
 
   三种模式：
-    dev    后端 FastAPI 127.0.0.1:8765（--reload）+ 前端 Vite 5173 + 开浏览器
+    dev    后端 FastAPI 127.0.0.1:8765（--reload）+ 前端 Vite 8（Rolldown/oxc）
+           :5173（strictPort:true，端口被占即显式报错）+ 开浏览器
     demo   同 dev，但数据目录指向 var\demo（缺库先 seed_demo.py）
     mobile 后端仅回环 8765 + 统一边缘服务 ops/server/server.js 0.0.0.0:3000
            （静态 + /api 代理 + 访问令牌）
+
+  运行环境：Node.js ^20.19.0 || >=22.12.0（Vite 8 engines；推荐 24，与 CI 一致）；
+            Python 3.11+（本机 venv 3.13、CI 3.11 均可）。
 
   运行期数据统一放仓库根 var/（见 ARCHITECTURE.md §7 / ADR-0004）：
     var\data 真实库 · var\demo 演示库 · var\legacy 历史副本。
@@ -42,17 +46,19 @@
   子进程日志写到 var\logs\<时间>-<服务>.out.log / .err.log。
 
 .EXAMPLE
-
-.PARAMETER Verify
-   真启动、真等端口/健康检查、然后自动停止：全部通过退出码 0，否则 1。
-   非交互环境（CI/重定向）会自动跳过浏览器与"按回车停止"。
-   子进程日志写到 var\logs\<时间>-<服务>.out.log / .err.log。
   powershell -ExecutionPolicy Bypass -File ops\start.ps1 -Mode dev
+
 .EXAMPLE
   powershell -ExecutionPolicy Bypass -File ops\start.ps1 -Mode demo -WhatIf
+
+.EXAMPLE
+  powershell -ExecutionPolicy Bypass -File ops\start.ps1 -Mode mobile -Verify
+
 .EXAMPLE
   powershell -ExecutionPolicy Bypass -File scripts\dev.ps1 -DataDir .\var\data-branch
 #>
+
+#Requires -Version 5.1
 
 param(
     [ValidateSet('dev', 'demo', 'mobile')]
@@ -175,13 +181,15 @@ function Test-BackendDeps([string]$PythonPath, [string]$ProbeExpr, [string]$Mode
 
 function Assert-Node {
     $node = Get-NodePath
-    if ($null -eq $node) { Fail 'node not found. Install Node.js 18+ first.' }
+    if ($null -eq $node) {
+        Fail 'node not found. Install Node.js 20.19+ or 22.12+ (24 recommended, CI parity) first.'
+    }
     return $node
 }
 
 function Assert-FrontendDeps {
     if (-not (Test-Path -LiteralPath (Join-Path $Frontend 'node_modules'))) {
-        Fail 'frontend deps missing. Run setup.bat, or: cd frontend && npm install'
+        Fail 'frontend deps missing. Run setup.bat, or: cd frontend && npm ci'
     }
 }
 

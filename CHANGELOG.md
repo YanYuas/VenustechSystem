@@ -2,6 +2,12 @@
 
 <!-- 下一版本占位：新改动从下一行开始追加；发布时整体归入 `## [X.Y.Z] - YYYY-MM-DD`。 -->
 
+### Changed — Phase 20 本地卫生 + 启动脚本/注释文档刷新（2026-11-01，未发版，VERSION 保持 1.1.0）
+
+- **本地卫生**：清理 ≈386MB 垃圾（`.arch-audit` 1.1GB→0.3MB、历史 pytest 临时副本、213 个 `__pycache__`、旧运行日志、根 `.ruff_cache`、npm 缓存）；`var/` 运行数据（data/demo/legacy/backups）零改动；`audit_workspace_hygiene` 契约通过。
+- **启动脚本**：`ops/start.ps1` 删除误插入的重复 `.PARAMETER Verify` 注释块、`#Requires` 移到 help 之后（`Get-Help` 可正常渲染）、Node 要求改为 Vite 8 engines（`^20.19 || >=22.12`，推荐 24）；`ops/setup.ps1` 统一「有 `package-lock.json` → `npm ci`，无 lock 回退 `npm install`」；`ops/backup-git.ps1` 补 UTF-8 BOM（修复 PS 5.1 下 7 处解析错误）；`audit_delivery` 的 BOM 守卫扩展到 `ops/*.ps1`（含反证）。
+- **文档/注释**：`docs/runbooks/startup.md` 修正 `strictPort: false` 过期描述（现为 true，端口占用显式报错）与重建依赖命令、CI 表对齐；README 覆盖率阈值 98%→99%；CONTRIBUTING ruff 0.6.2→0.17.3、历史债务表述更正；`docs/guides/frontend.md` 头部/Vite 8/npm ci/主题数/路径/12/16 项；`backend/tests/ROADMAP.md` 标注历史快照并更新现役规模（2047/99.82%/16 项）；`scripts/check_all.py` 注释 1126→2047；ARCHITECTURE §9 计数 1284→2047。
+
 ### Changed — Phase 19 快照优化（2026-11-01，未发版，VERSION 保持 1.1.0）
 
 - **D-66 闭环（P3）**：主密钥模式密钥轮换语义自洽——同 master 轮换改为「新 salt + 当前 master 派生」，旧 salt 入 keyring `previous_salts`（cap `KEEP_PREVIOUS`），旧代由 `master+旧 salt` 重派生；**磁盘仅存 16B salt，不落任何 key 明文**；换 master 明确要求走 `SecurityService.rotate_key` 全量重加密；旧随机模式 `previous_keys` 向后兼容。14 条专项测试 + 2 条负向验证。

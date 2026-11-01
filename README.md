@@ -171,7 +171,7 @@ backend/app/models/*.py     SQLAlchemy → SQLite（WAL）
 |---|---|---|
 | 一键门禁 | `python scripts/check_all.py --strict` | **16 项全绿**（缺依赖 = 失败，杜绝假绿） |
 | 后端测试 | `cd backend && python -m pytest tests -q` | **2047 passed** |
-| 后端覆盖率 | `cd backend && python -m pytest tests -q --cov=app --cov-report=term-missing --cov-fail-under=98` | **99.82%**（阈值 99） |
+| 后端覆盖率 | `cd backend && python -m pytest tests -q --cov=app --cov-report=term-missing --cov-fail-under=99` | **99.82%**（阈值 99） |
 | 后端 lint | `cd backend && python -m ruff check app tests` | 0（正确性规则 E4/E7/E9/F） |
 | 前端单测 | `cd frontend && npm test` | **578 passed** |
 | 前端覆盖率 | `cd frontend && npm run test:coverage` | lines **71.01%**（口径 v2；阈值 70/64/49/69 棘轮，说明见 [frontend.md §九](docs/guides/frontend.md)） |
@@ -182,7 +182,7 @@ backend/app/models/*.py     SQLAlchemy → SQLite（WAL）
 
 | Workflow | 守什么 |
 |---|---|
-| [backend-ci](.github/workflows/backend.yml) | Python 3.11：架构守护 → ruff → pytest → 覆盖率阈值 98% → 端到端冒烟 |
+| [backend-ci](.github/workflows/backend.yml) | Python 3.11：架构守护 → ruff → pytest → 覆盖率阈值 99% → 端到端冒烟 |
 | [frontend-ci](.github/workflows/frontend.yml) | Node 24：ESLint / Prettier / vue-tsc / vitest + 覆盖率阈值 / 构建 |
 | [repo-guard](.github/workflows/repo-guard.yml) | 版本一致性、日志格式、测试质量、交付物、工作区卫生、文档链接、敏感文件门禁、边缘服务单测 |
 | [android-apk](.github/workflows/android-build.yml) | Capacitor 同步 + 构建 debug APK |

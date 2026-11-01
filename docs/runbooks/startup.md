@@ -1,15 +1,16 @@
 # 启动与自检 runbook（dev / demo / mobile / setup）
 
 - 适用范围：本机开发、演示演示、局域网/手机访问、首次安装。
+- 运行环境：**Node.js `^20.19.0 || >=22.12.0`**（Vite 8 engines；推荐 24，与 CI 一致）、Python 3.11+。
 - 唯一实现：`ops/start.ps1`（启动）、`ops/setup.ps1`（安装）。
-  根目录 4 个 `.bat` 与 `scripts/dev.ps1` **只是薄转发壳**（3–17 行），不再复刻逻辑。
+  根目录 4 个 `.bat`（14–17 行）与 `scripts/dev.ps1`（约 47 行）**只是薄转发壳**，不再复刻逻辑。
 - 相关守护：`python scripts/audit_delivery.py`（单一实现 / 转发壳契约 / ASCII / BOM / 冒烟水分）。
 
 ## 1. 入口对照
 
 | 入口 | 等价命令 | 做什么 | 数据目录 |
 |---|---|---|---|
-| `start-dev.bat` | `ops\start.ps1 -Mode dev` | 后端 `--reload` :8765 + 前端 Vite :5173 + 浏览器 | `var\data` |
+| `start-dev.bat` | `ops\start.ps1 -Mode dev` | 后端 `--reload` :8765 + 前端 Vite 8（Rolldown/oxc）:5173（`strictPort:true`）+ 浏览器 | `var\data` |
 | `start-demo.bat` | `ops\start.ps1 -Mode demo` | 同上，演示库；缺库自动 seed | `var\demo` |
 | `start-mobile.bat` | `ops\start.ps1 -Mode mobile` | 后端仅回环 :8765 + 边缘服务 :3000 + 令牌 | `var\data` |
 | `setup.bat` | `ops\setup.ps1` | venv / 依赖 / node_modules 安装 | — |
@@ -36,7 +37,7 @@ ops\start.ps1 -Mode dev -DataDir .\var\data-feature-x
 4. 输出 `[VERIFY] PASS/FAIL`，`taskkill /T /F` 结束整棵进程树，并等端口释放。
 5. 退出码：**0 全部通过；1 任一失败**（失败时先看 `var\logs` 下对应服务的 `.err.log`）。
 
-实测（2026-10-28，Windows 10，Node 24 / Python 3.11）：
+实测（2026-10-28，Windows，Node 24 / Python 3.13 后端的 venv；CI 用 Python 3.11）：
 
 | 模式 | 结果 | 说明 |
 |---|---|---|
@@ -58,10 +59,12 @@ ops\start.ps1 -Mode dev -DataDir .\var\data-feature-x
 - **demo 没数据**：删除 `var\demo\app.db` 后重新 `start-demo.bat`（会自动 seed），不要动 `var\data`。
 - 非交互环境（CI/管道/远程 shell）：脚本不会等待回车、不会开浏览器；用 `-Verify` 做确定性自检。
 - **Vite 8 dev server（2026-11 起）**：`start-dev.bat` 的 Vite 由 Rolldown/oxc 驱动，**首次启动会做依赖
-  预构建**（可能比 vite 5 的 esbuild 预构建慢数秒，之后走缓存）；端口探测逻辑不变（仍是 :5173）。
-  注意 `server.strictPort: false` ⇒ 5173 被占用时 Vite 会**静默换到下一个端口**，此时 `-Verify`
-  会因等不到 5173 而失败 —— 先确认没有别的 dev server 在跑（`Get-NetTCPConnection -LocalPort 5173`）。
-  vite 大版本升级后本地先重建依赖：`rm -rf frontend/node_modules && cd frontend && npm ci`。
+  预构建**（可能比旧版 Vite 5 的 esbuild 预构建慢数秒，之后走缓存）；端口探测逻辑不变（仍是 :5173）。
+  注意 `server.strictPort: true`（2026-11 起）⇒ **5173 被占用时 Vite 显式报错退出**（不再静默换端口），
+  `-Verify` 只探测 :5173，不会误连到别的端口；失败时先看 `var\logs\*-frontend-Vite.err.log` 里的
+  `EADDRINUSE`，并确认没有别的 dev server 在跑（`Get-NetTCPConnection -LocalPort 5173`）。
+  Vite 大版本升级后本地先重建依赖（Windows PowerShell，单行）：
+  `cd frontend; Remove-Item -Recurse -Force node_modules; npm ci`
 
 ## 4. 与 CI 的边界
 
@@ -101,7 +104,7 @@ dev 模式（后端 :8765 + 前端 :5173）→ 等端口 + `GET /api/v1/health` 
 | 1 | `actions/checkout@v7` | — |
 | 2 | `actions/setup-python@v7`（3.11，cache pip） | 缓存键含 `backend/requirements*.txt` |
 | 3 | `actions/setup-node@v7`（24，cache npm） | 缓存键含 `frontend/package-lock.json`；Node 24 满足 vite 8 engines |
-| 4 | `python -m pip install -r backend/requirements-dev.txt` | **装到 PATH python（CI 无 venv）** |
+| 4 | `python -m pip install --upgrade pip` + `python -m pip install -r backend/requirements-dev.txt` | **装到 PATH python（CI 无 venv）** |
 | 5 | `npm ci`（cwd=`frontend`） | 满足 `Assert-FrontendDeps` 对 `frontend/node_modules` 的硬检查 |
 | 6 | `python scripts/audit_delivery.py` | 先跑秒级的启动器契约（单一实现 / 薄转发壳 / ASCII / BOM / 冒烟水分） |
 | 7 | `pwsh -NoProfile -ExecutionPolicy Bypass -File ops/start.ps1 -Mode dev -Verify` | 真启动 + 健康检查 + 自动停止 |
