@@ -300,6 +300,47 @@ class ProjectService:
             "updated_at": m.updated_at.isoformat() if m.updated_at else "",
         }
 
+    # ---------- 复盘摘要（2026-11-01，D-65）----------
+    # `Review` 只有 data(JSON) 列，没有 title/content 列；timeline/export 曾直接
+    # 访问 r.title / r.content → 只要项目关联过复盘就 AttributeError 500。
+    _REVIEW_SUMMARY_KEYS = ("gains", "key_gains", "monthly_summary", "completed_tasks")
+    _REVIEW_EXPORT_LABELS = (
+        ("completed_tasks", "完成的任务"),
+        ("unfinished_tasks", "未完成的任务"),
+        ("gains", "收获"),
+        ("key_gains", "关键收获"),
+        ("monthly_summary", "月度总结"),
+        ("tomorrow_plan", "明日计划"),
+    )
+
+    @classmethod
+    def _review_summary(cls, review) -> str:
+        data = review.data if isinstance(review.data, dict) else {}
+        for key in cls._REVIEW_SUMMARY_KEYS:
+            value = data.get(key)
+            if isinstance(value, str) and value.strip():
+                first = value.strip().splitlines()[0].strip()
+                return first[:40] + ("…" if len(first) > 40 else "")
+        return f"{review.review_date} 复盘"
+
+    @classmethod
+    def _review_export_content(cls, review) -> str:
+        data = review.data if isinstance(review.data, dict) else {}
+        sections = []
+        for key, label in cls._REVIEW_EXPORT_LABELS:
+            value = data.get(key)
+            if isinstance(value, str) and value.strip():
+                sections.append(f"## {label}\n{value.strip()}")
+        reflections = data.get("reflections")
+        if isinstance(reflections, list) and reflections:
+            lines = []
+            for item in reflections:
+                if isinstance(item, dict) and item.get("question"):
+                    lines.append(f"- **{item['question']}** {item.get('answer', '')}".rstrip())
+            if lines:
+                sections.append("## 反思问答\n" + "\n".join(lines))
+        return "\n\n".join(sections)
+
     def timeline(self, user_id: str, project_id: str) -> list[dict]:
         """项目时间线（M06 F05）；D-06：五类事件全部经各域 Repository 取数。"""
         self._owned(user_id, project_id)
@@ -316,7 +357,7 @@ class ProjectService:
             events.append({"type": "conversation", "title": f"AI对话：{c.title or '未命名'}", "time": c.created_at.isoformat(), "icon": "send"})
         reviews = self.review_repo.list_project_for_timeline(project_id, limit=20)
         for r in reviews:
-            events.append({"type": "review", "title": f"复盘记录：{r.title or '未命名复盘'}", "time": r.created_at.isoformat(), "icon": "refresh"})
+            events.append({"type": "review", "title": f"复盘记录：{self._review_summary(r)}", "time": r.created_at.isoformat(), "icon": "refresh"})
         milestones = self.milestone_repo.list_for_timeline(project_id, limit=20)
         for m in milestones:
             status = "完成" if m.completed else "创建"
@@ -334,5 +375,14 @@ class ProjectService:
         convs = self.conv_repo.list_all_by_project(project_id)
         convs_data = [{"id": c.id, "title": c.title, "created_at": c.created_at.isoformat()} for c in convs]
         reviews = self.review_repo.list_all_by_project(project_id)
-        reviews_data = [{"id": r.id, "title": r.title, "content": r.content or "", "review_date": str(r.review_date) if r.review_date else None, "created_at": r.created_at.isoformat()} for r in reviews]
+        reviews_data = [
+            {
+                "id": r.id,
+                "title": self._review_summary(r),
+                "content": self._review_export_content(r),
+                "review_date": str(r.review_date) if r.review_date else None,
+                "created_at": r.created_at.isoformat(),
+            }
+            for r in reviews
+        ]
         return {"project": {"id": project.id, "name": project.name, "description": project.description, "status": project.status, "created_at": project.created_at.isoformat()}, "tasks": tasks_data, "documents": docs_data, "conversations": convs_data, "reviews": reviews_data, "exported_at": datetime.now().isoformat()}

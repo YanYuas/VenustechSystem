@@ -45,9 +45,11 @@ export default defineConfig({
     // 统计面说明：本次分母**未变**（lines/statements 7453、branches 1388、functions 649），
     // 覆盖数纯新增：lines 6127→6318（+191）、branches 1155→1250（+95）、functions 314→343（+29），
     // 属"补测既有模块"的真实提升；阈值各留约 1.5pp 余量（83/89/51/83）。
+    // Phase17 task-64 复测 84.79 / 89.95 / 52.85（分母 +11 lines/+15 branches）：与 Phase16 基本持平，
+    // 按"不为升而抬"规则**维持阈值不动**；其中 branches 余量已 <1pp，后续再动需先复测两次确认。
     // 上调历史：{12,65,40,12}（Phase5）→ {20,72,52,20}（Phase6）→ {31,76,59,31}（Phase7）
     //           → {36,78,63,36}（Phase8）→ {40,79,64,40}（Phase9）→ {43,81,67,43}（Phase10）
-    //           → {81,88,45,81}（Phase11）→ {81,88,48,81}（Phase12/13 未再上调）→ 当前。
+    //           → {81,88,45,81}（Phase11）→ {81,88,48,81}（Phase12/13）→ {83,89,51,83}（Phase16）→ 当前。
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json-summary'],

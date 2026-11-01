@@ -38,8 +38,13 @@ def _chmod_raiser():
 
 
 def _os_without_chmod(raiser):
-    """只替换模块内的 os 引用：保留 urandom，注入会失败的 chmod。"""
-    return types.SimpleNamespace(urandom=os.urandom, chmod=raiser)
+    """只替换模块内的 os 引用：保留其它 os 能力（getpid/fsync/replace 等），
+    仅注入会失败的 chmod —— D-58 的原子写 helper 依赖 os.replace/fsync。"""
+    namespace = {
+        name: getattr(os, name) for name in dir(os) if not name.startswith("_")
+    }
+    namespace["chmod"] = raiser
+    return types.SimpleNamespace(**namespace)
 
 
 class TestPermissionFallbacks:

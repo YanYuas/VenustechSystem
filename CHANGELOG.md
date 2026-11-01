@@ -1,11 +1,23 @@
-# Changelog
-
-本项目所有重要变更都记录在此文件。
-
-格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
-版本遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
-
 ## [Unreleased]
+
+<!-- 下一版本占位：新改动从下一行开始追加；发布时整体归入 `## [X.Y.Z] - YYYY-MM-DD`。 -->
+
+## [1.0.1] - 2026-11-01
+
+**补丁版本**：P2 加密轮换原子性 + P3 债务清零 + D-64/D-65 两个真实缺陷；含 Phase 16（SQLAlchemy 2.1）与 Phase 17 变更。
+
+### Fixed — Phase 17：P2 加密原子性 + P3 债务清零 + 两个真实缺陷（2026-11-01）
+
+- **D-65（P2）** `project_service.timeline()/export()` 误用不存在的 `Review.title/content` → 项目关联复盘后 **GET 时间线/导出必 500**；改为从 `data` 派生摘要（gains/key_gains/monthly_summary/completed_tasks，兜底 `<date> 复盘`）与导出 Markdown，4 条回归测试。
+- **D-64** `DocumentGraph.vue` 的 `<style scoped>` 缺 `lang="scss"` 却用 SCSS 嵌套 → 组件样式此前未生效；补 1 行（Vite 8 spike 附带发现）。
+- **D-58（P2）** `encryption.rotate_key` 原子化：三写入点 tmp+fsync+`os.replace`；任一失败**逆序整体回滚**、内存保持旧值、原异常上抛；12 条专项测试。
+- **D-59** sqlite3 默认 date adapter 弃用 → 显式 ISO adapter（持久化格式不变），告警归零。
+- **D-60** weekly 重复任务无匹配日补 debug 日志；**D-61** toast 上限 50 + 同内容去重；**D-62** `Ctrl+Shift+N` 输入框守卫 + `Ctrl+]`/`Ctrl+S` shift 校验；**D-63** BaseModal 关闭后重置 `isClosing`（同一实例可重复关闭）。
+
+**发行：v1.0.1**（版本 1.0.0 → 1.0.1；发行说明 [docs/RELEASE_NOTES_v1.0.1.md](docs/RELEASE_NOTES_v1.0.1.md)）。
+**质量**：后端 **2026 passed / 99.75%**；前端 **578 passed / 84.79% lines**（阈值 {83,89,51,83}）；D-57 Vite 8 spike 结论「可升级、单独立项」（覆盖率口径需重校准）。
+
+---
 
 ### Changed — Phase 16：D-56 SQLAlchemy 2.1 升级 + 覆盖冲刺（2026-11-01）
 

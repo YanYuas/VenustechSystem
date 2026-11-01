@@ -121,6 +121,21 @@ describe('ModalItem：事件转发', () => {
     expect(wrapper.emitted('cancel')).toHaveLength(1)
   })
 
+  it('同一实例可重复关闭：dismiss 后 Esc 仍能 emit cancel（D-63）', async () => {
+    const wrapper = mountItem()
+
+    await wrapper.find('.qm-modal__close').trigger('click')
+    expect(wrapper.emitted('cancel')).toHaveLength(1)
+
+    // 等 BaseModal 在 nextTick 重置内部 isClosing
+    await wrapper.vm.$nextTick()
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.emitted('cancel')).toHaveLength(2)
+  })
+
   it('BaseModal 的 confirm 事件（footer 默认按钮）也走 onConfirm 并 emit confirm', async () => {
     const wrapper = mountItem()
 

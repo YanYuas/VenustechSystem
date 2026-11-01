@@ -109,6 +109,29 @@ describe('useShortcuts：全局组合键', () => {
 })
 
 describe('useShortcuts：输入框忽略规则', () => {
+  it('Ctrl+Shift+N 在输入框内不触发（D-62），在非输入区仍触发', () => {
+    const handlers = { 'new-document': vi.fn() }
+    setup(handlers)
+    const input = makeInput()
+
+    press({ key: 'n', ctrlKey: true, shiftKey: true }, input)
+    expect(handlers['new-document']).not.toHaveBeenCalled()
+
+    press({ key: 'n', ctrlKey: true, shiftKey: true })
+    expect(handlers['new-document']).toHaveBeenCalledTimes(1)
+  })
+
+  it('Ctrl+Shift+S 不触发保存；Ctrl+Shift+] 不触发收起抽屉（D-62）', () => {
+    const handlers = { save: vi.fn(), 'close-drawer': vi.fn() }
+    setup(handlers)
+
+    press({ key: 's', ctrlKey: true, shiftKey: true })
+    press({ key: ']', ctrlKey: true, shiftKey: true })
+
+    expect(handlers.save).not.toHaveBeenCalled()
+    expect(handlers['close-drawer']).not.toHaveBeenCalled()
+  })
+
   it('Ctrl+N / Ctrl+F 在 input 内不触发；Ctrl+S 在 input 内仍触发', () => {
     const handlers = { 'new-task': vi.fn(), 'module-search': vi.fn(), save: vi.fn() }
     setup(handlers)

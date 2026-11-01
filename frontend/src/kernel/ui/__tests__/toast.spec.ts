@@ -139,7 +139,60 @@ describe('toast：后端不可达抑制', () => {
   })
 })
 
-describe('toast：已知边界（记录当前实现，非本轮修复）', () => {
+describe('toast：容量上限（D-61）', () => {
+  it('超过 50 条时只保留最新 50 条，最旧的被淘汰', () => {
+    for (let i = 0; i < 60; i += 1) toast.info('批量', `#${i}`)
+
+    expect(toast.items).toHaveLength(50)
+    expect(toast.items[0].message).toBe('#10')
+    expect(toast.items[49].message).toBe('#59')
+  })
+
+  it('恰好 50 条时不淘汰', () => {
+    for (let i = 0; i < 50; i += 1) toast.info('批量', `#${i}`)
+
+    expect(toast.items).toHaveLength(50)
+    expect(toast.items[0].message).toBe('#0')
+  })
+
+  it('淘汰后继续入队仍维持上限', () => {
+    for (let i = 0; i < 60; i += 1) toast.info('批量', `#${i}`)
+    toast.info('再来一条', '#new')
+
+    expect(toast.items).toHaveLength(50)
+    expect(toast.items[49].message).toBe('#new')
+    expect(toast.items.map((x) => x.message)).not.toContain('#10')
+  })
+})
+
+describe('toast：同内容去重（D-61）', () => {
+  it('(type,title,message) 相同 → 只保留 1 条并复用已有 id', () => {
+    const first = toast.info('网络异常', '请稍后重试')
+    const second = toast.info('网络异常', '请稍后重试')
+
+    expect(second).toBe(first)
+    expect(toast.items).toHaveLength(1)
+  })
+
+  it('去重不刷新展示时长（duration 保持首次入队时的值）', () => {
+    toast.info('去重', '正文', 1234)
+    toast.info('去重', '正文', 9999)
+
+    expect(toast.items).toHaveLength(1)
+    expect(toast.items[0].duration).toBe(1234)
+  })
+
+  it('type 或 message 不同则不去重；title+message 相同但 type 不同也各自入队', () => {
+    toast.info('同名', '同文')
+    toast.info('同名', '不同文')
+    toast.success('同名', '同文')
+    toast.warning('同名')
+
+    expect(toast.items).toHaveLength(4)
+  })
+})
+
+describe('toast：计时归属（不变）', () => {
   it('store 不做自动过期：入队后推进 10s 条目仍在（计时由 ToastItem 负责）', async () => {
     vi.useFakeTimers()
     toast.info('常驻')
@@ -147,11 +200,5 @@ describe('toast：已知边界（记录当前实现，非本轮修复）', () =>
     await vi.advanceTimersByTimeAsync(10_000)
 
     expect(toast.items).toHaveLength(1)
-  })
-
-  it('无容量上限/无同 id 去重：连续同标题入队会全部保留', () => {
-    for (let i = 0; i < 120; i += 1) toast.info('重复标题', `#${i}`)
-
-    expect(toast.items).toHaveLength(120)
   })
 })

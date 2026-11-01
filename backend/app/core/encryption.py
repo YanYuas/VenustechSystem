@@ -12,6 +12,11 @@ import os
 import threading
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
+
+from app.core.logger import get_logger
+
+logger = get_logger("encryption")
 
 
 try:
@@ -19,6 +24,47 @@ try:
     HAS_CRYPTO = True
 except ImportError:
     HAS_CRYPTO = False
+
+
+def _atomic_write_bytes(path: Path, data: bytes) -> None:
+    """同目录临时文件 + fsync + `os.replace` 原子写（D-58）。
+
+    为什么不能直接 `path.write_bytes()`：轮换时进程若在写一半崩溃/被中断，
+    会留下半截密钥文件，旧密文将永久不可解。原子替换保证「要么旧内容、
+    要么完整新内容」，绝不出现半截状态。
+    """
+    tmp = path.with_name(f"{path.name}.tmp-{os.getpid()}-{uuid4().hex[:8]}")
+    try:
+        with open(tmp, "wb") as fh:
+            fh.write(data)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(tmp, path)
+    except Exception:
+        try:
+            if tmp.exists():
+                tmp.unlink()
+        except OSError:
+            logger.warning("原子写失败后清理临时文件失败（可手工删除）: {}", tmp)
+        raise
+
+
+def _snapshot_file(path: Path) -> tuple[bool, bytes | None]:
+    """记录文件是否存在 + 原始字节（D-58 回滚基准）。"""
+    if path.exists():
+        return True, path.read_bytes()
+    return False, None
+
+
+def _restore_file(path: Path, existed: bool, data: bytes | None) -> None:
+    """把文件恢复到快照状态：存在则原子写回旧字节，原本不存在则删除。"""
+    if existed and data is not None:
+        _atomic_write_bytes(path, data)
+        return
+    try:
+        path.unlink(missing_ok=True)
+    except OSError:
+        logger.exception("回滚时删除新增文件失败（请人工检查）: {}", path)
 
 
 class EncryptionManager:
@@ -184,48 +230,76 @@ class EncryptionManager:
         return dest_path
 
     def rotate_key(self, new_master_key: str | None = None):
-        """轮换密钥（重新加密所有数据）"""
+        """原子轮换密钥（D-58）：**要么全成、要么回滚到旧状态，绝不半途**。
+
+        为什么不 fail-open 而选择「整体回滚 + raise」：
+        密钥轮换是安全关键操作，半成功会生成「新 key 已落盘但密钥环/内存仍旧」
+        的中间态，可能让既有密文永久不可解 —— 这比让本次轮换失败（调用方重试）
+        严重得多。因此失败时：已写文件按逆序恢复旧字节/删除新增，内存
+        `_fernet`/`_previous_fernets` 保持旧值（磁盘与内存一致），原异常上抛。
+        """
         if not self._fernet:
             return
-        # 生成新密钥
-        if new_master_key:
-            salt = self.new_salt()
-            self._salt_file.write_bytes(salt)
-            new_key = self.derive_key(new_master_key, salt)
-        else:
-            new_key = Fernet.generate_key()
-        # 保留旧密钥为 previous（供历史密文解密），再落新密钥
-        old_key = self._key_file.read_bytes() if self._key_file.exists() else None
-        self._key_file.write_bytes(new_key)
-        # 历史密钥：当前生效中的 -> 入历史列表，保留最近 KEEP_PREVIOUS 代
-        new_hist = ([old_key.decode() if isinstance(old_key, bytes) else old_key]
-                    if old_key else [])
-        # 2026-10-11：此处原有一个 `for f in [self._fernet]: pass` 的空循环
-        # （注释自称"占位说明"，实际什么都没做且极易误导），已删。
+        # 回滚基准：三个写入点都必须先快照
+        salt_snapshot = _snapshot_file(self._salt_file)
+        key_snapshot = _snapshot_file(self._key_file)
+        keyring_snapshot = _snapshot_file(self._keyring_file)
+        written: list[tuple[Path, tuple[bool, bytes | None]]] = []
         try:
-            if self._keyring_file.exists():
-                ring = json.loads(self._keyring_file.read_text(encoding="utf-8"))
-                hist = [k for k in (ring.get("previous_keys") or [])]
-                cur = ring.get("current")
-                if cur and cur not in hist:
-                    hist.insert(0, cur)
-                new_hist = (new_hist + hist)[:self.KEEP_PREVIOUS]
-        except Exception:
-            pass
-        try:
-            self._keyring_file.write_text(
-                json.dumps({
-                    "current": (new_key.decode()
-                                if isinstance(new_key, bytes) else str(new_key)),
-                    "previous_keys": new_hist,
-                }), encoding="utf-8"
-            )
+            # 生成新密钥（new_master_key 时先落 salt，再派生）
+            if new_master_key:
+                salt = self.new_salt()
+                _atomic_write_bytes(self._salt_file, salt)
+                written.append((self._salt_file, salt_snapshot))
+                new_key = self.derive_key(new_master_key, salt)
+            else:
+                new_key = Fernet.generate_key()
+
+            # 保留旧密钥为 previous（供历史密文解密），再原子落新密钥
+            old_key = key_snapshot[1]
+            _atomic_write_bytes(self._key_file, new_key)
+            written.append((self._key_file, key_snapshot))
+            new_hist = ([old_key.decode()] if isinstance(old_key, bytes) else [])
+
+            # 历史密钥：当前生效中的 -> 入历史列表，保留最近 KEEP_PREVIOUS 代。
+            # 读旧密钥环失败属于「历史上限丢失」而非密钥损坏，记录 warning 后
+            # 继续（新 key 写入仍会原子完成；旧 key 已通过 key 文件快照保留）。
+            if keyring_snapshot[0] and keyring_snapshot[1]:
+                try:
+                    ring = json.loads(keyring_snapshot[1].decode("utf-8"))
+                    hist = [k for k in (ring.get("previous_keys") or [])]
+                    cur = ring.get("current")
+                    if cur and cur not in hist:
+                        hist.insert(0, cur)
+                    new_hist = (new_hist + hist)[:self.KEEP_PREVIOUS]
+                except (ValueError, TypeError, UnicodeDecodeError):
+                    logger.warning(
+                        "密钥环内容解析失败，历史代际按 key 文件快照处理（轮换继续）: {}",
+                        self._keyring_file,
+                    )
+
+            keyring_payload = json.dumps({
+                "current": (new_key.decode()
+                            if isinstance(new_key, bytes) else str(new_key)),
+                "previous_keys": new_hist,
+            }).encode("utf-8")
+            _atomic_write_bytes(self._keyring_file, keyring_payload)
+            written.append((self._keyring_file, keyring_snapshot))
             try:
                 os.chmod(self._keyring_file, 0o600)
             except OSError:
-                pass
-        except OSError:
-            pass
+                # 权限收紧失败不影响加解密正确性，仅记录（有界可诊断，不静默）
+                logger.warning("设置密钥环权限失败（不影响加解密）: {}", self._keyring_file)
+        except Exception:
+            logger.exception("密钥轮换失败，正在回滚到旧密钥材料（内存密钥保持不变）")
+            for path, snapshot in reversed(written):
+                try:
+                    _restore_file(path, *snapshot)
+                except Exception:
+                    logger.exception("轮换回滚失败，请人工检查密钥文件: {}", path)
+            raise
+
+        # 只有三个文件全部落盘成功，才刷新内存（磁盘与内存一致）
         self._previous_fernets = []
         for k in new_hist:
             try:

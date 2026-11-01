@@ -53,6 +53,8 @@ let closedEmitted = false
 function emitClosedOnce() {
   if (closedEmitted) return
   closedEmitted = true
+  // D-63：关闭完成（closed）后允许同一实例再次关闭
+  isClosing = false
   emit('closed')
 }
 
@@ -62,6 +64,13 @@ function close() {
   isClosing = true
   emit('dismiss')
   emit('update:modelValue', false)
+  // D-63：命令式弹窗（ModalItem 固定 `model-value=true`）不会触发 watch(modelValue)，
+  // 若只在 watch(true) 时重置 isClosing，同一实例第二次 dismiss/Esc 会被吞。
+  // 这里在下一次刷新（微任务）后重置：既能防同一 tick 内的重复关闭，
+  // 又不引入额外的长定时器（正常受控场景仍由父级 modelValue/closed 驱动）。
+  void nextTick(() => {
+    isClosing = false
+  })
 }
 
 /** 取消操作（触发 cancel 事件 + 关闭） */

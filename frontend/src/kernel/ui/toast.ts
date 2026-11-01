@@ -22,11 +22,24 @@ const toasts = reactive<ToastItem[]>([])
 let seed = 0
 let containerReady = false
 
+/** D-61：队列容量上限，超出按入队顺序淘汰最旧（避免长会话无限增长） */
+const MAX_TOASTS = 50
+
 function push(item: Omit<ToastItem, 'id' | 'duration'> & { duration?: number }) {
+  // D-61：同 `(type,title,message)` 去重 —— 同一条提示被重复触发时复用已有条目：
+  // 不新增队列项、**也不刷新它的展示时长**（计时仍由 ToastItem 的 deadline 管理；
+  // 若业务需要"重新计时"，应先 remove 再重新 show）。
+  const duplicate = toasts.find(
+    (t) =>
+      t.type === item.type && t.title === item.title && (t.message ?? '') === (item.message ?? ''),
+  )
+  if (duplicate) return duplicate.id
+
   const id = ++seed
   const duration = item.duration ?? DEFAULT_DURATION[item.type]
   // 计时由 BaseToast/ToastItem 组件层管理（支持 hover 暂停），此处只入队
   toasts.push({ ...item, id, duration })
+  if (toasts.length > MAX_TOASTS) toasts.splice(0, toasts.length - MAX_TOASTS)
   return id
 }
 

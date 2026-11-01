@@ -4,6 +4,10 @@
 # ============================================================
 from __future__ import annotations
 
+import sqlite3
+from datetime import date as _date
+from datetime import datetime as _datetime
+
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 
@@ -11,6 +15,22 @@ from app.config import get_settings
 
 # Base 定义在 models.base，此处再导出供 Alembic env/迁移引用
 from app.models.base import Base  # noqa: F401
+
+
+# D-59：Python 3.12+ 弃用了 sqlite3 的「默认 date/datetime adapter」，绑定
+# datetime.date/datetime 对象时会打 DeprecationWarning。这里显式注册与默认实现
+# 完全一致的 adapter（date → ISO date；datetime → 空格分隔 ISO），因此**持久化
+# 格式与行为不变**，只是消除弃用告警并锁定未来格式（默认 adapter 移除后仍可用）。
+def _sqlite_date_adapter(value: _date) -> str:
+    return value.isoformat()
+
+
+def _sqlite_datetime_adapter(value: _datetime) -> str:
+    return value.isoformat(" ")
+
+
+sqlite3.register_adapter(_date, _sqlite_date_adapter)
+sqlite3.register_adapter(_datetime, _sqlite_datetime_adapter)
 
 settings = get_settings()
 
