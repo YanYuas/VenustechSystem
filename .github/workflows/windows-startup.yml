@@ -33,13 +33,9 @@ on:
       - ".github/workflows/windows-startup.yml"
   # PR 也跑：合并前就挡住「启动脚本/启动链路」回归；paths 与 push 一致，
   # 不碰这些路径的 PR 不会触发（Windows 分钟约 2–3 分钟/次，见文件头成本说明）。
+    # 所有 PR 都跑：本 job 是 required check，带 paths 过滤会让无关 PR 永远等不到
+    # 状态而无法合并（2026-11-01 分支保护上线）；Windows 成本约 1–3 分钟/次。
   pull_request:
-    paths:
-      - "ops/**"
-      - "scripts/**"
-      - "backend/**"
-      - "frontend/**"
-      - ".github/workflows/windows-startup.yml"
 
 # 最小权限：只读仓库内容（本 workflow 不写回、不发版）
 permissions:
