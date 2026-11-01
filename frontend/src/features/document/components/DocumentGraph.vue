@@ -256,7 +256,7 @@ onUnmounted(() => {
   </div>
 </template>
 
-<style scoped>
+<style scoped lang="scss">
 .doc-graph {
   position: relative;
   width: 100%;

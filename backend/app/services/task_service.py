@@ -455,6 +455,12 @@ class TaskService:
             base_date = t.due_date or today
             target = self._next_occurrence(base_date, today, rtype, rule)
             if target is None:
+                # D-60：weekly 无匹配星期（或 base_date 在 60 天窗口外）此前静默跳过，
+                # 用户看不到「模板为何没生成实例」。补 task_id + 规则，便于排查。
+                logger.debug(
+                    "周期任务无匹配目标日，跳过生成: task_id={} rule={} base_date={}",
+                    t.id, rule, base_date,
+                )
                 continue
             # 幂等：同模板同目标日已存在实例则跳过（按 title+due_date 粗粒度判重）
             if self.repo.exists_instance(user_id, t.title, target):

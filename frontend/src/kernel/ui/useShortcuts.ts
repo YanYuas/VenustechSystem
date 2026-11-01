@@ -71,14 +71,14 @@ export function useShortcuts(handlers: ShortcutHandlers) {
       return
     }
 
-    // Ctrl+Shift+N —— 新建文档
-    if (e.shiftKey && key === 'n') {
+    // Ctrl+Shift+N —— 新建文档（D-62：与 Ctrl+N 一致，输入框内不打断输入）
+    if (e.shiftKey && key === 'n' && !isTyping(e)) {
       e.preventDefault()
       handlers['new-document']?.()
       return
     }
 
-    // Ctrl+S —— 保存（在输入框中也生效）
+    // Ctrl+S —— 保存（在输入框中也生效；D-62：Ctrl+Shift+S 不触发）
     if (!e.shiftKey && key === 's') {
       e.preventDefault()
       handlers['save']?.()
@@ -106,8 +106,8 @@ export function useShortcuts(handlers: ShortcutHandlers) {
       return
     }
 
-    // Ctrl+] —— 收起抽屉
-    if (e.key === ']') {
+    // Ctrl+] —— 收起抽屉（D-62：Ctrl+Shift+] 不触发）
+    if (!e.shiftKey && e.key === ']') {
       handlers['close-drawer']?.()
     }
   }

@@ -153,6 +153,20 @@ describe('BaseModal：confirm / cancel / dismiss 语义', () => {
     expect(wrapper.emitted('update:modelValue')).toEqual([[false]])
   })
 
+  it('同一实例可重复关闭：连续两次关闭按钮都 emit dismiss（D-63）', async () => {
+    const wrapper = mountModal({ title: 't' })
+    await open(wrapper)
+
+    await wrapper.find('.qm-modal__close').trigger('click')
+    expect(wrapper.emitted('dismiss')).toHaveLength(1)
+
+    // isClosing 在下一次刷新后重置（模拟 ModalItem 固定 modelValue=true 的场景）
+    await wrapper.vm.$nextTick()
+    await wrapper.find('.qm-modal__close').trigger('click')
+
+    expect(wrapper.emitted('dismiss')).toHaveLength(2)
+  })
+
   it('遮罩点击（maskClosable=true）关闭；面板内部点击不关闭', async () => {
     const wrapper = mountModal({ title: 't' })
     await open(wrapper)
