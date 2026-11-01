@@ -9,9 +9,13 @@
 #
 # 防 PR 爆炸（groups）的策略：
 #   1) 同生态内按「一起升级更安全 / 更省事」分组（如 pytest 与 pytest-cov 必须同步）；
-#   2) 兜底组只收 **minor + patch**；**major 升级不归组**，各自单独开 PR 强制人工评估
+#   2) 兜底组只收 **minor + patch**；**major 默认不归组**，各自单独开 PR 强制人工评估
 #      （破坏性变更要看 CHANGELOG 并跑全量门禁）；
+#      **例外**：前端构建/测试工具链（vite / vitest / @vitejs/* / @vitest/* / @types/node）
+#      加了「major 联升组」——它们的 major 互相强绑定，单包 major 会直接依赖解析失败
+#      （历史教训：Dependabot #9 只升 vite 8，@vitejs/plugin-vue@5 peer ^5||^6 → npm ci ERESOLVE）；
 #   3) 每个生态都有 open-pull-requests-limit 上限。
+# 官方分组语义：依赖命中多个组时归入**第一个**匹配组（按 groups 书写顺序）。
 # 官方语法：https://docs.github.com/code-security/dependabot/dependabot-options-reference
 #
 # 合并口径与普通 PR 相同：见 docs/guides/development.md §2.1 与 PR 模板的「已验证项」。
@@ -72,6 +76,24 @@ updates:
     commit-message:
       prefix: "chore(deps)"
     groups:
+      # ── major 联升组（2026-11 新增，必须放在所有 minor/patch 组之前）──────────────
+      # 为什么：vite / vitest / @vitejs/plugin-vue / @vitest/coverage-v8 / @types/node 的
+      # 大版本互相强绑定（vite major ⇒ 需要同代 plugin-vue；vitest major ⇒ 需要同版本
+      # coverage-v8；@types/node 要满足 vite/vitest 的 peer）。历史教训 Dependabot #9：
+      # 只升 `vite@8` 单包 → `@vitejs/plugin-vue@5` peer 仅 `^5||^6` → `npm ci ERESOLVE`，
+      # frontend-ci + windows-startup 直接红。让它们的大版本进同一个 PR 成套评估。
+      # 注意：本组只收 major；minor/patch 仍走下面的具体组/兜底组。
+      # 不覆盖无关包：vue / pinia / element-plus / sass / eslint / jsdom 等保持各自节奏
+      # （它们的 major 仍是单独 PR，人工评估）。
+      frontend-major-toolchain:
+        patterns:
+          - "vite"
+          - "vitest"
+          - "@vitest/*"
+          - "@vitejs/*"
+          - "@types/node"
+        update-types:
+          - "major"
       # 构建链：vite 与插件/TS/vue-tsc 版本互相约束，分开升容易得到「build 能过但 typecheck 崩」
       frontend-build-toolchain:
         patterns:

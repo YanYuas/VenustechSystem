@@ -415,7 +415,8 @@ CI：`.github/workflows/{backend,frontend,repo-guard}.yml` + `android-build.yml`
 
 | D-65 | P2 | `project_service.timeline()/export()` 访问 `Review.title`/`content`，但 Review 只有 `data` JSON → 项目一旦关联复盘，GET 时间线/导出 **必 500** | `app/services/project_service.py` | ✅ 已修（2026-11-01）：从 `data` 派生摘要（gains/key_gains/monthly_summary/completed_tasks，无则 `<date> 复盘`）+ 导出按字段生成 Markdown；4 条回归测试 |
 
-| D-66 | P3 | 主密钥模式下「旧代历史密钥」语义不自洽（ROADMAP 既有已知项，非 D-58 引入） | `core/encryption.py` | Phase 18（本次只保证该模式成功路径 + 失败回滚） |
+| D-66 | P3 | 主密钥模式「旧代历史密钥」语义不自洽：`_initialize` 忽略 key 文件、rotate 归档不到旧代材料 → 同 master 轮换后新密文重启不可解、换 master 旧密文可能丢失 | `core/encryption.py` | ✅ 已修（2026-11-01）：主密钥模式改为 **salt 历史**——同 master 轮换生成新 salt、旧 salt 入 keyring `previous_salts`（cap KEEP_PREVIOUS），旧代用 `master+旧 salt` 重派生；**磁盘只存 16B salt，不落任何 key 明文**（威胁模型：master 是唯一秘密）；换 master 明确为「需 `SecurityService` 全量重加密」，直接 manager 换 master 不保证旧密文；旧随机模式 `previous_keys` 向后兼容；14 条专项测试 + 负向验证 2/2 |
+| D-67 | P3 | 历史随机模式目录的 keyring 仍保留 `previous_keys` 中的 **key 明文**（本次 D-66 不新增、不清洗） | `core/encryption.py` / 历史数据目录 | Phase 20（一次性迁移清洗：旧代密文重加密后可移除明文历史） |
 
 > 原则：**先修 P0/P1 的"正确性"，再谈结构搬迁**。在事务边界、迁移基线、备份导入还有问题时做领域分包，只是把混乱打包进更漂亮的新目录。
 
@@ -444,6 +445,7 @@ CI：`.github/workflows/{backend,frontend,repo-guard}.yml` + `android-build.yml`
 | **Phase 16** | D-56 SQLAlchemy 2.1 升级 + 覆盖冲刺 | D-56 闭环：5 列显式 `Float` + 升级 **SQLAlchemy 2.1.6 / alembic 1.20.1**（迁移完整性 6 passed、三方类型一致）；后端 1995 passed、覆盖率 **98.94%→99.41%**（CI 阈值 98→99）；前端 569 passed、lines 82.2%→**84.77%**（阈值 {81,88,48,81}→{83,89,51,83}）；新登记 D-58~D-63 | ✅ 本轮完成（2026-11-01） |
 | **Phase 17** | P2 加密原子性 + 小债清零 + 补丁发行 | **D-58~D-63 全部修复**（加密轮换原子回滚/日期适配/weekly 日志/toast 上限去重/快捷键守卫/Modal 二次关闭），并借 Vite 8 spike 附带修掉 **D-64**（DocumentGraph 样式失效）与 **D-65**（项目时间线/导出复盘 500，P2）；后端 2026 passed、覆盖率 **99.41%→99.75%**；前端 578 passed、lines 84.79%（阈值 {83,89,51,83}）；发 **v1.0.1**；D-57 结论转「可升级、单独立项」；新登记 D-66 | ✅ 本轮完成（2026-11-01） |
 | **Phase 18** | Vite 8 迁移（D-57） | vite 8.3.5 + plugin-vue 6 + vitest 5 + coverage-v8 5 + @types/node 24 + 显式 esbuild；rolldown `codeSplitting.groups` / `minify:'oxc'` / `strictPort:true`；构建 −0.76%、578 tests 全绿；覆盖率口径 v2 重校准 {70,64,49,69}（双口径记录）；CI/启动链路配套（esbuild 显式依赖、Node 24 确认、windows dev 观察点）；发 **v1.1.0** | ✅ 本轮完成（2026-11-01） |
+| **Phase 19** | 快照优化（不迭代版本号） | **D-66 闭环**（主密钥 salt 历史、不落 key 明文、换 master 语义钉住）；删除 review `_list_item` 死代码；覆盖率 **99.76%→99.82%**（2047 passed，剩余 18 全为 B/C/D 分类）；Dependabot 新增 major 联升组（vite/vitest/@vitejs/@vitest/@types/node）；仓库卫生 **.arch-audit 1.09GB→18MB**；**保持 VERSION=1.1.0，不发版** | ✅ 快照已合入（2026-11-01） |
 
 **明确不做（以及为什么）**：
 

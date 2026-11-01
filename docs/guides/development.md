@@ -74,8 +74,18 @@ Remove-Item "C:\Users\21722\qimingxing-git-repo\*.lock" -Force
 - **Dependabot**：[`.github/dependabot.yml`](../../.github/dependabot.yml) 每周一 09:00（Asia/Shanghai）
   检查 4 处依赖：`backend/`（pip）、`frontend/`（npm）、`ops/server/`（npm）、GitHub Actions。
   **分组策略**：同生态内按「一起升级更安全」分组（pytest 生态 / FastAPI 栈 / DB 栈 /
-  前端构建-测试-lint 工具链 / Capacitor），且只有 **minor + patch** 归组；**major 升级单独开 PR**，
-  强制人工评估破坏性变更。Dependabot PR 的合并口径同普通 PR：至少跑对应门禁
+  前端构建-测试-lint 工具链 / Capacitor），普通组只有 **minor + patch**；**major 默认单独开 PR**，
+  强制人工评估破坏性变更。
+  **例外：前端「major 联升组」（2026-11 新增，`frontend-major-toolchain`，组顺序放在最前）**——
+  `vite` / `vitest` / `@vitest/*`（含 coverage-v8）/ `@vitejs/*`（含 plugin-vue）/ `@types/node`
+  的大版本会进**同一个 PR**。原因：这些包的大版本互相强绑定（vite major ⇒ 需同代 plugin-vue；
+  vitest major ⇒ 需同版本 coverage-v8；`@types/node` 要满足 vite/vitest 的 peer），单包 major 会在
+  `npm ci` 阶段就直接 `ERESOLVE`。**要修的就是 Dependabot #9 的根因**：当时只升了 `vite@8`，
+  `@vitejs/plugin-vue@5.x` 的 peer 仍为 `^5 || ^6` → frontend-ci + windows-startup 双双变红。
+  **major 组 PR 仍需人工 review（可能一次改多个包 + 大 lock diff）**：按 Vite 8 spike 的经验核对
+  breaking changes、重建 lock，并等 frontend-ci + windows-startup 双平台绿；无关包
+  （vue / pinia / element-plus / sass / eslint / jsdom 等）不进本组，保持各自升级节奏。
+  Dependabot PR 的合并口径同普通 PR：至少跑对应门禁
   （后端 ruff + pytest，前端 lint + test + build，或直接 `check_all --strict`）。
 - **Issue 模板**：[`.github/ISSUE_TEMPLATE/`](../../.github/ISSUE_TEMPLATE) 含 bug / feature 两个模板
   （自动带出复现步骤 / 环境 / 验收标准），新建 issue 时选择即可。
