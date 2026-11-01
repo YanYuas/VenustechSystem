@@ -2,7 +2,7 @@
 // useConversation —— 第二分身（AI对话）业务逻辑
 // 支持无API Key时的规则式回复降级
 // ============================================================
-import { ref, onScopeDispose } from 'vue'
+import { ref, computed, onScopeDispose } from 'vue'
 import { conversationApi, aiApi } from '../api'
 import { learningApi } from '@/features/learning'
 import { useAsync } from '@/kernel/async/useAsync'
@@ -169,16 +169,55 @@ export function useConversation() {
   const currentId = ref<string | null>(null)
   const streaming = ref(false)
   const streamContent = ref('')
+  /** 会话列表是否已完成首次加载（用于空态判定，避免首屏闪烁） */
+  const listLoaded = ref(false)
 
   const { execute: fetchConversations } = useAsync(async () => {
-    conversations.value = await conversationApi.list()
-    return conversations.value
+    try {
+      conversations.value = await conversationApi.list()
+      return conversations.value
+    } finally {
+      // 首次列表请求结束（无论成功/失败）才允许判定「无会话」空态，
+      // 否则挂载瞬间会闪一下「暂无对话」。
+      listLoaded.value = true
+    }
   })
 
-  const { execute: fetchMessages } = useAsync(async (id: string) => {
+  const { execute: fetchMessages, loading: messagesLoading } = useAsync(async (id: string) => {
     messages.value = await conversationApi.messages(id)
     currentId.value = id
     return messages.value
+  })
+
+  /**
+   * 首次进入会话页：拉列表，并在没有当前会话时自动选中第一条。
+   *
+   * 修前缺陷（P21 UI 探针）：onMounted 只拉列表不选会话，
+   * 左侧有会话、右侧消息区却整片空白。
+   */
+  async function ensureActiveConversation() {
+    await fetchConversations()
+    const first = conversations.value[0]
+    if (!currentId.value && first) {
+      // 先记住选中项再拉消息：拉消息失败时仍停留在该会话（与手点列表语义一致），
+      // 否则用户此时发消息会被误判为「没有当前会话」而新建一条。
+      currentId.value = first.id
+      await fetchMessages(first.id)
+    }
+    return conversations.value
+  }
+
+  /**
+   * 右侧消息区空态（模板据此渲染空态面板，避免空白）：
+   * - null：正常渲染消息（列表/消息加载中也为 null）
+   * - 'no-conversation'：一个会话都没有 → 引导新建
+   * - 'no-message'：有会话但暂无消息 → 引导发第一条
+   */
+  const emptyState = computed<'no-conversation' | 'no-message' | null>(() => {
+    if (!listLoaded.value || messagesLoading.value) return null
+    if (!conversations.value.length) return 'no-conversation'
+    if (!messages.value.length) return 'no-message'
+    return null
   })
 
   const { execute: createConversation } = useAsync(async (title?: string) => {
@@ -318,8 +357,11 @@ export function useConversation() {
     currentId,
     streaming,
     streamContent,
+    listLoaded,
+    emptyState,
     fetchConversations,
     fetchMessages,
+    ensureActiveConversation,
     createConversation,
     sendMessage,
     stopStreaming,

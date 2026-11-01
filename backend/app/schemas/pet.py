@@ -4,7 +4,16 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
+
 from pydantic import BaseModel, Field
+
+# 与前端 `frontend/src/features/pet/model.ts` 契约严格对齐（Phase21 D-75）：
+#   size        = small | medium | large   （旧 seed 曾写数字 80/120/160）
+#   speak_scene = never | remind | interact | celebrate | always（旧 seed 曾写 notification）
+# 请求层用 Literal：非法值直接进不了 service（不静默归一），API 返回统一校验错误。
+PetSize = Literal["small", "medium", "large"]
+SpeakScene = Literal["never", "remind", "interact", "celebrate", "always"]
 
 
 class PetConfigOut(BaseModel):
@@ -36,7 +45,8 @@ class PetConfigOut(BaseModel):
 
 class UpdatePetConfigRequest(BaseModel):
     enabled: bool | None = None
-    size: str | None = None
+    # None = 不更新；非法枚举值 → 请求校验失败（不静默吞）
+    size: PetSize | None = None
     opacity: float | None = None
     always_on_top: bool | None = None
     auto_start: bool | None = None
@@ -55,7 +65,7 @@ class UpdatePetConfigRequest(BaseModel):
     tts_rate: float | None = None
     tts_pitch: float | None = None
     tts_volume: float | None = None
-    speak_scene: str | None = None
+    speak_scene: SpeakScene | None = None
 
 
 class UpdatePetStatsRequest(BaseModel):

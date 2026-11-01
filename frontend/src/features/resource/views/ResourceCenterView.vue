@@ -3,7 +3,8 @@
 // 资源中心（二期 M7 P0）
 // 收集箱 + 模板库 + 领域库
 // ============================================================
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { resourceApi } from '../api'
 import { useToast } from '@/kernel/ui/toast'
 import type { InboxItem, Template, Domain } from '../model'
@@ -18,6 +19,22 @@ const tabs = [
   { key: 'templates', label: '模板库', icon: '📋' },
   { key: 'domains', label: '领域库', icon: '📚' },
 ] as const
+
+// ?tab= 深链：首页资源卡按分类 id 跳转（inbox→inbox、template→templates、其余→domains）
+type ResourceTab = 'inbox' | 'templates' | 'domains'
+const route = useRoute()
+const TAB_BY_QUERY: Record<string, ResourceTab> = {
+  inbox: 'inbox',
+  templates: 'templates',
+  // 兼容首页资源分类的单数 id（后端契约 category.id = 'template'）
+  template: 'templates',
+  domains: 'domains',
+  domain: 'domains',
+}
+function resolveQueryTab(raw: unknown): ResourceTab {
+  const v = Array.isArray(raw) ? raw[0] : raw
+  return typeof v === 'string' ? (TAB_BY_QUERY[v] ?? 'inbox') : 'inbox'
+}
 
 // ==================== 收集箱 ====================
 const inboxItems = ref<InboxItem[]>([])
@@ -194,10 +211,14 @@ async function deleteDomain(id: string) {
 const domainIcons = ['📁', '📚', '💼', '🎨', '🎵', '🏃', '🍳', '✈️', '💡', '🔧']
 const domainColors = ['#FFB6C1', '#87CEEB', '#98FB98', '#FFDAB9', '#DDA0DD', '#F0E68C']
 
-// 初始化
-onMounted(() => {
-  fetchInbox()
-})
+// 初始化：按 ?tab= 进入对应分类（缺省/非法值回收集箱，保持现行为）
+onMounted(() => switchTab(resolveQueryTab(route.query.tab)))
+
+// 同一路由内 query 变化（首页资源卡连点不同分类）也要切换
+watch(
+  () => route.query.tab,
+  (raw) => switchTab(resolveQueryTab(raw)),
+)
 
 function switchTab(tab: 'inbox' | 'templates' | 'domains') {
   activeTab.value = tab

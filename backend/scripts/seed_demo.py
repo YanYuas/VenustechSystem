@@ -1109,14 +1109,14 @@ def seed_companion(db, counts: dict[str, int]) -> None:
     db.commit()
 
     db.add(PetConfig(
-        user_id=_uid(), enabled=True, size=120, opacity=0.95,
+        user_id=_uid(), enabled=True, size="medium", opacity=0.95,
         always_on_top=False, auto_start=True, position_x=1770, position_y=880,
         current_avatar_id=avatars[0] if avatars else None,
         state_awareness_enabled=True, action_switch_interval=8,
         show_bubble=True, bubble_duration=6, click_interaction=True,
         draggable=True, right_click_menu=True,
         tts_enabled=False, tts_rate=1.0, tts_pitch=1.0, tts_volume=0.8,
-        speak_scene="notification",
+        speak_scene="remind",
         intimacy=62, satiety=75, mood=80, energy=68,
         stats_updated_at=ago(hours=2),
     ))

@@ -274,3 +274,64 @@ describe('默认导出', () => {
     expect(typeof router.afterEach).toBe('function')
   })
 })
+
+// ============================================================
+// P21 回归：404 不得污染 lastRoute
+//
+// 修前缺陷（真实浏览器探针实测）：afterEach 无条件写 to.fullPath，
+// 访问一次未知路由后，下次启动从根路径进入会被 beforeEach 重定向回 404。
+// 修复：afterEach 跳过 not-found；beforeEach 恢复前 resolve 校验，失效则清理。
+// ============================================================
+describe('lastRoute：404 不落盘（P21 回归）', () => {
+  it('访问未知路由不会把 404 路径写入 lastRoute（保留上一次合法值）', async () => {
+    const r = await loadRouter()
+
+    await r.push('/tasks')
+    expect(localStorage.getItem(LAST_ROUTE_KEY)).toBe('/tasks')
+
+    await r.push('/no-such-route')
+    expect(r.currentRoute.value.name).toBe('not-found')
+    expect(localStorage.getItem(LAST_ROUTE_KEY)).toBe('/tasks')
+  })
+
+  it('首次导航即 404：lastRoute 保持为空，不写入未知路径', async () => {
+    const r = await loadRouter()
+
+    await r.push('/no-such-route')
+
+    expect(r.currentRoute.value.name).toBe('not-found')
+    expect(localStorage.getItem(LAST_ROUTE_KEY)).toBeNull()
+  })
+
+  it('预置失效 lastRoute：首次进入根路径落在 /dashboard，不会被弹回 404', async () => {
+    localStorage.setItem(LAST_ROUTE_KEY, '/no-such-route')
+    const r = await loadRouter()
+
+    await r.push('/')
+
+    expect(r.currentRoute.value.path).toBe('/dashboard')
+    expect(r.currentRoute.value.name).toBe('dashboard')
+    // 失效值被清除；随后正常导航把当前页写回（不再是那个 404）
+    expect(localStorage.getItem(LAST_ROUTE_KEY)).toBe('/dashboard')
+  })
+
+  it('预置站外/不可解析的 lastRoute：忽略并清理', async () => {
+    localStorage.setItem(LAST_ROUTE_KEY, 'https://evil.example/steal')
+    const r = await loadRouter()
+
+    await r.push('/')
+
+    expect(r.currentRoute.value.path).toBe('/dashboard')
+    expect(localStorage.getItem(LAST_ROUTE_KEY)).toBe('/dashboard')
+  })
+
+  it('合法 lastRoute 携带 query 时也能恢复', async () => {
+    localStorage.setItem(LAST_ROUTE_KEY, '/tasks?status=pending')
+    const r = await loadRouter()
+
+    await r.push('/')
+
+    expect(r.currentRoute.value.path).toBe('/tasks')
+    expect(r.currentRoute.value.query.status).toBe('pending')
+  })
+})

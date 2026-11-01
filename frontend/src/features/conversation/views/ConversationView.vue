@@ -67,9 +67,10 @@ const {
   currentId,
   streaming,
   streamContent,
+  emptyState,
+  ensureActiveConversation,
   sendMessage,
   createConversation,
-  fetchConversations,
   fetchMessages,
   stopStreaming,
   deleteConversation,
@@ -341,7 +342,8 @@ function removeRefDoc(id: string) {
 
 onMounted(() => {
   startReminderTimer()
-  fetchConversations().catch(() => {
+  // 首次进入：拉列表并自动选中第一条会话（修前只拉列表，右侧消息区整片空白）
+  ensureActiveConversation().catch(() => {
     /* http 层已提示 */
   })
 })
@@ -630,6 +632,25 @@ loadTraits()
       </div>
       <BaseCard class="conv-view__chat" padding="0">
         <div class="conv-view__messages">
+          <div v-if="emptyState" class="conv-view__msg-empty">
+            <template v-if="emptyState === 'no-conversation'">
+              <p class="conv-view__msg-empty-title">暂无对话</p>
+              <p class="conv-view__msg-empty-desc">
+                点击左侧「新建」创建第一个对话，开始和你的第二分身聊天
+              </p>
+              <BaseButton
+                variant="primary"
+                size="sm"
+                @click="createConversation('新对话').catch(() => {})"
+              >
+                新建对话
+              </BaseButton>
+            </template>
+            <template v-else>
+              <p class="conv-view__msg-empty-title">还没有消息</p>
+              <p class="conv-view__msg-empty-desc">在下方输入框发送第一条消息，开始这段对话</p>
+            </template>
+          </div>
           <div v-for="m in messages" :key="m.id" class="conv-view__msg" :class="`is-${m.role}`">
             <div class="conv-view__msg-bubble">{{ m.content }}</div>
           </div>
@@ -992,6 +1013,27 @@ loadTraits()
     display: flex;
     flex-direction: column;
     gap: var(--space-4);
+  }
+  &__msg-empty {
+    flex: 1;
+    min-height: 220px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    text-align: center;
+    color: var(--text-mid);
+  }
+  &__msg-empty-title {
+    font-size: var(--text-lg);
+    font-weight: 600;
+    color: var(--text-hi);
+  }
+  &__msg-empty-desc {
+    font-size: var(--text-sm);
+    max-width: 320px;
+    line-height: 1.6;
   }
   &__msg {
     display: flex;

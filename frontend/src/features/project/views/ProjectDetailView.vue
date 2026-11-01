@@ -417,7 +417,7 @@ function fmtDateTime(v: string | null): string {
           </BaseButton>
           <BaseButton variant="secondary" size="sm" :loading="exporting" @click="onExport"
             ><AppIcon name="download" :size="14" /> 导出</BaseButton
-          >`n
+          >
           <BaseButton variant="secondary" size="sm" @click="onArchiveToggle">
             {{ isArchived ? '恢复项目' : '归档' }}
           </BaseButton>

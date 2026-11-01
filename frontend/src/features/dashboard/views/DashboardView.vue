@@ -110,6 +110,20 @@ const identityRows = computed(() => data.value?.identities.list ?? [])
 const unassignedOpen = computed(() => data.value?.identities.unassigned_open ?? 0)
 const resourceCategories = computed(() => data.value?.resource_center.categories ?? [])
 const lifeCategories = computed(() => data.value?.life.categories ?? [])
+
+/**
+ * 资源分类 id → 资源中心 tab（后端契约 category.id：inbox / template / domain）。
+ * 其余自定义分类统一落到领域库，避免点进去丢上下文。
+ */
+function resourceTabFor(categoryId: string): 'inbox' | 'templates' | 'domains' {
+  if (categoryId === 'inbox') return 'inbox'
+  if (categoryId === 'template') return 'templates'
+  return 'domains'
+}
+
+function openResourceCategory(categoryId: string) {
+  router.push({ path: '/resource-center', query: { tab: resourceTabFor(categoryId) } })
+}
 </script>
 
 <template>
@@ -375,7 +389,7 @@ const lifeCategories = computed(() => data.value?.life.categories ?? [])
             v-for="c in resourceCategories"
             :key="c.id"
             class="dash__resource"
-            @click="router.push('/resource-center')"
+            @click="openResourceCategory(c.id)"
           >
             <AppIcon :name="c.icon" :size="16" class="dash__resource-icon" />
             <span class="dash__resource-name">{{ c.name }}</span>
