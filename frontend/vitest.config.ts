@@ -40,22 +40,19 @@ export default defineConfig({
     // 不隐藏 console.warn（项目里有意为之的告警要看得见）
     silent: false,
     // 覆盖率：阈值棘轮（只许上调；下调须在 CHANGELOG 说明理由）。
-    // 阈值依据（2026-10-31，Phase12 task-50 实测，两轮复测一致）：lines 82.09 /
-    // branches 89.73 / functions 49.2 / statements 82.09。
-    // 统计面变化说明：本 Phase 补充 DesktopPet/DocumentGraph/AppIcon 测试后，
-    // functions 分母 591→628（+37）、covered 274→309（+35）——绝对值明显上升，属正常增长；
-    // lines 82.42→82.09 属测量/时序波动，已连跑两次确认稳定，非回退。
-    // 阈值：lines/branches 各留约 1pp（81/88）；functions 45→48（实测 49.2 留约 1.2pp）。
-    // Phase11 历史：router lazy-loader 测试首次把 24 个 view 模块带入统计面
-    //（functions 分母 382→591、covered 260→274），曾按新口径把 functions 阈值设为 45。
+    // 阈值依据（2026-11-01，Phase16 task-60 实测）：lines 84.77 / branches 90.05 /
+    // functions 52.85 / statements 84.77。
+    // 统计面说明：本次分母**未变**（lines/statements 7453、branches 1388、functions 649），
+    // 覆盖数纯新增：lines 6127→6318（+191）、branches 1155→1250（+95）、functions 314→343（+29），
+    // 属"补测既有模块"的真实提升；阈值各留约 1.5pp 余量（83/89/51/83）。
     // 上调历史：{12,65,40,12}（Phase5）→ {20,72,52,20}（Phase6）→ {31,76,59,31}（Phase7）
     //           → {36,78,63,36}（Phase8）→ {40,79,64,40}（Phase9）→ {43,81,67,43}（Phase10）
-    //           → {81,88,45,81}（Phase11）→ 当前。
+    //           → {81,88,45,81}（Phase11）→ {81,88,48,81}（Phase12/13 未再上调）→ 当前。
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json-summary'],
       reportsDirectory: './coverage',
-      thresholds: { lines: 81, branches: 88, functions: 48, statements: 81 },
+      thresholds: { lines: 83, branches: 89, functions: 51, statements: 83 },
       // 统计 src 下全部实现代码；测试自身与生成物不计入
       include: ['src/**/*.{ts,vue}'],
       exclude: [

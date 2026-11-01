@@ -186,7 +186,9 @@ class TestLifeApiGroup2HabitListUpdateDeleteCalendar:
         # 查库验证
         db = _db()
         try:
-            in_db = db.query(__import__("app.models.life", fromlist=["Habit"]).Habit).get(habit_id)
+            from app.models.life import Habit
+
+            in_db = db.get(Habit, habit_id)
             assert in_db.name == "新名字"
             assert in_db.goal_days == 60
             assert in_db.icon == "old"  # 未指定字段不变

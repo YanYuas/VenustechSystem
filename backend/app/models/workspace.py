@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, SoftDeleteMixin, TimestampMixin, UUIDMixin
@@ -57,7 +57,8 @@ class WorkspaceFile(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
     ext: Mapped[str | None] = mapped_column(String(30), nullable=True)  # 小写含点，如 ".py"
     is_dir: Mapped[bool] = mapped_column(default=False)
     size: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    mtime: Mapped[float] = mapped_column(nullable=False, default=0.0)
+    # D-56：显式 Float（2.1 隐式 float→Double 会与迁移 DDL 的 FLOAT 不一致）
+    mtime: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     # 扫描时从根继承（根改身份后重扫即刷新）；为将来逐文件改身份留位
     identity_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     indexed_at: Mapped[datetime | None] = mapped_column(nullable=True)
