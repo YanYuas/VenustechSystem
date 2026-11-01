@@ -24,12 +24,9 @@ on:
       - "scripts/**"
       - "docs/architecture/**"
       - ".github/workflows/backend.yml"
+    # 所有 PR 都跑：本 job 是 main 分支保护的 required check，带 paths 过滤会让
+    # docs-only PR 永远等不到状态而无法合并（2026-11-01 分支保护上线时发现）。
   pull_request:
-    paths:
-      - "backend/**"
-      - "scripts/**"
-      - "docs/architecture/**"
-      - ".github/workflows/backend.yml"
 
 # 最小权限：只读仓库内容（本 workflow 不写回、不发版）
 permissions:

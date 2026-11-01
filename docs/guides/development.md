@@ -1,6 +1,6 @@
 # 启明星系统 · 开发规范
 
-> 最后更新：2026-10-31
+> 最后更新：2026-11-01
 
 ## 1. 分支策略
 
@@ -11,12 +11,15 @@ main              ← 主分支，始终保持可运行
   └─ mod/xxx      ← 模块开发分支（历史遗留，不再新建）
 ```
 
-**规则**：
-- 小改动可直接在 main 提交
+**规则**（2026-11-01 起 main 已开启**分支保护**，直推会被拒绝）：
+- **所有改动必须走 PR**：`git switch -c <type>/<scope>-<desc>` → commit → push 分支 → 开 PR →
+  required checks 全绿 → squash merge（合并后删除分支）
 - 大功能开 `feat/<模块>-<功能>` 分支，如 `feat/document-offline`
 - Bug 修复开 `fix/<模块>-<问题>` 分支
-- 分支完成后合并到 main，删除功能分支
 - **不再新建 `mod-*` 分支**（历史遗留，已全部合并待清理）
+- 紧急热修（如 main 完全不可用）：临时关闭保护（Settings → Branches 编辑/删除规则，或 API
+  `DELETE /repos/{owner}/{repo}/branches/main/protection`）→ 修复 → **立即恢复保护**，并在
+  PR/commit 说明里记录"为何绕行、何时恢复"；不允许把"临时关闭"变成常态
 
 **重要**：`.git/` 是目录联接，指向 `C:\Users\21722\qimingxing-git-repo`。如遇 `index.lock` 错误，需到目标目录删除锁文件：
 ```powershell
@@ -54,8 +57,20 @@ Remove-Item "C:\Users\21722\qimingxing-git-repo\*.lock" -Force
   `lint + format:check + typecheck + test + build`；勾不了就写原因（如「本机无 Node，build 由 CI 覆盖」），
   **不要空勾**。
 - **CODEOWNERS**：[`.github/CODEOWNERS`](../../.github/CODEOWNERS) 为 `* @YanYuas`（单人维护）——
-  所有 PR 自动请求维护者 review；强制力来自 main 分支保护里的 "Require review from Code Owners"
-  （仓库设置，不是本文件能决定的）。
+  所有 PR 自动请求维护者 review。**当前未开启 "Require review from Code Owners"**：单人仓库无法给自己的 PR
+  批准，开启会导致 PR 永远无法合并；等有第二位 maintainer 时，再到分支保护里打开该开关并设
+  `required_approving_review_count = 1`。
+- **main 分支保护（2026-11-01 开启，API/Rules 双处配置）**：
+  - required checks（5 个 job，缺一不可）：
+    `lint + pytest + 架构守护 + 冒烟`（backend-ci）、`lint + format + typecheck + vitest + build`（frontend-ci）、
+    `守护脚本 + 敏感文件门禁` 与 `统一服务测试（鉴权 / 路径穿越）`（repo-guard）、
+    `dev 真启动 + 健康检查 + 自动停止`（windows-startup）；**android 的 `build` 暂不设为 required**（APK 尚未对外发放）。
+  - 必须经 PR 合并；**`enforce_admins=true`**（管理员也不能直推/强推）；禁止 force-push 与删除 main；
+    要求对话解决（conversation resolution）；`strict=false`（不强制 PR 分支与 main 同步后再跑，减少单人维护摩擦）。
+  - **tag 规则集 `protect-release-tags`**：`refs/tags/v*` 禁止删除/移动（对应 §10「已发布 tag 不可移动」）。
+  - 注意：为让 required checks 在**所有 PR** 上都有状态上报，backend/frontend/windows-startup 的
+    `pull_request` 触发**不再带 paths 过滤**（否则 docs-only PR 会卡在 "Expected" 永远无法合并）；
+    `push` 触发仍保留 paths，避免无谓的 main 构建。
 - **Dependabot**：[`.github/dependabot.yml`](../../.github/dependabot.yml) 每周一 09:00（Asia/Shanghai）
   检查 4 处依赖：`backend/`（pip）、`frontend/`（npm）、`ops/server/`（npm）、GitHub Actions。
   **分组策略**：同生态内按「一起升级更安全」分组（pytest 生态 / FastAPI 栈 / DB 栈 /
@@ -330,11 +345,17 @@ python scripts/check_all.py --strict      # 16 项
 # 3) CHANGELOG：把 [Unreleased] 归入 ## [X.Y.Z] - YYYY-MM-DD（Keep a Changelog 格式，不丢历史），
 #    补 docs/RELEASE_NOTES_v1.0.0.md 这类按版本命名的发布说明
 
-# 4) 提交 + tag + 推送（维护者执行；本仓库 .git 是目录联接，须在有权限的会话操作）
+# 4) 发布提交走 PR（main 已保护），合并后再打 tag
+git switch -c release/v1.0.0
 git add -A
 git commit -m "release: v1.0.0"
+git push origin release/v1.0.0
+gh pr create --title "release: v1.0.0" --body-file var/tmp/release-pr.md   # 等 required checks 全绿
+gh pr merge --squash --delete-branch
+
+# 4b) 本地同步 main 后打 annotated tag 并推送（tag 推送不受分支保护影响；v* 受 tag 规则集保护）
+git switch main && git pull --ff-only origin main
 git tag -a v1.0.0 -m "Qimingxing v1.0.0"
-git push origin main
 git push origin v1.0.0
 
 # 5) GitHub Release：基于 tag v1.0.0 创建，正文取自发布说明
