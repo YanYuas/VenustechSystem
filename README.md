@@ -9,8 +9,8 @@
 [![windows-startup](https://github.com/YanYuas/VenustechSystem/actions/workflows/windows-startup.yml/badge.svg?branch=main)](https://github.com/YanYuas/VenustechSystem/actions/workflows/windows-startup.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](CHANGELOG.md)
-[![backend](https://img.shields.io/badge/backend-2047%20tests%20%C2%B7%2099.82%25%20coverage-brightgreen.svg)](https://github.com/YanYuas/VenustechSystem/actions/workflows/backend.yml)
-[![frontend](https://img.shields.io/badge/frontend-578%20tests%20%C2%B7%2071.01%25%20coverage-brightgreen.svg)](https://github.com/YanYuas/VenustechSystem/actions/workflows/frontend.yml)
+[![backend](https://img.shields.io/badge/backend-2071%20tests%20%C2%B7%2099.82%25%20coverage-brightgreen.svg)](https://github.com/YanYuas/VenustechSystem/actions/workflows/backend.yml)
+[![frontend](https://img.shields.io/badge/frontend-604%20tests%20%C2%B7%2071.25%25%20coverage-brightgreen.svg)](https://github.com/YanYuas/VenustechSystem/actions/workflows/frontend.yml)
 
 ![启明星系统首页（奶油糖果主题）](docs/assets/screenshot-main.png)
 
@@ -170,11 +170,11 @@ backend/app/models/*.py     SQLAlchemy → SQLite（WAL）
 | 维度 | 命令 | 现状 |
 |---|---|---|
 | 一键门禁 | `python scripts/check_all.py --strict` | **16 项全绿**（缺依赖 = 失败，杜绝假绿） |
-| 后端测试 | `cd backend && python -m pytest tests -q` | **2047 passed** |
+| 后端测试 | `cd backend && python -m pytest tests -q` | **2071 passed** |
 | 后端覆盖率 | `cd backend && python -m pytest tests -q --cov=app --cov-report=term-missing --cov-fail-under=99` | **99.82%**（阈值 99） |
 | 后端 lint | `cd backend && python -m ruff check app tests` | 0（正确性规则 E4/E7/E9/F） |
-| 前端单测 | `cd frontend && npm test` | **578 passed** |
-| 前端覆盖率 | `cd frontend && npm run test:coverage` | lines **71.01%**（口径 v2；阈值 70/64/49/69 棘轮，说明见 [frontend.md §九](docs/guides/frontend.md)） |
+| 前端单测 | `cd frontend && npm test` | **604 passed** |
+| 前端覆盖率 | `cd frontend && npm run test:coverage` | lines **71.25%**（口径 v2；阈值 70/64/49/69 棘轮，说明见 [frontend.md §九](docs/guides/frontend.md)） |
 | 前端质量 | `cd frontend && npm run lint && npm run typecheck && npm run format:check` | 0（ESLint 含 ADR-0007 分层边界） |
 | 启动自检 | `start-dev.bat -Verify` | 真启动 → 健康检查 → 自动停止 |
 
@@ -218,12 +218,16 @@ backend/app/models/*.py     SQLAlchemy → SQLite（WAL）
 | **Phase 17** | **P2 加密原子性 + v1.0.1** | D-58~D-65 修复（加密轮换回滚、时间线/导出 500、DocumentGraph 样式失效等）；后端 **2026 / 99.75%**、前端 **578 / 84.79%**；首发补丁 **v1.0.1** |
 | **Phase 18** | **Vite 8 迁移（v1.1.0）** | D-57：vite 8.3.5 + plugin-vue 6 + vitest 5 + 显式 esbuild；构建 −0.76%、578 tests 全绿；覆盖率口径 v2 重校准 {70,64,49,69}；**v1.1.0** |
 | Phase 19 | 快照优化（未发版） | D-66 主密钥 salt 历史 + 不落 key 明文；删除 review 死代码；后端 **2047 / 99.82%**；Dependabot major 联升组；`.arch-audit` 1.09GB→18MB |
+| Phase 20 | 本地卫生 + 启动脚本/注释文档 | 清理 ≈386MB；`ops/backup-git.ps1` 补 BOM + BOM 守卫扩展；`npm ci` 统一；README/ROADMAP/check_all 注释去陈旧 |
+| **Phase 21** | **UI 全界面联动与展现调查 + 微调** | puppeteer 全路由探针（24 路由 + 6 移动端）：0 控制台错误/0 失败请求；修复 7 个真实缺陷（项目详情 `` `n `` 泄漏、404 污染 lastRoute、会话首屏空白、21 个缺失图标、epic 首屏主题、桌宠原生控件、资源卡分类联动）；桌宠前后端契约收敛（schema Literal + seed 合法 + 迁移 0023 归一化）；前端 **604 tests / 71.25% lines**、后端 **2071 / 99.82%** |
 
 ### 已知限制与后续方向
 
 - ~~D-56 SQLAlchemy 2.1 升级暂缓~~ **已在 v1.0.1 完成**：5 列显式 `Float` + SQLAlchemy 2.1.6 / alembic 1.20.1，迁移完整性三方对账通过。
 - ~~D-57 Vite 8 迁移~~ **已在 v1.1.0 完成**：vite 8.3.5 / plugin-vue 6 / vitest 5 / 显式 esbuild；覆盖率口径 v2 已按规则显式重校准并双口径记录。
 - ~~D-66 主密钥模式历史密钥语义~~ **已在 Phase 19 修复**：salt 历史 + 不落 key 明文；换 master 需服务层全量重加密。剩余 D-67（历史 key 明文清洗）留待 Phase 20。
+- **D-68（P3）**「系统提醒 · 查看全部」暂无通知中心页，当前跳转 /tasks（语义不符，Phase 22 补通知中心或改打开通知面板）。
+- **D-69（P3）**`ConversationView` 提醒轮询里仍有硬编码 `http://127.0.0.1:8765` 裸 fetch（移动端会坏，Phase 22 统一走 http/feature api）。
 - **单用户模型**：无账号体系与多租户，认证是"本地信任 + 外部令牌"；不做云端同步（云适配器契约已冻结，留作后续）。
 - 其余债务与处置状态：**[ARCHITECTURE.md](ARCHITECTURE.md) §10（不假装健康，逐条列出已修/未修）**。
 

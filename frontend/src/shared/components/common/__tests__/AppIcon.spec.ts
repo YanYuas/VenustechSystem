@@ -8,6 +8,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
 
+import { DIMENSIONS } from '@/shared/constants/dimensions'
 import AppIcon from '../AppIcon.vue'
 
 const mounted: Array<{ unmount: () => void }> = []
@@ -46,7 +47,8 @@ describe('AppIcon：图标映射', () => {
   })
 
   it('未知 name 回退为 0 条 path，但 svg 仍渲染（占位不炸）', () => {
-    const wrapper = mountIcon('loading')
+    // 注意：'loading' 已作为 spin 的别名（Phase21 补图标），这里必须用真正未定义的 name
+    const wrapper = mountIcon('no-such-icon')
 
     expect(wrapper.find('svg').exists()).toBe(true)
     expect(wrapper.findAll('path')).toHaveLength(0)
@@ -89,5 +91,71 @@ describe('AppIcon：尺寸与 SVG 属性', () => {
 
     expect(svg.attributes('aria-hidden')).toBe('true')
     expect(svg.classes()).toContain('app-icon')
+  })
+})
+
+// ============================================================
+// 图标完整性回归（Phase21 D-66）：全站曾因 AppIcon 缺名出现大量空白图标
+// ============================================================
+/** 后端契约图标清单（dashboard_service 的资源/生活/资产分类 + 路由 meta + 各页面动态图标） */
+const CONTRACT_ICONS = [
+  'inbox',
+  'robot',
+  'workflow',
+  'pet',
+  'mic',
+  'graduation',
+  'brain',
+  'terminal',
+  'layout',
+  'activity',
+  'zap',
+  'trending-up',
+  'award',
+  'message',
+  'database',
+  'chat',
+  'code',
+  'idea',
+  'monitor',
+  'folder-plus',
+  'settings',
+]
+
+describe('AppIcon：图标完整性（D-66 空白图标回归）', () => {
+  it('DIMENSIONS 里每个 dimension.icon 与 tab.icon 都能渲染出路径', () => {
+    for (const dim of DIMENSIONS) {
+      expect(
+        mountIcon(dim.icon).findAll('path').length,
+        `dimension ${dim.id} icon=${dim.icon}`,
+      ).toBeGreaterThan(0)
+      for (const tab of dim.tabs) {
+        expect(
+          mountIcon(tab.icon).findAll('path').length,
+          `dimension ${dim.id} tab ${tab.id} icon=${tab.icon}`,
+        ).toBeGreaterThan(0)
+      }
+    }
+  })
+
+  it('后端契约图标清单逐个可渲染（缺一即红）', () => {
+    for (const name of CONTRACT_ICONS) {
+      const paths = mountIcon(name).findAll('path')
+      expect(paths.length, `契约图标缺失：${name}`).toBeGreaterThan(0)
+      for (const p of paths) {
+        expect((p.attributes('d') ?? '').length, `${name} 存在空 path`).toBeGreaterThan(0)
+      }
+    }
+  })
+
+  it('契约图标与界面别名共用同一视觉（settings=gear / error=alert / loading=spin）', () => {
+    const d = (name: string) =>
+      mountIcon(name)
+        .findAll('path')
+        .map((p) => p.attributes('d'))
+
+    expect(d('settings')).toEqual(d('gear'))
+    expect(d('error')).toEqual(d('alert'))
+    expect(d('loading')).toEqual(d('spin'))
   })
 })

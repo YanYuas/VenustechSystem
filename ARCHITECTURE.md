@@ -417,6 +417,8 @@ CI：`.github/workflows/{backend,frontend,repo-guard}.yml` + `android-build.yml`
 
 | D-66 | P3 | 主密钥模式「旧代历史密钥」语义不自洽：`_initialize` 忽略 key 文件、rotate 归档不到旧代材料 → 同 master 轮换后新密文重启不可解、换 master 旧密文可能丢失 | `core/encryption.py` | ✅ 已修（2026-11-01）：主密钥模式改为 **salt 历史**——同 master 轮换生成新 salt、旧 salt 入 keyring `previous_salts`（cap KEEP_PREVIOUS），旧代用 `master+旧 salt` 重派生；**磁盘只存 16B salt，不落任何 key 明文**（威胁模型：master 是唯一秘密）；换 master 明确为「需 `SecurityService` 全量重加密」，直接 manager 换 master 不保证旧密文；旧随机模式 `previous_keys` 向后兼容；14 条专项测试 + 负向验证 2/2 |
 | D-67 | P3 | 历史随机模式目录的 keyring 仍保留 `previous_keys` 中的 **key 明文**（本次 D-66 不新增、不清洗） | `core/encryption.py` / 历史数据目录 | Phase 20（一次性迁移清洗：旧代密文重加密后可移除明文历史） |
+| D-68 | P3 | 「系统提醒 · 查看全部」缺通知中心页，当前跳 `/tasks` 语义不符 | `app/layout/LeftInfoPanel.vue` | Phase 22（补通知中心页或改打开通知面板） |
+| D-69 | P3 | `ConversationView` 提醒轮询硬编码 `http://127.0.0.1:8765` 裸 fetch（移动端会坏） | `features/conversation/views/ConversationView.vue` | Phase 22（统一走 http/feature api） |
 
 > 原则：**先修 P0/P1 的"正确性"，再谈结构搬迁**。在事务边界、迁移基线、备份导入还有问题时做领域分包，只是把混乱打包进更漂亮的新目录。
 
@@ -447,6 +449,7 @@ CI：`.github/workflows/{backend,frontend,repo-guard}.yml` + `android-build.yml`
 | **Phase 18** | Vite 8 迁移（D-57） | vite 8.3.5 + plugin-vue 6 + vitest 5 + coverage-v8 5 + @types/node 24 + 显式 esbuild；rolldown `codeSplitting.groups` / `minify:'oxc'` / `strictPort:true`；构建 −0.76%、578 tests 全绿；覆盖率口径 v2 重校准 {70,64,49,69}（双口径记录）；CI/启动链路配套（esbuild 显式依赖、Node 24 确认、windows dev 观察点）；发 **v1.1.0** | ✅ 本轮完成（2026-11-01） |
 | **Phase 19** | 快照优化（不迭代版本号） | **D-66 闭环**（主密钥 salt 历史、不落 key 明文、换 master 语义钉住）；删除 review `_list_item` 死代码；覆盖率 **99.76%→99.82%**（2047 passed，剩余 18 全为 B/C/D 分类）；Dependabot 新增 major 联升组（vite/vitest/@vitejs/@vitest/@types/node）；仓库卫生 **.arch-audit 1.09GB→18MB**；**保持 VERSION=1.1.0，不发版** | ✅ 快照已合入（2026-11-01） |
 | **Phase 20** | 本地卫生 + 启动脚本/注释文档刷新 | 清理本地垃圾 **≈386MB**（`.arch-audit` 1.1GB→0.3MB、213 个 `__pycache__`、旧 pytest 副本/日志/缓存）；`ops/start.ps1` 修复重复 `.PARAMETER` 注释 + `#Requires` 移到 help 后（Get-Help 可渲染）；`ops/setup.ps1` 统一「有 lock → `npm ci`」；`#Requires`/Node 要求（`^20.19 \|\| >=22.12`，推荐 24）/strictPort 描述对齐 Vite 8；`ops/backup-git.ps1` 补 BOM 并把 BOM 守卫扩到 `ops/*.ps1`；README/CONTRIBUTING/frontend.md/测试 ROADMAP/check_all 注释去陈旧（98%→99%、ruff 0.17.3、Vite 8、1219→2047）；**不迭代版本号** | ✅ 快照已合入（2026-11-01） |
+| **Phase 21** | UI 全界面联动与展现调查 + 微调 | 真实浏览器（puppeteer-core）全量探针：24 路由 + 6 移动端页，**0 控制台错误 / 0 失败请求 / 0 横向溢出**；修复 7 个缺陷：ProjectDetail 字面量 `` `n `` 泄漏、404 污染 `qm-star-last-route`、会话首屏右侧空白（自动选中+空态）、AppIcon 缺 21 个图标（全站空白图标）、`index.html` epic 首屏主题映射、桌宠设置原生控件→BaseSwitch/BaseSelect、资源卡分类 `?tab=` 联动；桌宠契约收敛（schema `Literal` + seed 合法值 + 迁移 0023 归一化）；新增 D-68/D-69；前端 **604 tests / 71.25% lines**（阈值 {70,64,49,69}）、后端 **2071 / 99.82%** | ✅ 本轮完成（2026-11-01） |
 
 **明确不做（以及为什么）**：
 

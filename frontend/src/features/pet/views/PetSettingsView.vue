@@ -8,6 +8,9 @@ import { petApi } from '../api'
 import { useToast } from '@/kernel/ui/toast'
 import type { PetConfig, PetAvatar, PetState } from '../model'
 import BaseCard from '@/shared/components/common/BaseCard.vue'
+import BaseSelect from '@/shared/components/common/BaseSelect.vue'
+import BaseSwitch from '@/shared/components/common/BaseSwitch.vue'
+import type { SelectOption } from '@/shared/types/common'
 
 const toast = useToast()
 
@@ -19,15 +22,79 @@ const tabs = [
   { key: 'avatar', label: '形象管理', icon: '🎨' },
 ] as const
 
+// 控件选项（原生 <select> → BaseSelect；字段与保存逻辑不变）
+const SIZE_OPTIONS: SelectOption[] = [
+  { value: 'small', label: '小 (80px)' },
+  { value: 'medium', label: '中 (120px)' },
+  { value: 'large', label: '大 (160px)' },
+]
+const SPEAK_SCENE_OPTIONS: SelectOption[] = [
+  { value: 'never', label: '从不说话' },
+  { value: 'remind', label: '仅提醒时' },
+  { value: 'interact', label: '互动时' },
+  { value: 'celebrate', label: '庆祝时' },
+  { value: 'always', label: '始终说话' },
+]
+const AVATAR_MODE_OPTIONS: SelectOption[] = [
+  { value: 'simple', label: '简单模式（静态+表情）' },
+  { value: 'advanced', label: '进阶模式（多帧动作）' },
+]
+
+function onSizeChange(v: string) {
+  if (config.value) config.value.size = v as PetConfig['size']
+}
+function onSpeakSceneChange(v: string) {
+  if (config.value) config.value.speak_scene = v as PetConfig['speak_scene']
+}
+function onAvatarModeChange(v: string) {
+  avatarForm.value.mode = v as 'simple' | 'advanced'
+}
+
 // ==================== 配置 ====================
 const config = ref<PetConfig | null>(null)
 const configLoading = ref(false)
 const currentState = ref<PetState | null>(null)
 
+/** 旧数据兼容：历史/演示数据里 size 可能是 80/120/160（数字或字符串）而非枚举 */
+function normalizeSize(raw: unknown): PetConfig['size'] {
+  if (raw === 'small' || raw === 'medium' || raw === 'large') return raw
+  const legacy: Record<string, PetConfig['size']> = {
+    '80': 'small',
+    '120': 'medium',
+    '160': 'large',
+  }
+  const key = typeof raw === 'number' ? String(raw) : typeof raw === 'string' ? raw.trim() : ''
+  return legacy[key] ?? 'medium'
+}
+
+const SPEAK_SCENES: PetConfig['speak_scene'][] = [
+  'never',
+  'remind',
+  'interact',
+  'celebrate',
+  'always',
+]
+
+/** 旧数据兼容：未知 speak_scene（如历史值 notification）回退「仅提醒时」 */
+function normalizeSpeakScene(raw: unknown): PetConfig['speak_scene'] {
+  return SPEAK_SCENES.includes(raw as PetConfig['speak_scene'])
+    ? (raw as PetConfig['speak_scene'])
+    : 'remind'
+}
+
+/** 加载后归一化为前端契约枚举，保证 BaseSelect 能显示当前值、保存时写回合法值 */
+function normalizeConfig(raw: PetConfig): PetConfig {
+  return {
+    ...raw,
+    size: normalizeSize(raw.size),
+    speak_scene: normalizeSpeakScene(raw.speak_scene),
+  }
+}
+
 async function fetchConfig() {
   configLoading.value = true
   try {
-    config.value = await petApi.getConfig()
+    config.value = normalizeConfig(await petApi.getConfig())
   } catch (e) {
     toast.error('加载配置失败')
   } finally {
@@ -170,18 +237,19 @@ onMounted(() => fetchConfig())
         <BaseCard class="config-section">
           <h3 class="section-title">🖥️ 显示设置</h3>
           <div class="form-row">
-            <label class="form-label">
-              <input type="checkbox" v-model="config.enabled" />
-              启用桌宠
-            </label>
+            <div class="form-label">
+              <BaseSwitch v-model="config.enabled" label="启用桌宠" />
+              <span>启用桌宠</span>
+            </div>
           </div>
           <div class="form-row">
             <label class="form-label">桌宠大小</label>
-            <select v-model="config.size" class="form-select">
-              <option value="small">小 (80px)</option>
-              <option value="medium">中 (120px)</option>
-              <option value="large">大 (160px)</option>
-            </select>
+            <BaseSelect
+              class="form-select"
+              :model-value="config.size"
+              :options="SIZE_OPTIONS"
+              @update:model-value="onSizeChange"
+            />
           </div>
           <div class="form-row">
             <label class="form-label">透明度: {{ Math.round(config.opacity * 100) }}%</label>
@@ -195,38 +263,38 @@ onMounted(() => fetchConfig())
             />
           </div>
           <div class="form-row">
-            <label class="form-label">
-              <input type="checkbox" v-model="config.always_on_top" />
-              始终置顶
-            </label>
-            <label class="form-label">
-              <input type="checkbox" v-model="config.auto_start" />
-              开机自启
-            </label>
+            <div class="form-label">
+              <BaseSwitch v-model="config.always_on_top" label="始终置顶" />
+              <span>始终置顶</span>
+            </div>
+            <div class="form-label">
+              <BaseSwitch v-model="config.auto_start" label="开机自启" />
+              <span>开机自启</span>
+            </div>
           </div>
           <div class="form-row">
-            <label class="form-label">
-              <input type="checkbox" v-model="config.draggable" />
-              允许拖拽
-            </label>
-            <label class="form-label">
-              <input type="checkbox" v-model="config.click_interaction" />
-              点击互动
-            </label>
-            <label class="form-label">
-              <input type="checkbox" v-model="config.right_click_menu" />
-              右键菜单
-            </label>
+            <div class="form-label">
+              <BaseSwitch v-model="config.draggable" label="允许拖拽" />
+              <span>允许拖拽</span>
+            </div>
+            <div class="form-label">
+              <BaseSwitch v-model="config.click_interaction" label="点击互动" />
+              <span>点击互动</span>
+            </div>
+            <div class="form-label">
+              <BaseSwitch v-model="config.right_click_menu" label="右键菜单" />
+              <span>右键菜单</span>
+            </div>
           </div>
         </BaseCard>
 
         <BaseCard class="config-section">
           <h3 class="section-title">💬 气泡设置</h3>
           <div class="form-row">
-            <label class="form-label">
-              <input type="checkbox" v-model="config.show_bubble" />
-              显示对话气泡
-            </label>
+            <div class="form-label">
+              <BaseSwitch v-model="config.show_bubble" label="显示对话气泡" />
+              <span>显示对话气泡</span>
+            </div>
           </div>
           <div class="form-row">
             <label class="form-label">气泡时长: {{ config.bubble_duration }}秒</label>
@@ -250,10 +318,10 @@ onMounted(() => fetchConfig())
           <h3 class="section-title">🎭 状态感知</h3>
           <p class="section-desc">桌宠会根据时间、任务、心情自动切换动作和表情</p>
           <div class="form-row">
-            <label class="form-label">
-              <input type="checkbox" v-model="config.state_awareness_enabled" />
-              启用状态感知
-            </label>
+            <div class="form-label">
+              <BaseSwitch v-model="config.state_awareness_enabled" label="启用状态感知" />
+              <span>启用状态感知</span>
+            </div>
           </div>
           <div class="form-row">
             <label class="form-label">动作切换间隔: {{ config.action_switch_interval }}秒</label>
@@ -345,20 +413,19 @@ onMounted(() => fetchConfig())
           <h3 class="section-title">🔊 语音TTS</h3>
           <p class="section-desc">桌宠说话时播放语音（使用浏览器内置语音合成）</p>
           <div class="form-row">
-            <label class="form-label">
-              <input type="checkbox" v-model="config.tts_enabled" />
-              启用语音
-            </label>
+            <div class="form-label">
+              <BaseSwitch v-model="config.tts_enabled" label="启用语音" />
+              <span>启用语音</span>
+            </div>
           </div>
           <div class="form-row" v-if="config.tts_enabled">
             <label class="form-label">说话场景</label>
-            <select v-model="config.speak_scene" class="form-select">
-              <option value="never">从不说话</option>
-              <option value="remind">仅提醒时</option>
-              <option value="interact">互动时</option>
-              <option value="celebrate">庆祝时</option>
-              <option value="always">始终说话</option>
-            </select>
+            <BaseSelect
+              class="form-select"
+              :model-value="config.speak_scene"
+              :options="SPEAK_SCENE_OPTIONS"
+              @update:model-value="onSpeakSceneChange"
+            />
           </div>
           <div class="form-row" v-if="config.tts_enabled">
             <label class="form-label">语速: {{ config.tts_rate.toFixed(1) }}x</label>
@@ -417,10 +484,12 @@ onMounted(() => fetchConfig())
         <BaseCard v-if="showAvatarForm" class="form-card">
           <div class="form-row">
             <input v-model="avatarForm.name" class="form-input" placeholder="形象名称" />
-            <select v-model="avatarForm.mode" class="form-select">
-              <option value="simple">简单模式（静态+表情）</option>
-              <option value="advanced">进阶模式（多帧动作）</option>
-            </select>
+            <BaseSelect
+              class="form-select"
+              :model-value="avatarForm.mode"
+              :options="AVATAR_MODE_OPTIONS"
+              @update:model-value="onAvatarModeChange"
+            />
           </div>
           <input v-model="avatarForm.description" class="form-input" placeholder="描述（可选）" />
           <input
@@ -615,8 +684,7 @@ onMounted(() => fetchConfig())
   gap: 6px;
   cursor: pointer;
 }
-.form-input,
-.form-select {
+.form-input {
   flex: 1;
   min-width: 120px;
   padding: 8px 12px;
@@ -626,8 +694,46 @@ onMounted(() => fetchConfig())
   color: var(--text-hi);
   font-size: var(--text-sm);
 }
+/* BaseSelect 根节点：在 form-row 里占满剩余宽度（内部样式由 BaseSelect 自己负责） */
+.form-select {
+  flex: 1;
+  min-width: 160px;
+}
+/* 原生 range 主题化：轨道/滑块都用设计 token（原先浏览器默认蓝色控件，与主题割裂） */
 .form-range {
   flex: 1;
+  min-width: 160px;
+  height: 6px;
+  appearance: none;
+  -webkit-appearance: none;
+  background: var(--bg-inset);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+
+  &::-webkit-slider-thumb {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--primary);
+    border: 2px solid var(--bg-panel);
+    box-shadow: var(--dot-shadow);
+  }
+  &::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--primary);
+    border: 2px solid var(--bg-panel);
+    box-shadow: var(--dot-shadow);
+  }
+  &::-moz-range-track {
+    height: 6px;
+    background: var(--bg-inset);
+    border-radius: var(--radius-pill);
+  }
 }
 
 .save-btn {

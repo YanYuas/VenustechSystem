@@ -2,6 +2,30 @@
 
 <!-- 下一版本占位：新改动从下一行开始追加；发布时整体归入 `## [X.Y.Z] - YYYY-MM-DD`。 -->
 
+### Fixed — Phase 21 UI 全界面联动与展现调查 + 微调（2026-11-01，未发版）
+
+**调查方法**：`puppeteer-core` + 本机 Chrome 对 24 条路由（桌面 1440×900）+ 6 个关键页（移动端 390×844）逐页截图；收集 console/pageerror/失败请求/错误文案/横向溢出/空白图标；验证 TopNav、DimensionTabs、项目页签、Ctrl+K 搜索、四套主题×明暗（真实 reload）、设置页主题卡、dashboard→项目详情、404 重启路径。结果：**0 控制台错误 / 0 失败请求 / 0 横向溢出**。
+
+**修复的 7 个缺陷**
+- **项目详情页**模板泄漏字面量 `` `n ``（渲染为可见文本）；全仓 grep 同类 = 0。
+- **404 污染 `qm-star-last-route`**：访问未知路由后下次启动被重定向回 404 → afterEach 跳过 not-found、beforeEach 恢复前 resolve 校验并清理失效值；路由改为 `createAppRouter(history)` 工厂便于测试。
+- **会话页首屏右侧空白**：自动选中第一条会话并拉消息；无会话/无消息显示明确空态与新建入口。
+- **AppIcon 缺 21 个契约图标**（维度 Tab：桌宠/设置/成长/长期资产/工作流；首页资源/生活卡；会话模式；AI 助理麦克风；设置「跟随系统」；文档「新建文件夹」等）→ 全站空白图标清零；含 `error`=alert、`loading`=spin 别名。
+- **epic 主题首屏 FOUC**：`index.html` 内联脚本补 epic/epic-dark 映射，与 `useTheme.resolveDataTheme` 一致（实测 early==settled==epic）。
+- **桌宠设置页原生控件**（select/checkbox/蓝色 range）→ BaseSwitch/BaseSelect + 主题 token range；旧值归一化（size 80/120/160→枚举、未知 speak_scene→remind）。
+- **首页资源卡丢失分类** → 按分类 id 传 `?tab=`，资源中心支持深链与同路由 query 切换。
+
+**桌宠前后端契约收敛**
+- `app/schemas/pet.py`：`UpdatePetConfigRequest.size/speak_scene` 改 `Literal[...]`（非法值 400/1001，项目统一信封；读接口保持宽松兼容旧值）。
+- `seed_demo.py`：`size=120→"medium"`、`speak_scene="notification"→"remind"`。
+- 迁移 **0023**：历史 80/120/160→small/medium/large、未知→medium/remind（幂等，downgrade 留空并注释）。
+- 前端 `PetSettingsView` 加载时归一化旧值并写回合法值。
+
+**其他**
+- `global.scss`：原生 checkbox/radio 加 `accent-color: var(--primary)`（左侧待办/头像/助理清单不再浏览器蓝）。
+- 新增 D-68（缺通知中心页，提醒「查看全部」跳 /tasks）、D-69（ConversationView 硬编码 127.0.0.1 裸 fetch）。
+- 质量：前端 **604 tests / 41 files**、lines **71.25%**（阈值 {70,64,49,69}）；后端 **2071 passed / 99.82%**（迁移 0023 后 missed 仍 18）。
+
 ### Changed — Phase 20 本地卫生 + 启动脚本/注释文档刷新（2026-11-01，未发版，VERSION 保持 1.1.0）
 
 - **本地卫生**：清理 ≈386MB 垃圾（`.arch-audit` 1.1GB→0.3MB、历史 pytest 临时副本、213 个 `__pycache__`、旧运行日志、根 `.ruff_cache`、npm 缓存）；`var/` 运行数据（data/demo/legacy/backups）零改动；`audit_workspace_hygiene` 契约通过。

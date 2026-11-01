@@ -408,3 +408,73 @@ describe('useConversation：会话 CRUD 与 AI 文档能力', () => {
     expect(aiApi.inspiration).toHaveBeenCalledWith('d1')
   })
 })
+
+// ============================================================
+// P21 回归：会话页首次进入右侧空白
+//
+// 修前：onMounted 只 fetchConversations()，不选中会话 → 左侧有列表、
+// 右侧消息区整片空白（浏览器探针截图 desktop-conversation.png）。
+// 修复：ensureActiveConversation() 拉列表后自动选中第一条并拉消息；
+//       无会话时由 emptyState 驱动右侧空态面板。
+// ============================================================
+describe('useConversation：首屏自动选中与空态（P21 回归）', () => {
+  it('ensureActiveConversation：有会话且未选中时自动选中第一条并拉消息', async () => {
+    const api = setup()
+    list.mockResolvedValueOnce([makeConversation('c1'), makeConversation('c2')])
+
+    await api.ensureActiveConversation()
+
+    expect(api.currentId.value).toBe('c1')
+    expect(messagesApi).toHaveBeenCalledTimes(1)
+    expect(messagesApi).toHaveBeenCalledWith('c1')
+    expect(api.messages.value).toHaveLength(1)
+    expect(api.emptyState.value).toBeNull()
+  })
+
+  it('ensureActiveConversation：没有任何会话时保持未选中，空态为 no-conversation', async () => {
+    const api = setup()
+    list.mockResolvedValueOnce([])
+
+    await api.ensureActiveConversation()
+
+    expect(api.currentId.value).toBeNull()
+    expect(messagesApi).not.toHaveBeenCalled()
+    expect(api.emptyState.value).toBe('no-conversation')
+  })
+
+  it('ensureActiveConversation：已有当前会话时不被列表第一条覆盖', async () => {
+    const api = setup()
+    api.currentId.value = 'c2'
+    list.mockResolvedValueOnce([makeConversation('c1')])
+
+    await api.ensureActiveConversation()
+
+    expect(api.currentId.value).toBe('c2')
+    expect(messagesApi).not.toHaveBeenCalled()
+  })
+
+  it('列表加载完成前不显示空态（避免首屏闪「暂无对话」）', async () => {
+    const api = setup()
+    expect(api.listLoaded.value).toBe(false)
+    expect(api.emptyState.value).toBeNull()
+
+    // 列表为空（真实的"无会话"场景），加载完成后才允许显示空态
+    list.mockResolvedValueOnce([])
+    await api.fetchConversations()
+
+    expect(api.listLoaded.value).toBe(true)
+    expect(api.emptyState.value).toBe('no-conversation')
+  })
+
+  it('新建会话尚无消息时空态为 no-message（右侧不再空白）', async () => {
+    const api = setup()
+    create.mockResolvedValueOnce(makeConversation('c-new'))
+    list.mockResolvedValueOnce([makeConversation('c-new')])
+
+    await api.createConversation('新对话')
+
+    expect(api.currentId.value).toBe('c-new')
+    expect(api.messages.value).toEqual([])
+    expect(api.emptyState.value).toBe('no-message')
+  })
+})
