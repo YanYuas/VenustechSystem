@@ -408,6 +408,9 @@ CI：`.github/workflows/{backend,frontend,repo-guard}.yml` + `android-build.yml`
 | D-58 | P2 | `core/encryption.rotate_key` 只捕获 `OSError`：密钥环写入抛非 OSError 时会出现「新 key 已落盘、密钥环未写、内存仍旧 key」中间态（已重加密的旧密文可能不可解） | `backend/app/core/encryption.py:198-228` | Phase 17（密钥环写失败改 fail-open，或先写密钥环(临时+atomic)再切 key） |
 | D-59 | P3 | Python 3.12+ 的 sqlite3 默认 date adapter 弃用告警（全量 1 次，来自重复任务递归测试；不改变持久化行为） | `test_task_production` 递归任务路径 | Phase 17（显式 adapter 或 SQLAlchemy 字符串绑定） |
 | D-60 | P3 | `task_service.generate_recurring_instances` 的 weekly 模板在窗口内无匹配星期时静默跳过（无日志，配置错误会永久不生成） | `app/services/task_service.py:458` | Phase 17（补 debug 日志） |
+| D-61 | P3 | `kernel/ui/toast.ts` 的 store 无 TTL/容量上限/同 id 去重（计时在 ToastItem），理论可无界堆积；当前短文本+手动关闭下风险低 | `frontend/src/kernel/ui/toast.ts` | Phase 17（加 TTL/上限/去重需与 ToastItem hover 暂停语义一起设计） |
+| D-62 | P3 | `useShortcuts` 输入框守卫不一致：`Ctrl+N`/`Ctrl+F` 有 `isTyping` 守卫，`Ctrl+Shift+N` 没有；`Ctrl+]`/`Ctrl+S` 不校验 shiftKey | `frontend/src/kernel/ui/useShortcuts.ts` | Phase 17（按产品预期统一守卫语义） |
+| D-63 | P3 | `ModalItem` 固定 `modelValue=true` 且 `BaseModal.isClosing` 仅在该 watch 变 true 时重置 → 同一实例第二次关闭路径（dismiss/Esc）被吞（命令式层收到首个事件即移除，当前无用户可见问题） | `shared/components/common/ModalItem.vue` / `BaseModal.vue` | Phase 17（若未来有"取消后不关闭"用法需重置 isClosing） |
 
 > 原则：**先修 P0/P1 的"正确性"，再谈结构搬迁**。在事务边界、迁移基线、备份导入还有问题时做领域分包，只是把混乱打包进更漂亮的新目录。
 
@@ -433,7 +436,7 @@ CI：`.github/workflows/{backend,frontend,repo-guard}.yml` + `android-build.yml`
 | **Phase 13** | 输入校验/前端行为收尾 + 仓库治理 | D-50~D-54 修复（昵称/verify-api 校验、桌宠定时器与文案顺序、文档图后台暂停/惯性）；后端 1965 passed、覆盖率 **98.33%→98.95%**（CI 阈值 97→98）；前端 510 passed、lines 82.18%（阈值 {81,88,48,81} 保持）；GitHub 治理落地（Dependabot 4 生态分组 / PR 模板 / Issue 模板 / CODEOWNERS / development.md §2.1）；新登记 D-55 | ✅ 本轮完成（2026-10-31） |
 | **Phase 14** | 依赖治理 + 定时器收尾 | D-55 修复（桌宠气泡定时器统一句柄/集中清理）；**7 个 Dependabot PR 合并**（pytest/coverage、sass、Actions×5、jsdom、FastAPI 栈、前端运行时、ruff+cryptography），#9 vite major + #6 SQLAlchemy 2.1 经评估后关闭并 ignore（登记 D-56/D-57）；main 5 workflow 全绿；本地依赖对齐（ruff 0.17.3 / pytest 9.2.0 / npm ci）；后端 1965 passed / 98.94%、前端 515 passed / 82.2% | ✅ 本轮完成（2026-10-31） |
 | **Phase 15** | 首个可发行版本 v1.0.0 | 版本 0.7.0→**1.0.0** 全量同步（`check_versions.py --sync` 幂等，含 frontend/package-lock.json 根版本）；根 `LICENSE`（MIT）；`docs/RELEASE_NOTES_v1.0.0.md`（亮点/架构摘要/质量数据/快速开始/已知限制/升级说明）；CHANGELOG 归入 `[1.0.0] - 2026-11-01`（历史不丢）；发布流程文档（`docs/guides/development.md` §10，SemVer + `vX.Y.Z` tag 规范） | ✅ 本轮完成（2026-11-01，本地校验通过；tag / GitHub Release 待维护者执行） |
-| **Phase 16** | D-56 SQLAlchemy 2.1 升级 + 覆盖冲刺 | D-56 闭环：5 列显式 `Float` + 升级 **SQLAlchemy 2.1.6 / alembic 1.20.1**（迁移完整性 6 passed、三方类型一致）；后端 1995 passed、覆盖率 **98.94%→99.41%**（CI 阈值 98→99）；前端 569 passed、lines 82.2%→**84.77%**（阈值 {81,88,48,81}→{83,89,51,83}）；新登记 D-58~D-60 | ✅ 本轮完成（2026-11-01） |
+| **Phase 16** | D-56 SQLAlchemy 2.1 升级 + 覆盖冲刺 | D-56 闭环：5 列显式 `Float` + 升级 **SQLAlchemy 2.1.6 / alembic 1.20.1**（迁移完整性 6 passed、三方类型一致）；后端 1995 passed、覆盖率 **98.94%→99.41%**（CI 阈值 98→99）；前端 569 passed、lines 82.2%→**84.77%**（阈值 {81,88,48,81}→{83,89,51,83}）；新登记 D-58~D-63 | ✅ 本轮完成（2026-11-01） |
 
 **明确不做（以及为什么）**：
 

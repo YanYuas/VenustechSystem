@@ -23,7 +23,9 @@
 **新登记 3 个问题（D-58~D-60，未修）**
 - **D-58（P2）** `encryption.rotate_key` 只捕获 `OSError`：密钥环写入抛非 OSError 时可能留下「新 key 已落盘、密钥环未写、内存仍旧 key」中间态（旧密文风险）；
 - D-59（P3）SQLite 默认 date adapter 弃用告警（Python 3.12+，非阻塞）；
-- D-60（P3）重复任务 weekly 模板无匹配星期时静默跳过（建议补 debug 日志）。
+- D-60（P3）重复任务 weekly 模板无匹配星期时静默跳过（建议补 debug 日志）；
+- D-61（P3）toast store 无 TTL/上限/同 id 去重；D-62（P3）`useShortcuts` 输入框守卫与 shiftKey 校验不一致；
+  D-63（P3）`ModalItem`/`BaseModal` 同一实例二次关闭路径被 `isClosing` 吞掉（当前命令式层无可见影响）。
 
 <!-- 下一版本占位：新改动从下一行开始追加；发布时整体归入 `## [X.Y.Z] - YYYY-MM-DD`。 -->
 
