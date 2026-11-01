@@ -23,7 +23,6 @@ from app.schemas.review import (
     AutoFillData,
     ConvertTaskRequest,
     ReviewData,
-    ReviewListItem,
     ReviewOut,
     UpsertReviewRequest,
 )
@@ -169,13 +168,3 @@ class ReviewService:
         if project is None or project.deleted_at is not None:
             raise ValidationException("项目不存在")
         return project_id
-
-    @staticmethod
-    def _list_item(r: Review) -> ReviewListItem:
-        d = r.data or {}
-        return ReviewListItem(
-            id=r.id, type=r.type, review_date=r.review_date,
-            mood=d.get("mood"), energy=d.get("energy"),
-            summary=(d.get("gains") or "")[:60],
-            created_at=r.created_at, updated_at=r.updated_at,
-        )

@@ -2,6 +2,15 @@
 
 <!-- 下一版本占位：新改动从下一行开始追加；发布时整体归入 `## [X.Y.Z] - YYYY-MM-DD`。 -->
 
+### Changed — Phase 19 快照优化（2026-11-01，未发版，VERSION 保持 1.1.0）
+
+- **D-66 闭环（P3）**：主密钥模式密钥轮换语义自洽——同 master 轮换改为「新 salt + 当前 master 派生」，旧 salt 入 keyring `previous_salts`（cap `KEEP_PREVIOUS`），旧代由 `master+旧 salt` 重派生；**磁盘仅存 16B salt，不落任何 key 明文**；换 master 明确要求走 `SecurityService.rotate_key` 全量重加密；旧随机模式 `previous_keys` 向后兼容。14 条专项测试 + 2 条负向验证。
+- **死代码清理**：删除 `app/services/review_service.py::_list_item`（全仓唯一引用为定义处；删除后该文件覆盖 100%）。
+- **覆盖收尾**：后端 **2030 → 2047 passed**、覆盖率 **99.76% → 99.82%**（missed 24→18；新增 sync DERIVED_SKIP 删除传导防御 + WAL 降级 fail-open 用例）。剩余 18 行已分类：C 平台/环境 10、B 不可达 7、D 破坏性 1，属稳定底线。
+- **依赖治理**：`.github/dependabot.yml` 新增 `frontend-major-toolchain` major 联升组（vite / vitest / @vitest/* / @vitejs/* / @types/node），放在所有 minor/patch 组之前（first-match），修复 #9「只升单包 → npm ci ERESOLVE」根因；major 组 PR 仍需人工 review。文档见 `docs/guides/development.md §2.1`。
+- **新增债务 D-67（P3）**：历史随机模式 keyring 的 `previous_keys` 仍有 key 明文，本次不清洗，Phase 20 做一次性迁移治理。
+- **仓库卫生**：`.arch-audit` **1,093 MB → 18 MB**（清理历史 pytest 临时副本与 npm 缓存，保留报告/覆盖率基线）；`git gc` 后 `.git` 4.95 MB。
+
 ## [1.1.0] - 2026-11-01
 
 **工程栈升级（D-57）**：Vite 5 → 8（Rolldown/oxc/lightningcss 构建内核），Vitest 3 → 5，`@vitejs/plugin-vue` 5 → 6，`@types/node` 20 → 24；无用户可见功能变更。

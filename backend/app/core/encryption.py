@@ -67,6 +67,71 @@ def _restore_file(path: Path, existed: bool, data: bytes | None) -> None:
         logger.exception("回滚时删除新增文件失败（请人工检查）: {}", path)
 
 
+# ---------- D-66：主密钥模式的 salt 历史 / keyring 兼容工具 ----------
+
+def _encode_salt(salt: bytes) -> str:
+    """salt 历史以 base64 落盘（salt 本身不是秘密，可公开）。"""
+    return base64.b64encode(salt).decode("ascii")
+
+
+def _decode_salt(value: Any) -> bytes | None:
+    try:
+        raw = base64.b64decode(str(value).encode("ascii"), validate=True)
+    except (ValueError, TypeError):
+        return None
+    return raw if len(raw) == 16 else None
+
+
+def _keyring_json(snapshot: tuple[bool, bytes | None]) -> dict:
+    """读取 keyring 快照为 dict；不存在/损坏 → 空 dict（历史代际降级）。"""
+    if not snapshot[0] or not snapshot[1]:
+        return {}
+    try:
+        ring = json.loads(snapshot[1].decode("utf-8"))
+    except (ValueError, TypeError, UnicodeDecodeError):
+        return {}
+    return ring if isinstance(ring, dict) else {}
+
+
+def _previous_salts_from_ring(ring: dict) -> list[bytes]:
+    salts: list[bytes] = []
+    for item in ring.get("previous_salts") or []:
+        salt = _decode_salt(item)
+        if salt is not None:
+            salts.append(salt)
+    return salts
+
+
+def _legacy_keyring_fields(ring: dict) -> dict:
+    """保留旧格式「key 明文」字段（previous_keys / 单代 previous）以向后兼容。
+
+    previous_salts 是 D-66 新语义字段，由调用方按 master 轮换逻辑**重新计算**，
+    不能原样回填（否则历史永远停留在上一代）。
+    """
+    fields: dict[str, Any] = {}
+    for key in ("previous_keys", "previous"):
+        if key in ring:
+            fields[key] = ring[key]
+    return fields
+
+
+def _previous_fernets_from_legacy(ring: dict) -> list:
+    """旧随机模式 keyring 里的 key 明文条目（向后兼容读取，不再新增）。"""
+    result = []
+    for raw in (ring.get("previous_keys") or []):
+        try:
+            result.append(Fernet(raw.encode("utf-8")))
+        except Exception:
+            continue
+    prev1 = ring.get("previous")
+    if prev1:
+        try:
+            result.append(Fernet(prev1.encode("utf-8")))
+        except Exception:
+            pass
+    return result
+
+
 class EncryptionManager:
     """加密管理器：密钥派生、加密/解密、安全存储"""
 
@@ -140,25 +205,26 @@ class EncryptionManager:
                 pass
 
         self._fernet = Fernet(key)
-        # 密钥环里的历史密钥用于解密历史密文（轮换中断 / 多代轮换场景）
+        # 历史代际：随机模式读 keyring 里的 previous_keys；主密钥模式用
+        # **当前 master + 历史 salt 重派生**（磁盘只存 salt，不存任何 key 明文）。
+        ring: dict = {}
+        if self._keyring_file.exists():
+            try:
+                parsed = json.loads(self._keyring_file.read_text(encoding="utf-8"))
+                ring = parsed if isinstance(parsed, dict) else {}
+            except (ValueError, TypeError, UnicodeDecodeError):
+                ring = {}
         self._previous_fernets = []
-        try:
-            if self._keyring_file.exists():
-                ring = json.loads(self._keyring_file.read_text(encoding="utf-8"))
-                for prev in (ring.get("previous_keys") or []):
-                    try:
-                        self._previous_fernets.append(Fernet(prev.encode("utf-8")))
-                    except Exception:
-                        continue
-                # 兼容旧格式（单代 previous）
-                prev1 = ring.get("previous")
-                if prev1:
-                    try:
-                        self._previous_fernets.append(Fernet(prev1.encode("utf-8")))
-                    except Exception:
-                        pass
-        except Exception:
-            self._previous_fernets = []
+        if self._master_key and ring:
+            for old_salt in _previous_salts_from_ring(ring):
+                try:
+                    self._previous_fernets.append(
+                        Fernet(self.derive_key(self._master_key, old_salt))
+                    )
+                except Exception:
+                    continue
+        # 兼容旧随机模式 keyring（previous_keys / 单代 previous）
+        self._previous_fernets.extend(_previous_fernets_from_legacy(ring))
         # 2026-10-11：此处原有一段把 ring["previous"] 读进 `self._previous_fernet`
         # （单数）的逻辑。该属性**全仓没有任何读取方**（decrypt() 只用复数
         # `_previous_fernets`），且仅在存在旧格式键时才被赋值 —— 纯死代码，已删。
@@ -230,66 +296,107 @@ class EncryptionManager:
         return dest_path
 
     def rotate_key(self, new_master_key: str | None = None):
-        """原子轮换密钥（D-58）：**要么全成、要么回滚到旧状态，绝不半途**。
+        """原子轮换密钥（D-58 原子性 + D-66 主密钥语义）。
 
-        为什么不 fail-open 而选择「整体回滚 + raise」：
-        密钥轮换是安全关键操作，半成功会生成「新 key 已落盘但密钥环/内存仍旧」
-        的中间态，可能让既有密文永久不可解 —— 这比让本次轮换失败（调用方重试）
-        严重得多。因此失败时：已写文件按逆序恢复旧字节/删除新增，内存
-        `_fernet`/`_previous_fernets` 保持旧值（磁盘与内存一致），原异常上抛。
+        两种模式语义（威胁模型见类 docstring / 报告）：
+
+        · **随机密钥模式**（未设 master）：行为与历史完全一致 —— 生成新随机 key
+          写入 `.encryption_key`，旧 key 进 keyring `previous_keys`。
+        · **主密钥模式**（构造时传 master_key）：
+          - `new_master_key=None`（同 master 轮换）：生成**新 salt**，用当前 master
+            重派生新 key；旧 salt 归档进 keyring `previous_salts`，旧代由
+            `master + 旧 salt` **重新派生** —— 磁盘上始终只有 salt，**绝不落 key 明文**。
+          - 显式换 master：新 salt + 新 master 派生；旧代密文无法由新 master 重派生，
+            **必须在服务层做全量重加密**（Production 路径`SecurityService.rotate_key`
+            已先解密→换 key→全部重加密）。直接调用 manager 换 master 不保证旧密文可解；
+            本实例内存里保留旧 fernet 仅用于同进程内短暂过渡。
+
+        失败语义（D-58）：任一写入失败 → 逆序回滚到旧字节/删除新增，内存保持旧值，
+        原异常上抛；成功后才刷新 `_fernet` / `_previous_fernets` / `_master_key`。
         """
         if not self._fernet:
             return
-        # 回滚基准：三个写入点都必须先快照
+        # 回滚基准：写到的文件都必须先快照
         salt_snapshot = _snapshot_file(self._salt_file)
         key_snapshot = _snapshot_file(self._key_file)
         keyring_snapshot = _snapshot_file(self._keyring_file)
+        ring_before = _keyring_json(keyring_snapshot)
+
+        master_mode = self._master_key is not None
+        master_changed = bool(
+            master_mode
+            and new_master_key is not None
+            and new_master_key != self._master_key
+        )
+        active_master = new_master_key if master_changed else self._master_key
+
         written: list[tuple[Path, tuple[bool, bytes | None]]] = []
+        previous_salts: list[bytes] = []
+        new_hist: list[str] = []
         try:
-            # 生成新密钥（new_master_key 时先落 salt，再派生）
-            if new_master_key:
+            if master_mode:
+                # ---------- 主密钥模式：只落 salt / salt 历史，不落 key 明文 ----------
                 salt = self.new_salt()
                 _atomic_write_bytes(self._salt_file, salt)
                 written.append((self._salt_file, salt_snapshot))
-                new_key = self.derive_key(new_master_key, salt)
-            else:
-                new_key = Fernet.generate_key()
+                new_key = self.derive_key(active_master, salt)
 
-            # 保留旧密钥为 previous（供历史密文解密），再原子落新密钥
-            old_key = key_snapshot[1]
-            _atomic_write_bytes(self._key_file, new_key)
-            written.append((self._key_file, key_snapshot))
-            new_hist = ([old_key.decode()] if isinstance(old_key, bytes) else [])
+                if not master_changed:
+                    # 同 master 轮换：把当前 salt 归档为历史，旧代可重派生
+                    current_salt = salt_snapshot[1] if salt_snapshot[0] else None
+                    history = ([current_salt] if current_salt else []) + (
+                        _previous_salts_from_ring(ring_before)
+                    )
+                    previous_salts = history[: self.KEEP_PREVIOUS]
+                # 换 master：历史 salt 对新 master 无意义 → 不归档（需服务层重加密）
 
-            # 历史密钥：当前生效中的 -> 入历史列表，保留最近 KEEP_PREVIOUS 代。
-            # 读旧密钥环失败属于「历史上限丢失」而非密钥损坏，记录 warning 后
-            # 继续（新 key 写入仍会原子完成；旧 key 已通过 key 文件快照保留）。
-            if keyring_snapshot[0] and keyring_snapshot[1]:
+                payload: dict[str, Any] = {
+                    "mode": "master",
+                    "previous_salts": [_encode_salt(x) for x in previous_salts],
+                }
+                # 向后兼容：旧机器上已有的随机模式 keyring 字段原样保留（不新增）
+                payload.update(_legacy_keyring_fields(ring_before))
+                _atomic_write_bytes(
+                    self._keyring_file, json.dumps(payload).encode("utf-8")
+                )
+                written.append((self._keyring_file, keyring_snapshot))
                 try:
-                    ring = json.loads(keyring_snapshot[1].decode("utf-8"))
-                    hist = [k for k in (ring.get("previous_keys") or [])]
-                    cur = ring.get("current")
+                    os.chmod(self._keyring_file, 0o600)
+                except OSError:
+                    logger.warning("设置密钥环权限失败（不影响加解密）: {}", self._keyring_file)
+            else:
+                # ---------- 随机密钥模式：行为保持历史一致 ----------
+                # 历史语义：即使 manager 未设 master，显式传入 new_master_key 也会
+                # 「写 salt + 由该 master 派生 key」（key 文件仍保存派生结果，
+                # 供随机模式 _initialize 复用）。此处保持完全一致，避免回归。
+                if new_master_key:
+                    salt = self.new_salt()
+                    _atomic_write_bytes(self._salt_file, salt)
+                    written.append((self._salt_file, salt_snapshot))
+                    new_key = self.derive_key(new_master_key, salt)
+                else:
+                    new_key = Fernet.generate_key()
+                old_key = key_snapshot[1]
+                _atomic_write_bytes(self._key_file, new_key)
+                written.append((self._key_file, key_snapshot))
+                new_hist = [old_key.decode()] if isinstance(old_key, bytes) else []
+                if ring_before:
+                    hist = [k for k in (ring_before.get("previous_keys") or [])]
+                    cur = ring_before.get("current")
                     if cur and cur not in hist:
                         hist.insert(0, cur)
-                    new_hist = (new_hist + hist)[:self.KEEP_PREVIOUS]
-                except (ValueError, TypeError, UnicodeDecodeError):
-                    logger.warning(
-                        "密钥环内容解析失败，历史代际按 key 文件快照处理（轮换继续）: {}",
-                        self._keyring_file,
-                    )
-
-            keyring_payload = json.dumps({
-                "current": (new_key.decode()
-                            if isinstance(new_key, bytes) else str(new_key)),
-                "previous_keys": new_hist,
-            }).encode("utf-8")
-            _atomic_write_bytes(self._keyring_file, keyring_payload)
-            written.append((self._keyring_file, keyring_snapshot))
-            try:
-                os.chmod(self._keyring_file, 0o600)
-            except OSError:
-                # 权限收紧失败不影响加解密正确性，仅记录（有界可诊断，不静默）
-                logger.warning("设置密钥环权限失败（不影响加解密）: {}", self._keyring_file)
+                    new_hist = (new_hist + hist)[: self.KEEP_PREVIOUS]
+                payload = {"current": new_key.decode(), "previous_keys": new_hist}
+                if "previous_salts" in ring_before:      # 向后兼容保留
+                    payload["previous_salts"] = ring_before["previous_salts"]
+                _atomic_write_bytes(
+                    self._keyring_file, json.dumps(payload).encode("utf-8")
+                )
+                written.append((self._keyring_file, keyring_snapshot))
+                try:
+                    os.chmod(self._keyring_file, 0o600)
+                except OSError:
+                    logger.warning("设置密钥环权限失败（不影响加解密）: {}", self._keyring_file)
         except Exception:
             logger.exception("密钥轮换失败，正在回滚到旧密钥材料（内存密钥保持不变）")
             for path, snapshot in reversed(written):
@@ -299,14 +406,31 @@ class EncryptionManager:
                     logger.exception("轮换回滚失败，请人工检查密钥文件: {}", path)
             raise
 
-        # 只有三个文件全部落盘成功，才刷新内存（磁盘与内存一致）
-        self._previous_fernets = []
-        for k in new_hist:
-            try:
-                self._previous_fernets.append(Fernet(k.encode("utf-8")))
-            except Exception:
-                continue
-        self._fernet = Fernet(new_key)
+        # ---------- 全部落盘成功后才刷新内存（磁盘与内存一致） ----------
+        if master_mode:
+            old_fernets = list(self._previous_fernets)
+            previous: list = []
+            for old_salt in previous_salts:
+                try:
+                    previous.append(Fernet(self.derive_key(active_master, old_salt)))
+                except Exception:
+                    continue
+            previous.extend(_previous_fernets_from_legacy(ring_before))
+            if master_changed:
+                # 换 master：磁盘不再保留可重派生的旧代；仅本实例内存保留旧 fernet，
+                # 供同进程内过渡解密（生产必须走 service 全量重加密）。
+                previous = [self._fernet] + old_fernets[: max(0, self.KEEP_PREVIOUS - 1)]
+                self._master_key = active_master
+            self._previous_fernets = previous
+            self._fernet = Fernet(new_key)
+        else:
+            self._previous_fernets = []
+            for raw in new_hist:
+                try:
+                    self._previous_fernets.append(Fernet(raw.encode("utf-8")))
+                except Exception:
+                    continue
+            self._fernet = Fernet(new_key)
 
     def reload(self) -> None:
         """重新从磁盘读取密钥与密钥环，就地刷新本实例。
