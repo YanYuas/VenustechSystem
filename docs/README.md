@@ -8,7 +8,7 @@
 | 我要… | 去哪 | 备注 |
 |---|---|---|
 | 我是第一次接触这个项目 / 想 5 分钟跑起来 | [仓库根 README](../README.md) | 展示页：定位、功能、快速开始、徽章、路线图 |
-| 看首发版本说明 / 我该不该升级 | [RELEASE_NOTES v1.0.1 / v1.0.0](RELEASE_NOTES_v1.0.0.md) | v1.0.0 亮点、升级说明；版本变化见 [CHANGELOG](../CHANGELOG.md) |
+| 看首发版本说明 / 我该不该升级 | [RELEASE_NOTES v1.1.0 / v1.0.1 / v1.0.0](RELEASE_NOTES_v1.0.0.md) | v1.0.0 亮点、升级说明；版本变化见 [CHANGELOG](../CHANGELOG.md) |
 | 了解系统分层、模块边界、关键架构决策 | [1. 架构与决策](#1-架构与决策architecture) | 现行架构 + 旧架构存档（archived） |
 | 知道产品现在做什么、验收标准是什么 | [2. 产品与需求](#2-产品与需求product) → `product/prd/v2-current/` | **现行**以 v2-current + M01–M09 为准 |
 | 查 UI 规范、交互规则、主题效果 | [2 → UI 设计与交互](#ui-设计与交互) | 规范在 `product/ui/`，HTML 主题画廊在 `design/` |

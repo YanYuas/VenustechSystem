@@ -57,6 +57,11 @@ ops\start.ps1 -Mode dev -DataDir .\var\data-feature-x
   （`start-mobile.bat` 窗口会打印，来源 `.qm-token`；重配用 `node ops/server/rotate-token.mjs`）。
 - **demo 没数据**：删除 `var\demo\app.db` 后重新 `start-demo.bat`（会自动 seed），不要动 `var\data`。
 - 非交互环境（CI/管道/远程 shell）：脚本不会等待回车、不会开浏览器；用 `-Verify` 做确定性自检。
+- **Vite 8 dev server（2026-11 起）**：`start-dev.bat` 的 Vite 由 Rolldown/oxc 驱动，**首次启动会做依赖
+  预构建**（可能比 vite 5 的 esbuild 预构建慢数秒，之后走缓存）；端口探测逻辑不变（仍是 :5173）。
+  注意 `server.strictPort: false` ⇒ 5173 被占用时 Vite 会**静默换到下一个端口**，此时 `-Verify`
+  会因等不到 5173 而失败 —— 先确认没有别的 dev server 在跑（`Get-NetTCPConnection -LocalPort 5173`）。
+  vite 大版本升级后本地先重建依赖：`rm -rf frontend/node_modules && cd frontend && npm ci`。
 
 ## 4. 与 CI 的边界
 
@@ -84,24 +89,23 @@ dev 模式（后端 :8765 + 前端 :5173）→ 等端口 + `GET /api/v1/health` 
 - 手动：Actions → `windows-startup` → Run workflow（`workflow_dispatch`）；
 - 自动（push）：push 到 `main` 且改动命中 `ops/**`、`scripts/**`、`backend/**`、`frontend/**`
   或该 workflow 文件本身（`paths` 过滤）；
-- 自动（PR）：**`pull_request` 也跑，paths 与 push 完全一致** —— 目的是合并前就拦住
-  「启动脚本 / 后端启动链路」回归；不碰上述路径的 PR 不会触发。
-- **PR 成本**：Windows runner 约 **2–3 分钟/次**（约为 Linux 的 2×）。改 `backend/**` 的 PR
-  会同时多跑一次 `backend-ci`（Linux）+ 本 workflow（Windows）；`concurrency` 已按 `ref` 取消
-  旧运行，同一 PR 连续推送只保留最新一次。
+- 自动（PR）：`pull_request` 也跑（2026-11-01 分支保护上线后**不再带 paths**，所有 PR 都跑，
+  作为 required check）；合并前就能拦住「启动脚本 / 后端启动链路」回归。
+- **PR 成本**：Windows runner 约 **1–3 分钟/次**（约为 Linux 的 2×）。`concurrency` 已按 `ref`
+  取消旧运行，同一 PR 连续推送只保留最新一次。
 
 **跑什么（8 步）**
 
 | # | 步骤 | 说明 |
 |---|---|---|
-| 1 | `actions/checkout@v4` | — |
-| 2 | `actions/setup-python@v5`（3.11，cache pip） | 缓存键含 `backend/requirements*.txt` |
-| 3 | `actions/setup-node@v4`（24，cache npm） | 缓存键含 `frontend/package-lock.json` |
+| 1 | `actions/checkout@v7` | — |
+| 2 | `actions/setup-python@v7`（3.11，cache pip） | 缓存键含 `backend/requirements*.txt` |
+| 3 | `actions/setup-node@v7`（24，cache npm） | 缓存键含 `frontend/package-lock.json`；Node 24 满足 vite 8 engines |
 | 4 | `python -m pip install -r backend/requirements-dev.txt` | **装到 PATH python（CI 无 venv）** |
 | 5 | `npm ci`（cwd=`frontend`） | 满足 `Assert-FrontendDeps` 对 `frontend/node_modules` 的硬检查 |
 | 6 | `python scripts/audit_delivery.py` | 先跑秒级的启动器契约（单一实现 / 薄转发壳 / ASCII / BOM / 冒烟水分） |
 | 7 | `pwsh -NoProfile -ExecutionPolicy Bypass -File ops/start.ps1 -Mode dev -Verify` | 真启动 + 健康检查 + 自动停止 |
-| 8 | `actions/upload-artifact@v4`（`if: failure()`） | 上传 `var/logs/**` → artifact `windows-startup-logs`（保留 7 天） |
+| 8 | `actions/upload-artifact@v7`（`if: failure()`） | 上传 `var/logs/**` → artifact `windows-startup-logs`（保留 7 天） |
 
 **CI 没有 `backend/.venv`，dev 为什么能跑**：`ops/start.ps1` 的 `Resolve-Python 'dev'` 在 venv
 缺失时会打印 `[WARN] project venv not found` 并**回退到 PATH 上的 `python`**；`demo` / `mobile`
@@ -127,3 +131,7 @@ dev 模式（后端 :8765 + 前端 :5173）→ 等端口 + `GET /api/v1/health` 
 - **首次真实结果只能在 push 后看到**：本机无法复现 runner 的"无 `backend/.venv` + 全新
   `frontend/node_modules`"环境；本机等价验证用 §2 的 `-Verify` 与 §4 的三条命令。
 - 本 workflow 只覆盖 **dev**；demo / mobile 仍靠本机 `-Verify`（§2 实测表）覆盖，暂不进 CI。
+- **Vite 8 迁移（2026-11）时重点观察**：第 5 步 `npm ci`（vite 8 lock/peer 一致性）与第 7 步
+  `Startup self-check`（真启动 vite 8 dev server）。若失败，先看 `var/logs/*-frontend-Vite.err.log`
+  （dev server 起不来 / 端口被占 / 首次预构建超时）。frontend-ci 只覆盖 build + test，
+  **dev 链路只有本 workflow 能验证**，所以 vite 大版本 PR 必须等它绿再合并。

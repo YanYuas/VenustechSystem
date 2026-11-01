@@ -357,14 +357,31 @@ npm run test:coverage # 覆盖率报告（v8；text + json-summary，输出到 f
 
 - provider `v8`，`reporter: ['text', 'json-summary']`；`include: src/**`、排除 views/生成物/样式（见 `vitest.config.ts`）。
 - **阈值棘轮（只许上调）**：`vitest.config.ts` 的 `coverage.thresholds` 当前为
-  `{ lines: 83, branches: 89, functions: 51, statements: 83 }`
-  （2026-11-01 Phase16 实测 84.77 / 90.05 / 52.85 / 84.77，各留约 1.5pp 余量；
-  本次分母未变（lines 7453 / branches 1388 / functions 649），覆盖数纯新增：lines 6127→6318、branches 1155→1250、functions 314→343。
-  历史：Phase13 实测 82.18/89.91/49.44 时维持 `{81,88,48,81}` 未动；Phase12 实测 82.09/89.73/49.2 曾把 functions 45→48。
-  上调历史：`{12,65,40,12}`（Phase5）→ `{20,72,52,20}`（Phase6）→ `{31,76,59,31}`（Phase7）
+  `{ lines: 70, branches: 64, functions: 49, statements: 69 }`
+  （2026-11-01 Phase18（task-66，vite 8 + vitest 5 迁移）启用**覆盖率口径 v2**，实测
+  lines 2146/3022 = 71.01%、branches 1209/1849 = 65.38%、functions 539/1079 = 49.95%、statements 2359/3350 = 70.41%（连跑两次一致），
+  阈值按"实测留约 1pp"重校准为 70/64/49/69；**这不是覆盖率回退，而是 remapper 口径变更**，详见下方「覆盖率口径 v2」。
+  口径 v1（至 Phase17）阈值为 `{83,89,51,83}`、lines covered/total 6329/7464 = 84.79%。
+  上调历史（口径 v1 内）：`{12,65,40,12}`（Phase5）→ `{20,72,52,20}`（Phase6）→ `{31,76,59,31}`（Phase7）
   → `{36,78,63,36}`（Phase8）→ `{40,79,64,40}`（Phase9）→ `{43,81,67,43}`（Phase10）→ `{81,88,45,81}`（Phase11）
-  → `{81,88,48,81}`（Phase12/13）→ 当前）。
+  → `{81,88,48,81}`（Phase12/13）→ `{83,89,51,83}`（Phase16）；口径 v2：`{70,64,49,69}`（Phase18）→ 当前。
   `npm run test:coverage` 与 CI 的 `Coverage (threshold ratchet)` 步骤**都会因此失败**，即覆盖率回退会直接卡住合并。
+- **覆盖率口径 v2（Phase18：vitest 3→5 / coverage-v8 3→5）**：
+  coverage-v8 5 把内部 remapper 从 `v8-to-istanbul` 换成 `ast-v8-to-istanbul`（AST-aware remapping），
+  同一份源码、同一批 578 条测试，统计粒度发生不可逆变化（旧 remapper 路径已移除，`experimentalAstAwareRemapping` 选项不复存在）：
+  | 指标 | 口径 v1（Phase17，v8-to-istanbul） | 口径 v2（Phase18，ast-v8-to-istanbul） |
+  | --- | --- | --- |
+  | lines | 6329/7464 = **84.79%** | 2146/3022 = **71.01%** |
+  | statements | 6329/7464 = 84.79% | 2359/3350 = **70.41%** |
+  | branches | 1262/1403 = 89.95% | 1209/1849 = **65.38%** |
+  | functions | 343/649 = 52.85% | 539/1079 = **49.95%** |
+  逐文件 diff（基线 = main `9ff0005` CI artifact `frontend-coverage`，迁移后同测试集重测）：**167 个文件完全相同、无增删**；
+  .vue 文件 lines 3546→1334（covered 3473→963）、.ts 文件 lines 3918→1688（covered 2856→1183）；
+  典型：`DefaultLayout.vue` 80/80 100% → 2/39 5.12%（旧口径把模板/render 映射行全部计入行数，新口径只计可执行语句）；
+  `router/index.ts` 222/223 → 21/21（旧口径按映射范围逐行计，新口径只计 AST 语句起始行）。
+  **反证漂移来源**（同一批测试、逐项隔离）：`vite 8.3.5 + plugin-vue 6.0.10 + vitest 5` = 2146/3022；
+  `vite 7.3.7 + plugin-vue 6.0.10 + vitest 5` = 2146/3022；`vite 6.4.5 + plugin-vue 5.2.4 + vitest 5` = 2146/3022
+  → 与 vite 内核 / plugin-vue 版本无关，纯 vitest/coverage-v8 5 的 remapper 变化；因此选择显式重校准而不是掩盖。
 - **统计面变化时如何调整阈值（规则）**：覆盖率的百分比分母会随"测试真实 import 了哪些模块"变化，
   因此**每次调阈值必须同时记录「百分比」与「covered/total 绝对值」，用绝对值证明是上升而非回退**。
   调整流程：
@@ -374,7 +391,10 @@ npm run test:coverage # 覆盖率报告（v8；text + json-summary，输出到 f
   3. 若 covered 变小 → 视为真实回退，禁止下调阈值，必须补测试；
   4. 百分比阈值仍按"实测留约 1pp"设置，绝对值变化记录在回信/CHANGELOG；
   5. 百分比小幅波动（如 lines 82.42→82.09）需**连跑两次确认稳定**后再判定，避免把抖动当回退；
-  6. **不为"升"而抬阈值**：当实测已满足当前阈值且余量合理（≥1pp）时保持不动，避免把正常抖动变成门禁红。
+  6. **不为"升"而抬阈值**：当实测已满足当前阈值且余量合理（≥1pp）时保持不动，避免把正常抖动变成门禁红；
+  7. **口径变更（provider/remapper 换代）不是回退**：必须做①逐文件 diff（同文件集合）②双口径 covered/total 双记录
+     ③隔离实验证明与构建内核无关 ④文档+注释写明；重校准后的阈值**在新口径内继续只许上调**；
+     不允许用"口径变化"为由掩盖真实 covered 下降（若 covered 绝对值也下降需先补测试）。
   例 1（Phase11 task-46）：`router` 测试真实 `await` 24 个 view 模块后，
   lines 44.01%→82.4%（covered 3056→6092）、branches 82.36%→89.92%（832→1026）、
   functions 65.86%→46.36% 但 **covered 245→274 且分母 382→591**（新模块进入统计面）→
@@ -390,8 +410,11 @@ npm run test:coverage # 覆盖率报告（v8；text + json-summary，输出到 f
   - 不要断言未映射/不存在的东西（如未映射的 CSS class），否则断言与实现自相矛盾。
   - 断言分辨率要够：区分阈值应显著大于正常波动（例：松手首帧位移有清零 ≈1.6px、无清零 ≈96px，取 `<5px` 才有区分力）。
 - **测试并发**：`test.maxWorkers: 2`。jsdom + `@vue/test-utils` 组件测试内存占用高，默认按 CPU 核数并发在多文件（18+）时会 OOM（本机 16 核曾 `FATAL ERROR: Zone Allocation failed`）；显式限并发使本地与 2 核 CI runner 行为一致。
-- **规则**：阈值只允许上调；若因重构/删测试需要下调，**必须在 `CHANGELOG.md` 说明理由**并经评审，不允许静默调低。
+- **规则**：阈值只允许上调（**同一口径内**）；若因重构/删测试需要下调，**必须在 `CHANGELOG.md` 说明理由**并经评审，不允许静默调低。
+  口径变更（如 Phase18 vitest5 remapper 换代）走「覆盖率口径 v2」的显式重校准流程，旧阈值随旧口径失效，不视为"下调"。
 - 口径提醒：`lines` 的分母是 `src/**/*.{ts,vue}` 全量实现文件（含大量未测 Vue 组件），且 views 按约定排除；
+  口径 v2 下 lines/statements 只计 AST 可执行语句（旧 v1 按 sourcemap 映射范围逐行计，含大量模板/render 行），
+  故 v2 的 lines 百分比与 v1 不可直接横比，只能在同一口径内做棘轮。
   v8 provider 对"从未执行的文件"不生成 branch/function 计数，故 `branches/functions` 会显著高于 `lines` —— 评估覆盖率以 **lines** 为主。
 
 ---
